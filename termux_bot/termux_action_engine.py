@@ -20,7 +20,17 @@ if current_dir not in sys.path:
 if parent_dir not in sys.path:
     sys.path.insert(0, parent_dir)
 
-from pc_bot.pr_api import PrSocialAPI
+try:
+    from pr_api import PrSocialAPI
+except ImportError:
+    try:
+        from pc_bot.pr_api import PrSocialAPI
+    except ImportError:
+        for p in ["/root/prsocial", "/data/data/com.termux/files/home/prsocial"]:
+            if os.path.isdir(p) and p not in sys.path:
+                sys.path.insert(0, p)
+        from pc_bot.pr_api import PrSocialAPI
+
 from browser_termux import BrowserTermux
 
 # Couleurs ANSI
