@@ -290,7 +290,7 @@ class TermuxBotApp:
         if unblocked == 0:
             print(f"{GREEN}✓ Aucune tâche orpheline bloquante. Prêt pour l'automatisation.{RESET}")
 
-        target_platforms = ["threads", "reddit", "tiktok", "instagram", "youtube", "facebook", "telegram", "twitter", "snapchat", "github", "discord"]
+        target_platforms = ["threads", "reddit", "tiktok", "instagram", "youtube", "facebook", "linkedin", "telegram", "twitter", "snapchat", "github", "discord", "spotify"]
         active_list = [p for p in target_platforms if p in self.approved_accounts] if self.approved_accounts else target_platforms
 
         print(f"{WHITE}Réseaux surveillés : {', '.join([f'{CYAN}{p.upper()}{RESET}' for p in active_list])}\n")
@@ -327,7 +327,7 @@ class TermuxBotApp:
                                 time.sleep(1)
                             continue
 
-                        # Résolution URL cible (Threads / Reddit / etc.)
+                        # Résolution URL cible (Threads / Reddit / LinkedIn / etc.)
                         target_url = res_start.get("task", {}).get("target_url") or t.get("target_url") or ""
                         if not target_url:
                             u_name = (res_start.get("task", {}).get("target_username") or t.get("target_username") or "").strip().lstrip("@")
@@ -337,14 +337,62 @@ class TermuxBotApp:
                                 elif plat in ["twitter", "x"]: target_url = f"https://x.com/{u_name}"
                                 elif plat == "instagram": target_url = f"https://www.instagram.com/{u_name}"
                                 elif plat == "tiktok": target_url = f"https://www.tiktok.com/@{u_name}"
+                                elif plat == "linkedin": target_url = f"https://www.linkedin.com/in/{u_name}"
 
                         wait_sec = int(res_start.get("submit_after_sec") or 5)
                         api_check = res_start.get("api_check_enabled", 0)
 
+                        # Préparation rigoureuse du commentaire si l'action est un commentaire
+                        comment_text = None
+                        if "COMMENT" in action:
+                            assigned = (
+                                res_start.get("completion", {}).get("assigned_comment")
+                                or res_start.get("task", {}).get("assigned_comment")
+                                or t.get("assigned_comment")
+                            )
+                            if not assigned:
+                                c_list = res_start.get("task", {}).get("comment_list") or t.get("comment_list")
+                                if isinstance(c_list, str):
+                                    try:
+                                        c_list = json.loads(c_list)
+                                    except Exception:
+                                        c_list = [line.strip() for line in c_list.split("\n") if line.strip()]
+                                if isinstance(c_list, list) and c_list:
+                                    assigned = random.choice(c_list)
+
+                            c_type = (res_start.get("task", {}).get("comment_type") or t.get("comment_type") or "").lower()
+                            if not assigned and ("emoji" in c_type or "emoji" in action.lower()):
+                                assigned = random.choice(["🔥", "👏", "🚀", "❤️", "👍", "✨", "💯", "🙌"])
+
+                            if not assigned:
+                                if plat == "linkedin":
+                                    assigned = random.choice([
+                                        "Great insights, thanks for sharing! 👏",
+                                        "Very inspiring and relevant topic! 🚀",
+                                        "Thanks for this valuable perspective! ✨",
+                                        "Great share, very insightful! 💡"
+                                    ])
+                                elif plat in ["youtube", "tiktok"]:
+                                    assigned = random.choice([
+                                        "Top video ! 🔥",
+                                        "Great content, keep it up! 👏",
+                                        "Super vidéo ! 👍",
+                                        "Awesome! ✨"
+                                    ])
+                                else:
+                                    assigned = random.choice([
+                                        "Great content! 👍",
+                                        "Very interesting, thanks for sharing! ✨",
+                                        "Top ! 🔥",
+                                        "Nice post! 👏"
+                                    ])
+                            comment_text = str(assigned).strip()
+                            print(f"  💬 Commentaire préparé : {MAGENTA}'{comment_text}'{RESET}")
+
                         print(f"  🌐 URL : {DIM}{target_url}{RESET}")
                         print(f"  🤖 Exécution en arrière-plan...")
                         ok_act, msg_act, shot_path = self.browser.execute_task_action(
-                            platform=plat, action=action, target_url=target_url, task_id=task_id
+                            platform=plat, action=action, target_url=target_url, task_id=task_id, comment_text=comment_text
                         )
 
                         is_valid = False

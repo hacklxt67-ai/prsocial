@@ -105,8 +105,9 @@ class BrowserTermux:
         screenshot_path = os.path.join(SCREENSHOT_DIR, f"termux_task_{task_id}_{int(time.time())}.png")
 
         try:
-            driver.get(target_url)
-            time.sleep(3.5)
+            if target_url:
+                driver.get(target_url)
+                time.sleep(3.5)
 
             p = platform.lower()
             act = action.lower()
@@ -123,6 +124,8 @@ class BrowserTermux:
                 self._handle_instagram(driver, act, comment_text)
             elif "youtube" in p:
                 self._handle_youtube(driver, act, comment_text)
+            elif "linkedin" in p:
+                self._handle_linkedin(driver, act, comment_text)
             elif "telegram" in p:
                 self._handle_telegram(driver)
             elif "github" in p:
@@ -133,8 +136,15 @@ class BrowserTermux:
                 self._handle_twitter(driver, act, comment_text)
             elif "snapchat" in p or "snapchat.com" in target_url:
                 self._handle_snapchat(driver, act)
+            elif "spotify" in p:
+                self._handle_spotify(driver, act)
 
-            time.sleep(2.0)
+            # Si commentaire, délai supplémentaire pour que le commentaire apparaisse bien à l'écran
+            if "comment" in act:
+                time.sleep(3.5)
+            else:
+                time.sleep(2.0)
+
             driver.save_screenshot(screenshot_path)
             ensure_unique_screenshot(screenshot_path)
             return True, "Action effectuée et capture enregistrée", screenshot_path
@@ -161,6 +171,36 @@ class BrowserTermux:
             """)
             time.sleep(1)
         except Exception: pass
+
+        if "comment" in action:
+            c_js = """
+            var txt = arguments[0] || 'Great! 👍';
+            var replyBtn = document.querySelector('svg[aria-label*="Répondre" i], svg[aria-label*="Reply" i]');
+            if(replyBtn){
+                var p = replyBtn.closest('div[role="button"]') || replyBtn.parentElement;
+                if(p) p.click();
+            }
+            setTimeout(function(){
+                var box = document.querySelector('div[role="textbox"][contenteditable="true"], div[aria-label*="répondre" i]');
+                if(box){
+                    box.focus();
+                    document.execCommand('insertText', false, txt);
+                    box.dispatchEvent(new Event('input', { bubbles: true }));
+                    setTimeout(function(){
+                        var btns = document.querySelectorAll('div[role="button"], button');
+                        for(var i=0; i<btns.length; i++){
+                            var t = (btns[i].textContent||'').trim().toLowerCase();
+                            if(t === 'publier' || t === 'post' || t === 'reply'){ btns[i].click(); break; }
+                        }
+                    }, 600);
+                }
+            }, 800);
+            """
+            try:
+                driver.execute_script(c_js, comment_text)
+                time.sleep(2.0)
+            except Exception: pass
+            return
 
         if "follow" in action or "suivre" in action:
             driver.execute_script("""
@@ -205,6 +245,33 @@ class BrowserTermux:
             time.sleep(1)
         except Exception: pass
 
+        if "comment" in action:
+            c_js = """
+            var txt = arguments[0] || 'Great post! 👍';
+            var composer = document.querySelector('shreddit-comment-composer, div[slot="rte"], div[contenteditable="true"], textarea[name="comment"]');
+            if(!composer){
+                var cBtn = document.querySelector('button[aria-label*="comment" i], button[aria-label*="Ajouter un commentaire" i]');
+                if(cBtn) cBtn.click();
+            }
+            setTimeout(function(){
+                var box = document.querySelector('div[slot="rte"] div[contenteditable="true"], textarea[name="comment"], div[role="textbox"]');
+                if(box){
+                    box.focus();
+                    document.execCommand('insertText', false, txt);
+                    box.dispatchEvent(new Event('input', { bubbles: true }));
+                    setTimeout(function(){
+                        var submitBtn = document.querySelector('shreddit-comment-composer button[type="submit"], button[slot="submit-button"]');
+                        if(submitBtn) submitBtn.click();
+                    }, 500);
+                }
+            }, 800);
+            """
+            try:
+                driver.execute_script(c_js, comment_text)
+                time.sleep(2.0)
+            except Exception: pass
+            return
+
         if "upvote" in action or "vote" in action or "like" in action:
             driver.execute_script("""
             var up = document.querySelector('button[upvote-button], shreddit-post button[aria-label*="upvote" i], button[data-click-id="upvote"], button[aria-label*="vote positif" i]');
@@ -220,12 +287,59 @@ class BrowserTermux:
             """)
 
     def _handle_tiktok(self, driver, action: str, comment_text: Optional[str] = None):
-        driver.execute_script("""
-        var btn = document.querySelector('[data-e2e="follow-button"], [data-e2e="user-follow-button"]');
-        if(btn) btn.click();
-        """)
+        if "comment" in action:
+            c_js = """
+            var txt = arguments[0] || 'Great video! 👍';
+            var cInput = document.querySelector('div[contenteditable="true"][data-e2e*="comment" i], textarea[placeholder*="comment" i], [data-e2e="comment-input"]');
+            if(cInput){
+                cInput.focus();
+                document.execCommand('insertText', false, txt);
+                cInput.dispatchEvent(new Event('input', { bubbles: true }));
+                setTimeout(function(){
+                    var pBtn = document.querySelector('[data-e2e="comment-post"]');
+                    if(pBtn) pBtn.click();
+                }, 500);
+            }
+            """
+            try:
+                driver.execute_script(c_js, comment_text)
+                time.sleep(2.0)
+            except Exception: pass
+            return
+
+        if "like" in action or "aimer" in action:
+            driver.execute_script("""
+            var likeBtn = document.querySelector('[data-e2e="like-icon"], [data-e2e="browse-like-icon"], [data-e2e="video-like-button"]');
+            if(likeBtn){
+                var b = (likeBtn.tagName==='BUTTON')?likeBtn:(likeBtn.closest('button')||likeBtn);
+                b.click();
+            }
+            """)
+        else:
+            driver.execute_script("""
+            var btn = document.querySelector('[data-e2e="follow-button"], [data-e2e="user-follow-button"]');
+            if(btn) btn.click();
+            """)
 
     def _handle_facebook(self, driver, action: str, comment_text: Optional[str] = None):
+        if "comment" in action:
+            c_js = """
+            var txt = arguments[0] || 'Top ! 👍';
+            var box = document.querySelector('div[role="textbox"][aria-label*="commentaire" i], div[role="textbox"][aria-label*="comment" i]');
+            if(box){
+                box.focus();
+                document.execCommand('insertText', false, txt);
+                box.dispatchEvent(new Event('input', { bubbles: true }));
+                var enterEvent = new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true });
+                box.dispatchEvent(enterEvent);
+            }
+            """
+            try:
+                driver.execute_script(c_js, comment_text)
+                time.sleep(2.0)
+            except Exception: pass
+            return
+
         driver.execute_script("""
         var btns = document.querySelectorAll('button, [role="button"]');
         for(var i=0; i<btns.length; i++){
@@ -235,21 +349,123 @@ class BrowserTermux:
         """)
 
     def _handle_instagram(self, driver, action: str, comment_text: Optional[str] = None):
-        driver.execute_script("""
-        var btns = document.querySelectorAll('button');
-        for(var i=0; i<btns.length; i++){
-            var t = (btns[i].textContent||'').trim().toLowerCase();
-            if(t==='suivre'||t==='follow'||t==="s'abonner"){ btns[i].click(); break; }
-        }
-        """)
+        if "comment" in action:
+            c_js = """
+            var txt = arguments[0] || 'Super! 🔥';
+            var ta = document.querySelector('textarea[aria-label*="Ajouter un commentaire" i], textarea[placeholder*="commentaire" i], textarea[placeholder*="comment" i], textarea');
+            if(ta){
+                ta.focus();
+                ta.value = txt;
+                ta.dispatchEvent(new Event('input', { bubbles: true }));
+                setTimeout(function(){
+                    var btns = document.querySelectorAll('button, div[role="button"]');
+                    for(var i=0; i<btns.length; i++){
+                        var t = (btns[i].textContent||'').trim().toLowerCase();
+                        if(t === 'publier' || t === 'post'){ btns[i].click(); break; }
+                    }
+                }, 500);
+            }
+            """
+            try:
+                driver.execute_script(c_js, comment_text)
+                time.sleep(2.0)
+            except Exception: pass
+            return
+
+        if "like" in action or "aimer" in action:
+            driver.execute_script("""
+            var svg = document.querySelector('svg[aria-label*="J\'aime" i], svg[aria-label*="Like" i]');
+            if(svg){ var p = svg.closest('button, div[role="button"]')||svg.parentElement; if(p) p.click(); }
+            """)
+        else:
+            driver.execute_script("""
+            var btns = document.querySelectorAll('button');
+            for(var i=0; i<btns.length; i++){
+                var t = (btns[i].textContent||'').trim().toLowerCase();
+                if(t==='suivre'||t==='follow'||t==="s'abonner"){ btns[i].click(); break; }
+            }
+            """)
 
     def _handle_youtube(self, driver, action: str, comment_text: Optional[str] = None):
+        if "comment" in action:
+            c_js = """
+            var txt = arguments[0] || 'Great video! 👏';
+            window.scrollTo(0, 450);
+            var ph = document.querySelector('#simplebox-placeholder');
+            if(ph) ph.click();
+            setTimeout(function(){
+                var inp = document.querySelector('#contenteditable-root, div[role="textbox"]#contenteditable-root');
+                if(inp){
+                    inp.focus();
+                    document.execCommand('insertText', false, txt);
+                    inp.dispatchEvent(new Event('input', { bubbles: true }));
+                    setTimeout(function(){
+                        var sub = document.querySelector('#submit-button button, button[aria-label*="Commenter" i], button[aria-label*="Comment" i]');
+                        if(sub) sub.click();
+                    }, 600);
+                }
+            }, 800);
+            """
+            try:
+                driver.execute_script(c_js, comment_text)
+                time.sleep(2.5)
+            except Exception: pass
+            return
+
         driver.execute_script("""
         var sub = document.querySelector('#subscribe-button button, ytd-subscribe-button-renderer button');
         if(sub) sub.click();
         var like = document.querySelector('like-button-view-model button, #segmented-like-button button');
         if(like) like.click();
         """)
+
+    def _handle_linkedin(self, driver, action: str, comment_text: Optional[str] = None):
+        if "comment" in action:
+            c_js = """
+            var txt = arguments[0] || 'Great insights, thanks for sharing! 👏';
+            var commBtn = document.querySelector('button[aria-label*="Commenter" i], button[aria-label*="Comment" i], button.comment-button');
+            if(commBtn) commBtn.click();
+            setTimeout(function(){
+                var box = document.querySelector('div.editor-content p, div[role="textbox"], div[contenteditable="true"]');
+                if(box){
+                    box.focus();
+                    document.execCommand('insertText', false, txt);
+                    box.dispatchEvent(new Event('input', { bubbles: true }));
+                    setTimeout(function(){
+                        var pubBtn = document.querySelector('button.comments-comment-box__submit-button, button[class*="submit-button" i]');
+                        if(pubBtn) pubBtn.click();
+                    }, 600);
+                }
+            }, 800);
+            """
+            try:
+                driver.execute_script(c_js, comment_text)
+                time.sleep(2.5)
+            except Exception: pass
+            return
+
+        if "connection" in action or "connect" in action:
+            driver.execute_script("""
+            var btns = document.querySelectorAll('button, [role="button"]');
+            for(var i=0; i<btns.length; i++){
+                var t = (btns[i].textContent||'').trim().toLowerCase();
+                var aria = (btns[i].getAttribute('aria-label')||'').toLowerCase();
+                if(t==='se connecter'||t==='connect'||aria.indexOf('connect')!==-1||aria.indexOf('inviter')!==-1){ btns[i].click(); break; }
+            }
+            """)
+        elif "like" in action or "aimer" in action:
+            driver.execute_script("""
+            var lk = document.querySelector('button.react-button__trigger, button[aria-label*="J\'aime" i], button[aria-label*="Like" i]');
+            if(lk) lk.click();
+            """)
+        else:
+            driver.execute_script("""
+            var btns = document.querySelectorAll('button, [role="button"]');
+            for(var i=0; i<btns.length; i++){
+                var t = (btns[i].textContent||'').trim().toLowerCase();
+                if(t==='suivre'||t==='follow'||t.indexOf('+ suivre')!==-1){ btns[i].click(); break; }
+            }
+            """)
 
     def _handle_telegram(self, driver):
         driver.execute_script("""
@@ -275,6 +491,30 @@ class BrowserTermux:
         """)
 
     def _handle_twitter(self, driver, action: str, comment_text: Optional[str] = None):
+        if "comment" in action:
+            c_js = """
+            var txt = arguments[0] || 'Nice! 🔥';
+            var replyBtn = document.querySelector('button[data-testid="reply"]');
+            if(replyBtn) replyBtn.click();
+            setTimeout(function(){
+                var box = document.querySelector('div[role="textbox"][data-testid="tweetTextarea_0"]');
+                if(box){
+                    box.focus();
+                    document.execCommand('insertText', false, txt);
+                    box.dispatchEvent(new Event('input', { bubbles: true }));
+                    setTimeout(function(){
+                        var tweetBtn = document.querySelector('button[data-testid="tweetButton"]');
+                        if(tweetBtn) tweetBtn.click();
+                    }, 600);
+                }
+            }, 800);
+            """
+            try:
+                driver.execute_script(c_js, comment_text)
+                time.sleep(2.0)
+            except Exception: pass
+            return
+
         driver.execute_script("""
         var fol = document.querySelector('button[data-testid$="-follow"], button[data-testid="placementTracking"], [aria-label*="Follow @" i]');
         if(fol) fol.click();
@@ -284,4 +524,14 @@ class BrowserTermux:
         driver.execute_script("""
         var s = document.querySelector('button[class*="Subscribe" i], button[class*="Add" i]');
         if(s) s.click();
+        """)
+
+    def _handle_spotify(self, driver, action: str):
+        driver.execute_script("""
+        var btns = document.querySelectorAll('button');
+        for(var i=0; i<btns.length; i++){
+            var aria = (btns[i].getAttribute('aria-label')||'').toLowerCase();
+            var t = (btns[i].textContent||'').trim().toLowerCase();
+            if(aria.indexOf('suivre')!==-1||aria.indexOf('follow')!==-1||t==='suivre'||t==='follow'){ btns[i].click(); break; }
+        }
         """)
