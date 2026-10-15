@@ -13,6 +13,14 @@ from selenium.webdriver.support import expected_conditions as EC
 
 logger = logging.getLogger("BrowserBot")
 
+try:
+    from screenshot_guard import ScreenshotGuard
+except ImportError:
+    try:
+        from pc_bot.screenshot_guard import ScreenshotGuard
+    except ImportError:
+        ScreenshotGuard = None
+
 DEFAULT_PROFILE_DIR = r"D:\social_pc_bot\chrome_profile"
 SCREENSHOT_DIR = r"D:\social_pc_bot\screenshots"
 
@@ -249,9 +257,22 @@ class BrowserBot:
                 action_done = True # Navigation simple
 
             time.sleep(2.0) # Laisser l'animation / confirmation d'action s'afficher
+
+            # NETTOYAGE DOM & INJECTION DE PREUVE VISUELLE STRICTE
+            if ScreenshotGuard:
+                ScreenshotGuard.clean_and_prepare_dom(driver, platform, action, comment_text)
+
             driver.save_screenshot(screenshot_path)
             ensure_unique_screenshot(screenshot_path)
-            return True, "Action effectuée et capture enregistrée", screenshot_path
+
+            # CONTRÔLE DE SÉCURITÉ POST-CAPTURE STRICT ANTI-REJET
+            if ScreenshotGuard:
+                ok_guard, guard_msg = ScreenshotGuard.strict_pre_submission_check(driver, platform, screenshot_path, True)
+                if not ok_guard:
+                    logger.warning(f"🛡️ Capture PC invalidée par le garde-fou: {guard_msg}")
+                    return False, f"Rejet interne de sécurité (Anti-Ban) : {guard_msg}", screenshot_path
+
+            return True, "Action effectuée et capture validée", screenshot_path
 
         except Exception as e:
             try:

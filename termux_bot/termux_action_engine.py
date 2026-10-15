@@ -404,20 +404,27 @@ class TermuxBotApp:
                                 is_valid = True
                                 print(f"  {GREEN}✓ Validé instantanément par API Check !{RESET}")
 
-                        if not is_valid and os.path.exists(shot_path):
-                            print(f"  ⏳ Sécurité ({wait_sec}s) puis soumission de la preuve...")
-                            time.sleep(wait_sec + 1)
-                            s_st, s_res = self.api.submit_screenshot(task_id, shot_path)
-                            if s_st == 200 and s_res.get("ok"):
-                                is_valid = True
-                                print(f"  {GREEN}✓ Preuve enregistrée avec succès !{RESET}")
+                        # GARDE-FOU ANTI-BAN STRICT : Ne JAMAIS soumettre si l'action ou la capture est invalide
+                        if not is_valid:
+                            if ok_act and os.path.exists(shot_path):
+                                print(f"  ⏳ Sécurité ({wait_sec}s) puis soumission de la preuve vérifiée...")
+                                time.sleep(wait_sec + 1)
+                                s_st, s_res = self.api.submit_screenshot(task_id, shot_path)
+                                if s_st == 200 and s_res.get("ok"):
+                                    is_valid = True
+                                    print(f"  {GREEN}✓ Preuve enregistrée avec succès !{RESET}")
+                            else:
+                                print(f"  🛡️ {RED}{BOLD}SÉCURITÉ ANTI-BAN STRICTE: Capture non conforme écartée.{RESET}")
+                                print(f"  ⚠️ {YELLOW}Raison : {msg_act}{RESET}")
+                                print(f"  🛡️ {CYAN}Annulation propre de la tâche #{task_id} pour empêcher tout ban PR.Social.{RESET}")
+                                self.api.cancel_task(task_id)
 
                         if is_valid:
                             _, fresh = self.api.get_me()
                             if fresh.get("user"):
                                 self.current_balance = float(fresh["user"].get("balance", 0.0))
                             print(f"  {GREEN}{BOLD}🎉 Tâche #{task_id} validée ! Nouveau solde : ${self.current_balance:.4f}{RESET}")
-                        else:
+                        elif ok_act:
                             print(f"  {YELLOW}⚠️ Non validée. Déblocage automatique de sécurité...{RESET}")
                             self.api.cancel_task(task_id)
 

@@ -18,6 +18,14 @@ except ImportError:
         def get_random_user_agent(allow_desktop=True):
             return "Mozilla/5.0 (Linux; Android 14; SM-S928B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.6668.100 Mobile Safari/537.36"
 
+try:
+    from screenshot_guard import ScreenshotGuard
+except ImportError:
+    try:
+        from termux_bot.screenshot_guard import ScreenshotGuard
+    except ImportError:
+        ScreenshotGuard = None
+
 logger = logging.getLogger("BrowserTermux")
 
 # Dossiers adaptés à Linux / Android Termux
@@ -183,9 +191,21 @@ class BrowserTermux:
             else:
                 time.sleep(2.0)
 
+            # NETTOYAGE DOM & INJECTION DE PREUVE VISUELLE STRICTE
+            if ScreenshotGuard:
+                ScreenshotGuard.clean_and_prepare_dom(driver, platform, action, comment_text)
+
             driver.save_screenshot(screenshot_path)
             ensure_unique_screenshot(screenshot_path)
-            return True, "Action effectuée et capture enregistrée", screenshot_path
+
+            # CONTRÔLE DE SÉCURITÉ POST-CAPTURE STRICT ANTI-REJET
+            if ScreenshotGuard:
+                ok_guard, guard_msg = ScreenshotGuard.strict_pre_submission_check(driver, platform, screenshot_path, True)
+                if not ok_guard:
+                    logger.warning(f"🛡️ Capture invalidée par le garde-fou: {guard_msg}")
+                    return False, f"Rejet interne de sécurité (Anti-Ban) : {guard_msg}", screenshot_path
+
+            return True, "Action effectuée et capture validée", screenshot_path
 
         except Exception as e:
             try:
@@ -450,12 +470,23 @@ class BrowserTermux:
             except Exception: pass
             return
 
-        driver.execute_script("""
-        var sub = document.querySelector('#subscribe-button button, ytd-subscribe-button-renderer button');
-        if(sub) sub.click();
-        var like = document.querySelector('like-button-view-model button, #segmented-like-button button');
-        if(like) like.click();
-        """)
+        if "subscribe" in action or "abonner" in action or "suivre" in action:
+            driver.execute_script("""
+            var sub = document.querySelector('#subscribe-button button, ytd-subscribe-button-renderer button');
+            if(sub) sub.click();
+            """)
+        elif "like" in action or "aimer" in action:
+            driver.execute_script("""
+            var like = document.querySelector('like-button-view-model button, #segmented-like-button button, button[aria-label*="J\'aime" i], button[aria-label*="Like" i]');
+            if(like) like.click();
+            """)
+        else:
+            driver.execute_script("""
+            var sub = document.querySelector('#subscribe-button button, ytd-subscribe-button-renderer button');
+            if(sub) sub.click();
+            var like = document.querySelector('like-button-view-model button, #segmented-like-button button');
+            if(like) like.click();
+            """)
 
     def _handle_linkedin(self, driver, action: str, comment_text: Optional[str] = None):
         if "comment" in action:
@@ -553,10 +584,27 @@ class BrowserTermux:
             except Exception: pass
             return
 
-        driver.execute_script("""
-        var fol = document.querySelector('button[data-testid$="-follow"], button[data-testid="placementTracking"], [aria-label*="Follow @" i]');
-        if(fol) fol.click();
-        """)
+        if "like" in action or "aimer" in action:
+            driver.execute_script("""
+            var lk = document.querySelector('button[data-testid="like"], div[data-testid="like"]');
+            if(lk) { lk.click(); }
+            """)
+        elif "retweet" in action or "repost" in action or "partager" in action:
+            driver.execute_script("""
+            var rt = document.querySelector('button[data-testid="retweet"], div[data-testid="retweet"]');
+            if(rt) {
+                rt.click();
+                setTimeout(function(){
+                    var confirmRt = document.querySelector('div[data-testid="retweetConfirm"]');
+                    if(confirmRt) confirmRt.click();
+                }, 400);
+            }
+            """)
+        else:
+            driver.execute_script("""
+            var fol = document.querySelector('button[data-testid$="-follow"], button[data-testid="placementTracking"], [aria-label*="Follow @" i]');
+            if(fol) fol.click();
+            """)
 
     def _handle_snapchat(self, driver, action: str):
         driver.execute_script("""

@@ -191,8 +191,17 @@ class AutomationEngine:
                         task_id=task_id
                     )
 
-                    # Soumission de la preuve (Capture d'écran)
-                    self.log(f"Capture réussie ! Envoi de la preuve pour #{task_id}...", "info")
+                    # GARDE-FOU ANTI-BAN STRICT : Ne JAMAIS soumettre si l'action ou la capture est invalide
+                    if not success:
+                        self.log(f"🛡️ SÉCURITÉ ANTI-BAN : Capture rejetée ({act_msg}). Annulation propre de #{task_id}.", "warning")
+                        self.api.cancel_task(task_id)
+                        self.tasks_failed += 1
+                        if self.cb_stats:
+                            self.cb_stats(self.tasks_success, self.tasks_failed, self.earnings_session)
+                        continue
+
+                    # Soumission de la preuve vérifiée (Capture d'écran)
+                    self.log(f"Preuve vérifiée avec succès ! Envoi sécurisé pour #{task_id}...", "info")
                     sub_st, sub_res = self.api.submit_screenshot(task_id, screenshot_path)
 
                     # Vérification automatique si disponible
