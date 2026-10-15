@@ -52,21 +52,24 @@ proot-distro login debian -- bash -c '
 '
 
 # 5. Création du lanceur rapide dans Termux
+CURRENT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LAUNCHER="$HOME/lancer_bot.sh"
-cat << 'EOF' > "$LAUNCHER"
+cat << EOF > "$LAUNCHER"
 #!/data/data/com.termux/files/usr/bin/bash
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BOT_DIR="$SCRIPT_DIR/social1/termux_bot"
-
-if [ ! -d "$BOT_DIR" ]; then
-    BOT_DIR="$HOME/termux_bot"
+BOT_DIR="$CURRENT_DIR"
+if [ ! -d "\$BOT_DIR" ]; then
+    if [ -d "\$HOME/prsocial/termux_bot" ]; then
+        BOT_DIR="\$HOME/prsocial/termux_bot"
+    elif [ -d "\$HOME/pr_social/termux_bot" ]; then
+        BOT_DIR="\$HOME/pr_social/termux_bot"
+    fi
 fi
 
 echo "============================================================"
 echo "⚡ Démarrage du PR.Social Bot sous Termux (Android Debian)"
 echo "============================================================"
-proot-distro login debian -- bash -c "
-    cd '$BOT_DIR' || cd /root/termux_bot || cd /data/data/com.termux/files/home
+proot-distro login debian --bind "\$BOT_DIR":/root/termux_bot -- bash -c "
+    cd /root/termux_bot
     python3 termux_action_engine.py
 "
 EOF
