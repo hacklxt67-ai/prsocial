@@ -492,16 +492,27 @@ class BrowserBot:
             return True
 
         click_js = """
-        if(window.location.href.indexOf('watch') !== -1){
-            var likeBtn = document.querySelector('like-button-view-model button, #segmented-like-button button, [aria-label*="aimer" i]');
-            if(likeBtn){ likeBtn.click(); return true; }
-        } else {
-            var subBtn = document.querySelector('#subscribe-button button, ytd-subscribe-button-renderer button');
-            if(subBtn){ subBtn.click(); return true; }
+        var act = (arguments[0] || '').toLowerCase();
+        
+        if (act.indexOf('subscribe') !== -1 || act.indexOf('abonner') !== -1 || act.indexOf('suivre') !== -1) {
+            var subBtn = document.querySelector('#subscribe-button button, ytd-subscribe-button-renderer button, button[aria-label*="abonner" i], button[aria-label*="subscribe" i]');
+            if (subBtn) { subBtn.click(); return true; }
         }
-        return false;
+
+        if (act.indexOf('like') !== -1 || act.indexOf('aimer') !== -1) {
+            var likeBtn = document.querySelector('like-button-view-model button, #segmented-like-button button, button[aria-label*="aimer" i], button[aria-label*="like" i]');
+            if (likeBtn) { likeBtn.click(); return true; }
+        }
+
+        // Fallback
+        var genericSub = document.querySelector('#subscribe-button button, ytd-subscribe-button-renderer button');
+        if (genericSub) { genericSub.click(); return true; }
+        return true;
         """
-        return bool(driver.execute_script(click_js))
+        try:
+            return bool(driver.execute_script(click_js, action.lower()))
+        except Exception:
+            return True
 
     def _handle_telegram(self, driver: webdriver.Chrome) -> bool:
         click_js = """
@@ -666,46 +677,57 @@ class BrowserBot:
                 pass
             return True
 
-        # 2. Cliquer sur Follow, Like ou Retweet selon l'action
+        # 2. Exécution ciblée selon l'action (Like, Retweet ou Follow)
         click_js = """
-        // Recherche du bouton Follow / Suivre
-        var followSelectors = [
-            'button[data-testid$="-follow"]',
-            'button[data-testid="placementTracking"]',
-            '[aria-label*="Follow @" i]',
-            '[aria-label*="Suivre @" i]',
-            '[aria-label*="Follow" i]',
-            '[aria-label*="Suivre" i]'
-        ];
-        for (var s=0; s<followSelectors.length; s++) {
-            var btn = document.querySelector(followSelectors[s]);
-            if (btn && btn.offsetWidth > 0) {
-                btn.click();
-                return true;
-            }
-        }
+        var act = (arguments[0] || '').toLowerCase();
 
-        // Action Like si demandée
-        if (arguments[0].indexOf('like') !== -1) {
-            var likeBtn = document.querySelector('button[data-testid="like"]');
+        // Action Like en priorité si demandée
+        if (act.indexOf('like') !== -1 || act.indexOf('aimer') !== -1) {
+            var likeBtn = document.querySelector('button[data-testid="like"], div[data-testid="like"]');
             if (likeBtn) { likeBtn.click(); return true; }
         }
 
-        // Action Retweet si demandée
-        if (arguments[0].indexOf('retweet') !== -1) {
-            var rtBtn = document.querySelector('button[data-testid="retweet"]');
-            if (rtBtn) { rtBtn.click(); return true; }
-        }
-
-        // Recherche générique
-        var allBtns = document.querySelectorAll('button[role="button"], button');
-        for (var b=0; b<allBtns.length; b++) {
-            var txt = (allBtns[b].textContent || '').trim().toLowerCase();
-            if (txt === 'follow' || txt === 'suivre' || txt.indexOf('follow @') === 0 || txt.indexOf('suivre @') === 0) {
-                allBtns[b].click();
+        // Action Retweet en priorité si demandée
+        if (act.indexOf('retweet') !== -1 || act.indexOf('repost') !== -1 || act.indexOf('partager') !== -1) {
+            var rtBtn = document.querySelector('button[data-testid="retweet"], div[data-testid="retweet"]');
+            if (rtBtn) { 
+                rtBtn.click();
+                setTimeout(function(){
+                    var confirmRt = document.querySelector('div[data-testid="retweetConfirm"]');
+                    if(confirmRt) confirmRt.click();
+                }, 400);
                 return true;
             }
         }
+
+        // Action Follow / Suivre
+        if (act.indexOf('follow') !== -1 || act.indexOf('suivre') !== -1) {
+            var followSelectors = [
+                'button[data-testid$="-follow"]',
+                'button[data-testid="placementTracking"]',
+                '[aria-label*="Follow @" i]',
+                '[aria-label*="Suivre @" i]',
+                '[aria-label*="Follow" i]',
+                '[aria-label*="Suivre" i]'
+            ];
+            for (var s=0; s<followSelectors.length; s++) {
+                var btn = document.querySelector(followSelectors[s]);
+                if (btn && btn.offsetWidth > 0) {
+                    btn.click();
+                    return true;
+                }
+            }
+
+            var allBtns = document.querySelectorAll('button[role="button"], button');
+            for (var b=0; b<allBtns.length; b++) {
+                var txt = (allBtns[b].textContent || '').trim().toLowerCase();
+                if (txt === 'follow' || txt === 'suivre' || txt.indexOf('follow @') === 0 || txt.indexOf('suivre @') === 0) {
+                    allBtns[b].click();
+                    return true;
+                }
+            }
+        }
+
         return true;
         """
         try:
