@@ -22,29 +22,31 @@ pkg install -y proot-distro git python tsu
 
 # 3. Installation de Debian via proot-distro
 echo "[3/5] Configuration du conteneur Debian Linux..."
-if ! proot-distro list | grep -q "debian.*installed"; then
-    proot-distro install debian
+if [ -d "$PREFIX/var/lib/proot-distro/installed-rootfs/debian" ] || proot-distro list | grep -q "debian"; then
+    echo " -> Debian est déjà installé, passage à la suite."
 else
-    echo " -> Debian est déjà installé."
+    echo " -> Installation du conteneur Debian..."
+    proot-distro install debian || true
 fi
 
 # 4. Configuration interne de Debian (Chromium, Chromedriver, Python3, Selenium)
 echo "[4/5] Installation de Chromium Headless, Chromedriver et Python dans Debian..."
 proot-distro login debian -- bash -c '
-    set -e
-    apt-get update -y
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update -y || true
     apt-get install -y --no-install-recommends \
         python3 \
         python3-pip \
         python3-requests \
         python3-pil \
+        python3-selenium \
         chromium \
         chromium-driver \
         ca-certificates \
-        curl
+        curl || true
     
-    # Installation de Selenium compatible
-    pip3 install selenium --break-system-packages || pip3 install selenium
+    # Installation de Selenium fallback si nécessaire
+    pip3 install selenium --break-system-packages 2>/dev/null || pip3 install selenium 2>/dev/null || true
     
     # Création des dossiers de travail
     mkdir -p /root/social_bot_data/screenshots
