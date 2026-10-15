@@ -1,18 +1,35 @@
 import os
+import sys
 import time
 import requests
 from typing import Optional, Dict, Any, Tuple
 
+try:
+    from user_agents import get_random_user_agent, get_client_hints
+except ImportError:
+    try:
+        from termux_bot.user_agents import get_random_user_agent, get_client_hints
+    except ImportError:
+        def get_random_user_agent(allow_desktop=True):
+            return "Mozilla/5.0 (Linux; Android 14; SM-S928B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.6668.100 Mobile Safari/537.36"
+        def get_client_hints(ua):
+            return {"sec-ch-ua-platform": '"Android"', "sec-ch-ua-mobile": "?1"}
+
 BASE_URL = "https://pr.social/api"
-DEFAULT_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
 
 class PrSocialAPI:
-    def __init__(self, token: str = "", cf_clearance: str = "", user_agent: str = DEFAULT_UA):
+    def __init__(self, token: str = "", cf_clearance: str = "", user_agent: Optional[str] = None):
         self.session = requests.Session()
-        self.user_agent = user_agent
+        self.user_agent = user_agent or get_random_user_agent()
         self.token = token.strip()
         self.cf_clearance = cf_clearance.strip()
         self._update_headers()
+
+    def rotate_user_agent(self) -> str:
+        """Génère et applique un nouveau User-Agent avec headers cohérents pour éviter les restrictions."""
+        self.user_agent = get_random_user_agent()
+        self._update_headers()
+        return self.user_agent
 
     def update_credentials(self, token: str, cf_clearance: str = ""):
         self.token = token.strip()
@@ -36,13 +53,17 @@ class PrSocialAPI:
             cookies.append(f"cf_clearance={cf.strip()}")
 
         cookie_str = "; ".join(cookies)
-        self.session.headers.update({
+        hints = get_client_hints(self.user_agent)
+
+        headers = {
             "User-Agent": self.user_agent,
             "Accept": "application/json, text/plain, */*",
             "Accept-Language": "fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7",
             "Referer": "https://pr.social/tasks",
             "Cookie": cookie_str
-        })
+        }
+        headers.update(hints)
+        self.session.headers.update(headers)
 
     def request(self, method: str, path: str, json_data: Optional[Dict] = None, params: Optional[Dict] = None, timeout: int = 35, retries: int = 3) -> Tuple[int, Dict[str, Any]]:
         url = BASE_URL + path

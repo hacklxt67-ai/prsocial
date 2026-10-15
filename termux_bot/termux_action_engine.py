@@ -133,7 +133,7 @@ class TermuxBotApp:
         self.token = self.session_data.get("token", "")
         self.cf = self.session_data.get("cf_clearance", "")
         self.api = PrSocialAPI(token=self.token, cf_clearance=self.cf)
-        self.browser = BrowserTermux(headless=True)
+        self.browser = BrowserTermux(headless=True, user_agent=self.api.user_agent)
         self.current_user = ""
         self.current_balance = 0.0
         self.approved_accounts = {}
@@ -295,6 +295,8 @@ class TermuxBotApp:
 
         print(f"{WHITE}Réseaux surveillés : {', '.join([f'{CYAN}{p.upper()}{RESET}' for p in active_list])}\n")
 
+        tasks_completed_count = 0
+
         try:
             while True:
                 tasks_found = 0
@@ -418,6 +420,12 @@ class TermuxBotApp:
                         else:
                             print(f"  {YELLOW}⚠️ Non validée. Déblocage automatique de sécurité...{RESET}")
                             self.api.cancel_task(task_id)
+
+                        tasks_completed_count += 1
+                        if tasks_completed_count % 4 == 0:
+                            new_ua = self.api.rotate_user_agent()
+                            self.browser.user_agent = new_ua
+                            print(f"  🛡️ {CYAN}Protection Anti-Ban : Empreinte User-Agent renouvelée avec succès.{RESET}")
 
                         pause = random.uniform(5.0, 9.0)
                         print(f"  ⏸️ Pause de sécurité : {pause:.1f}s...")
