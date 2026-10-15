@@ -32,24 +32,25 @@ Le script va automatiquement :
 
 ---
 
-## 🎮 3. Lancer le Bot
+## 🎮 3. Connexion et Lancement du Bot
 
-Pour démarrer le bot à tout moment, tapez simplement :
+Pour démarrer le bot à tout moment dans Termux, tapez simplement :
 ```bash
 ./lancer_bot.sh
 ```
-ou directement depuis le dossier `termux_bot` :
-```bash
-python3 termux_action_engine.py
-```
 
-Le bot va immédiatement :
-1. Se connecter à votre compte PR.Social (`@michelbaggio`).
-2. Détecter tous vos réseaux sociaux approuvés (**Threads**, **Reddit**, **TikTok**, **Instagram**, **YouTube**, **Facebook**, etc.).
-3. Réclamer les tâches les plus rémunératrices.
-4. Effectuer les actions en arrière-plan sans ouvrir aucune fenêtre.
-5. Capturer la preuve et soumettre la capture automatiquement.
-6. Actualiser votre solde en direct sur votre terminal.
+### 🔑 A. Première Utilisation (Login Cookie)
+1. Au tout premier lancement (ou après déconnexion), le bot affiche :
+   `[1] Login Cookie (Coller le Cookie / Token)`
+2. Choisissez `1` et collez votre Cookie / Token PR.Social récupéré depuis votre navigateur (`token=eyJ...` ou jeton direct).
+3. Le bot vérifie instantanément votre session auprès de PR.Social et **la sauvegarde définitivement**.
+
+### ⚡ B. Connexion Automatique aux Lancements Suivants
+- Dès le lancement suivant, vous n'avez **plus rien à saisir** !
+- Le bot détecte votre session enregistrée, se connecte automatiquement et affiche :  
+  `✓ Connexion automatique réussie ! Bienvenue @VotreCompte (Solde: $X.XXXX)`
+- Vous accédez directement au tableau de bord.
+- Si vous souhaitez changer de compte, il vous suffit de choisir l'option **`[3] Changer de Cookie / Déconnexion`**.
 
 ---
 

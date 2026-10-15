@@ -1,11 +1,12 @@
 import os
 import sys
+import re
 import time
 import json
 import random
 import logging
 from datetime import datetime
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Tuple
 
 # Forcer l'encodage UTF-8 sous Termux/Linux
 if hasattr(sys.stdout, "reconfigure"):
@@ -53,6 +54,40 @@ CONFIG_PATH_LOCAL = os.path.join(current_dir, "config.json")
 def clear_screen():
     os.system("clear" if os.name != "nt" else "cls")
 
+def parse_cookie_input(raw: str) -> Tuple[str, str]:
+    """Extrait de manière tolérante le token JWT et le cookie cf_clearance."""
+    raw = raw.strip()
+    if raw.lower().startswith("cookie:"):
+        raw = raw[7:].strip()
+
+    # Si chaîne JSON collée
+    if raw.startswith("{") and raw.endswith("}"):
+        try:
+            j = json.loads(raw)
+            return j.get("token", "").strip(), j.get("cf_clearance", "").strip()
+        except Exception:
+            pass
+
+    tok = raw
+    cf = ""
+
+    # Extraction par regex pour token
+    m_tok = re.search(r'(?:^|[;\s])token=["\']?([^"\'\s;]+)["\']?', raw)
+    if m_tok:
+        tok = m_tok.group(1).strip()
+
+    # Extraction par regex pour cf_clearance
+    m_cf = re.search(r'(?:^|[;\s])cf_clearance=["\']?([^"\'\s;]+)["\']?', raw)
+    if m_cf:
+        cf = m_cf.group(1).strip()
+
+    # Nettoyage supplémentaire
+    if tok.startswith("Bearer "):
+        tok = tok[7:].strip()
+    tok = tok.strip('"\'')
+    cf = cf.strip('"\'')
+    return tok, cf
+
 def load_saved_session() -> Dict[str, Any]:
     os.makedirs(DATA_DIR, exist_ok=True)
     for path in [CONFIG_PATH_LOCAL, CONFIG_PATH_HOME]:
@@ -78,6 +113,17 @@ def save_session(token: str, cf_clearance: str = ""):
             os.makedirs(os.path.dirname(path), exist_ok=True)
             with open(path, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2)
+        except Exception:
+            pass
+
+def clear_saved_session():
+    """Efface les informations de session sauvegardées."""
+    data = {"token": "", "cf_clearance": "", "delay_min": 5, "delay_max": 10}
+    for path in [CONFIG_PATH_LOCAL, CONFIG_PATH_HOME]:
+        try:
+            if os.path.exists(path):
+                with open(path, "w", encoding="utf-8") as f:
+                    json.dump(data, f, indent=2)
         except Exception:
             pass
 
@@ -156,39 +202,33 @@ class TermuxBotApp:
 
         choice = input(f"\n{BOLD}Votre choix [1-2] : {RESET}").strip()
         if choice == "1":
-            print(f"\n{CYAN}Collez votre jeton/cookie (ex: eyJhb... ou token=eyJ... ou ligne de cookies) :{RESET}")
+            print(f"\n{CYAN}Collez votre Cookie / Token de connexion :{RESET}")
+            print(f"{DIM}(Formats acceptés : eyJhb... OU token=eyJ... OU Cookie de navigateur complet){RESET}")
             raw = input("👉 ").strip()
             if raw:
-                tok = raw
-                cf = ""
-                # Parser si chaîne de cookies complète
-                if "token=" in raw:
-                    for part in raw.split(";"):
-                        part = part.strip()
-                        if part.startswith("token="):
-                            tok = part[6:]
-                        elif part.startswith("cf_clearance="):
-                            cf = part[13:]
+                tok, cf = parse_cookie_input(raw)
                 
-                tok = tok.strip()
                 self.api.update_credentials(tok, cf)
                 self.token = tok
                 self.cf = cf
 
-                print(f"\n{YELLOW}Vérification de la session en cours...{RESET}")
+                print(f"\n{YELLOW}Vérification de la session en cours auprès de PR.Social...{RESET}")
                 if self.verify_login():
                     save_session(self.token, self.cf)
-                    print(f"{GREEN}✓ Connexion réussie ! Session sauvegardée définitivement.{RESET}")
-                    time.sleep(1.5)
+                    print(f"\n{GREEN}{BOLD}✓ Connexion réussie !{RESET}")
+                    print(f"{GREEN}Session enregistrée. Les prochains lancements se feront automatiquement !{RESET}")
+                    time.sleep(2.0)
                 else:
-                    print(f"{RED}✖ Cookie ou Jeton invalide. Veuillez réessayer.{RESET}")
-                    time.sleep(2)
+                    self.token = ""
+                    self.cf = ""
+                    print(f"\n{RED}✖ Cookie ou Jeton invalide / refusé par PR.Social. Veuillez réessayer.{RESET}")
+                    time.sleep(2.5)
         elif choice == "2":
             print(f"\n{CYAN}Au revoir ! 👋{RESET}\n")
             sys.exit(0)
 
     # ==========================================================================
-    # MENU ÉTAT 2 : CONNECTÉ (TABLEAU DE BORD ÉPURÉ + 3 CHOIX UNIQUEMENT)
+    # MENU ÉTAT 2 : CONNECTÉ (TABLEAU DE BORD ÉPURÉ + 4 CHOIX CLAIRS)
     # ==========================================================================
     def show_authenticated_menu(self):
         clear_screen()
@@ -198,7 +238,7 @@ class TermuxBotApp:
         # Date et heure actuelles
         now_str = datetime.now().strftime("%d/%m/%Y - %H:%M:%S")
 
-        # Tableau de bord : UNIQUEMENT Utilisateur, Solde, Date et Heure
+        # Tableau de bord : Utilisateur, Solde, Date et Heure
         bal_str = f"${self.current_balance:.4f}"
         print(f"\n{BLUE}╭─────────────────────────────────────────────────────────────╮{RESET}")
         print(f"{BLUE}│{RESET}  👤 {WHITE}Utilisateur connecté :{RESET} {GREEN}{BOLD}@{self.current_user:<31}{RESET} {BLUE}│{RESET}")
@@ -206,20 +246,32 @@ class TermuxBotApp:
         print(f"{BLUE}│{RESET}  🕒 {WHITE}Date et Heure        :{RESET} {CYAN}{now_str:<32}{RESET} {BLUE}│{RESET}")
         print(f"{BLUE}╰─────────────────────────────────────────────────────────────╯{RESET}")
 
-        # Menu 3 choix stricts
+        # Menu à 4 choix clairs
         print(f"\n{CYAN}┌─────────────────────────────────────────────────────────────┐{RESET}")
         print(f"{CYAN}│{RESET}  {GREEN}{BOLD}[1]{RESET} 🚀 {WHITE}{BOLD}Start Tout (Auto-Bot + Déblocage Auto Tâches){RESET}       {CYAN}│{RESET}")
         print(f"{CYAN}│{RESET}  {CYAN}{BOLD}[2]{RESET} 🔗 {WHITE}Comptes Liés{RESET}                                          {CYAN}│{RESET}")
-        print(f"{CYAN}│{RESET}  {RED}{BOLD}[3]{RESET} 🚪 {WHITE}Quitter Bot{RESET}                                           {CYAN}│{RESET}")
+        print(f"{CYAN}│{RESET}  {YELLOW}{BOLD}[3]{RESET} 🔑 {WHITE}Changer de Cookie / Déconnexion{RESET}                       {CYAN}│{RESET}")
+        print(f"{CYAN}│{RESET}  {RED}{BOLD}[4]{RESET} 🚪 {WHITE}Quitter Bot{RESET}                                           {CYAN}│{RESET}")
         print(f"{CYAN}└─────────────────────────────────────────────────────────────┘{RESET}")
 
-        choice = input(f"\n{BOLD}Votre choix [1-3] : {RESET}").strip()
+        choice = input(f"\n{BOLD}Votre choix [1-4] : {RESET}").strip()
 
         if choice == "1":
             self.start_all_tasks()
         elif choice == "2":
             self.show_linked_accounts()
         elif choice == "3":
+            print(f"\n{YELLOW}Déconnexion en cours...{RESET}")
+            clear_saved_session()
+            self.token = ""
+            self.cf = ""
+            self.current_user = ""
+            self.current_balance = 0.0
+            self.approved_accounts.clear()
+            self.api.update_credentials("", "")
+            print(f"{GREEN}✓ Déconnecté. La session précédente a été réinitialisée.{RESET}")
+            time.sleep(1.5)
+        elif choice == "4":
             print(f"\n{CYAN}Arrêt du bot. À bientôt ! 👋{RESET}\n")
             self.browser.stop_driver()
             sys.exit(0)
@@ -348,16 +400,28 @@ class TermuxBotApp:
 
         input(f"\n{DIM}Appuyez sur Entrée pour revenir au menu...{RESET}")
 
-    # ==========================================================================
-    # BOUCLE PRINCIPALE DE L'APPLICATION
-    # ==========================================================================
     def run(self):
+        clear_screen()
+        self.print_logo()
+
+        # Vérification au démarrage : si une session est déjà enregistrée
+        if self.token:
+            print(f"\n{CYAN}🔄 Session enregistrée trouvée. Connexion automatique en cours...{RESET}")
+            if self.verify_login():
+                print(f"{GREEN}{BOLD}✓ Connexion automatique réussie !{RESET} {GREEN}Bienvenue @{self.current_user} (Solde: ${self.current_balance:.4f}){RESET}")
+                time.sleep(1.2)
+            else:
+                print(f"{YELLOW}⚠️ La session enregistrée a expiré ou est invalide.{RESET}")
+                time.sleep(1.5)
+                self.token = ""
+                self.cf = ""
+
         while True:
-            # Si pas de session valide -> Menu ÉTAT 1
-            if not self.verify_login():
+            # Si pas de session valide -> Menu ÉTAT 1 (Demande Login Cookie)
+            if not self.token or not self.verify_login():
                 self.show_unauthenticated_menu()
             else:
-                # Session valide -> Menu ÉTAT 2
+                # Session valide -> Menu ÉTAT 2 (Connecté)
                 self.show_authenticated_menu()
 
 def main():
