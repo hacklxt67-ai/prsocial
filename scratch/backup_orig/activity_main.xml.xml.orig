@@ -1,0 +1,222 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout android:layout_width="match_parent" android:layout_height="match_parent"
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <TextView android:textSize="12.0sp" android:textColor="#ffffff" android:gravity="center" android:layout_gravity="top" android:id="@id/network_banner" android:background="#cc3333" android:padding="10.0dp" android:visibility="gone" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="📡 Connexion perdue — en attente du réseau..." android:elevation="10.0dp" />
+    <androidx.swiperefreshlayout.widget.SwipeRefreshLayout android:id="@id/swipe_refresh" android:layout_width="match_parent" android:layout_height="match_parent">
+        <ScrollView android:background="@drawable/gradient_bg" android:layout_width="match_parent" android:layout_height="match_parent" android:fillViewport="true">
+            <LinearLayout android:orientation="vertical" android:padding="16.0dp" android:layout_width="match_parent" android:layout_height="wrap_content">
+                <LinearLayout android:orientation="vertical" android:background="#1a1a3a" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginBottom="12.0dp">
+                    <LinearLayout android:gravity="center_vertical" android:orientation="horizontal" android:id="@id/btn_subscription_toggle" android:background="?android:selectableItemBackground" android:paddingTop="12.0dp" android:paddingBottom="12.0dp" android:focusable="true" android:clickable="true" android:layout_width="match_parent" android:layout_height="wrap_content" android:paddingStart="12.0dp" android:paddingEnd="12.0dp">
+                        <TextView android:textSize="14.0sp" android:textStyle="bold" android:textColor="#ffffff" android:layout_width="0.0dp" android:layout_height="wrap_content" android:text="ABONNEMENT" android:layout_weight="1.0" />
+                        <TextView android:textSize="12.0sp" android:textColor="#7c4dff" android:id="@id/tv_subscription_arrow" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="▼" />
+                    </LinearLayout>
+                    <LinearLayout android:orientation="vertical" android:id="@id/layout_subscription_details" android:paddingBottom="12.0dp" android:visibility="gone" android:layout_width="match_parent" android:layout_height="wrap_content" android:paddingStart="12.0dp" android:paddingEnd="12.0dp">
+                        <View android:background="#333355" android:layout_width="match_parent" android:layout_height="1.0dp" android:layout_marginBottom="12.0dp" />
+                        <LinearLayout android:gravity="center_vertical" android:orientation="horizontal" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginBottom="12.0dp">
+                            <TextView android:textSize="13.0sp" android:textColor="#a0b0cc" android:layout_width="0.0dp" android:layout_height="wrap_content" android:text="Temps restant :" android:layout_weight="1.0" />
+                            <TextView android:textSize="15.0sp" android:textStyle="bold" android:textColor="#7c4dff" android:id="@id/tv_sub_countdown" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="--:--:--" android:fontFamily="monospace" />
+                        </LinearLayout>
+                        <TextView android:textSize="11.0sp" android:textColor="#7090b0" android:id="@id/tv_sub_expire_date" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginBottom="12.0dp" android:text="" android:fontFamily="monospace" />
+                        <LinearLayout android:gravity="center_vertical" android:orientation="horizontal" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginBottom="12.0dp">
+                            <TextView android:textSize="12.0sp" android:textColor="#a0b0cc" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="ID : " />
+                            <TextView android:textSize="12.0sp" android:textColor="#ffffff" android:id="@id/tv_sub_user_id" android:layout_width="0.0dp" android:layout_height="wrap_content" android:text="..." android:layout_weight="1.0" android:fontFamily="monospace" />
+                            <Button android:textSize="10.0sp" android:textColor="#ffffff" android:id="@id/btn_sub_copy_id" android:background="@drawable/btn_primary" android:layout_width="wrap_content" android:layout_height="30.0dp" android:text="Copier" android:paddingStart="10.0dp" android:paddingEnd="10.0dp" />
+                        </LinearLayout>
+                        <LinearLayout android:gravity="center_vertical" android:orientation="horizontal" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginBottom="16.0dp">
+                            <TextView android:textSize="13.0sp" android:textColor="#a0b0cc" android:layout_width="0.0dp" android:layout_height="wrap_content" android:text="STATUS :" android:layout_weight="1.0" />
+                            <TextView android:textSize="13.0sp" android:textStyle="bold" android:textColor="#50dd99" android:id="@id/tv_sub_status" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="✅ Actif" />
+                        </LinearLayout>
+                        <LinearLayout android:gravity="center" android:orientation="horizontal" android:layout_width="match_parent" android:layout_height="wrap_content">
+                            <Button android:textSize="11.0sp" android:textColor="#ffffff" android:id="@id/btn_sub_renew" android:background="@drawable/btn_primary" android:paddingTop="8.0dp" android:paddingBottom="8.0dp" android:layout_width="0.0dp" android:layout_height="wrap_content" android:text="Renouveler mon abonnement" android:layout_weight="1.0" android:layout_marginEnd="6.0dp" />
+                            <Button android:textSize="11.0sp" android:textColor="#ffffff" android:id="@id/btn_sub_support" android:background="@drawable/btn_secondary" android:paddingTop="8.0dp" android:paddingBottom="8.0dp" android:layout_width="0.0dp" android:layout_height="wrap_content" android:text="Contacter le support" android:layout_weight="1.0" android:layout_marginStart="6.0dp" />
+                        </LinearLayout>
+                    </LinearLayout>
+                </LinearLayout>
+                <LinearLayout android:gravity="center_vertical" android:orientation="horizontal" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginBottom="20.0dp">
+                    <TextView android:textSize="24.0sp" android:textStyle="bold" android:textColor="#ffffff" android:layout_width="0.0dp" android:layout_height="wrap_content" android:text="PR.SOCIAL" android:layout_weight="1.0" android:letterSpacing="0.1" />
+                    <Button android:textSize="12.0sp" android:textColor="#ff6b6b" android:id="@id/btn_logout" android:background="@drawable/btn_outline_red" android:layout_width="wrap_content" android:layout_height="36.0dp" android:text="Déco." android:paddingStart="14.0dp" android:paddingEnd="14.0dp" />
+                    <androidx.appcompat.widget.SwitchCompat android:textSize="16.0sp" android:textColor="#ffffff" android:id="@id/switch_alert_sound" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="🔔" android:layout_marginStart="10.0dp" android:thumbTint="#7c4dff" />
+                </LinearLayout>
+                <LinearLayout android:orientation="vertical" android:id="@id/card_profile" android:background="@drawable/card_bg" android:padding="18.0dp" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginBottom="14.0dp">
+                    <LinearLayout android:gravity="center_vertical" android:orientation="horizontal" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginBottom="10.0dp">
+                        <TextView android:textSize="14.0sp" android:textStyle="bold" android:textColor="#ffffff" android:layout_width="0.0dp" android:layout_height="wrap_content" android:text="👤 Mon Profil" android:layout_weight="1.0" />
+                        <TextView android:textSize="11.0sp" android:textColor="#50dd99" android:id="@id/tv_profile_status" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="● actif" />
+                    </LinearLayout>
+                    <LinearLayout android:gravity="center_vertical" android:orientation="horizontal" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginBottom="8.0dp">
+                        <TextView android:textSize="16.0sp" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="👤" android:layout_marginEnd="8.0dp" />
+                        <LinearLayout android:orientation="vertical" android:layout_width="0.0dp" android:layout_height="wrap_content" android:layout_weight="1.0">
+                            <TextView android:textSize="10.0sp" android:textColor="#7090b0" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Username" />
+                            <TextView android:textSize="14.0sp" android:textStyle="bold" android:textColor="#a0c4ff" android:id="@id/tv_profile_username" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="..." />
+                        </LinearLayout>
+                        <LinearLayout android:gravity="end" android:orientation="vertical" android:layout_width="wrap_content" android:layout_height="wrap_content">
+                            <TextView android:textSize="10.0sp" android:textColor="#7090b0" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="ID" />
+                            <TextView android:textSize="13.0sp" android:textStyle="bold" android:textColor="#7c4dff" android:id="@id/tv_profile_id" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="#..." />
+                        </LinearLayout>
+                    </LinearLayout>
+                    <LinearLayout android:gravity="center_vertical" android:orientation="horizontal" android:layout_width="match_parent" android:layout_height="wrap_content">
+                        <TextView android:textSize="16.0sp" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="✉" android:layout_marginEnd="8.0dp" />
+                        <LinearLayout android:orientation="vertical" android:layout_width="0.0dp" android:layout_height="wrap_content" android:layout_weight="1.0">
+                            <TextView android:textSize="10.0sp" android:textColor="#7090b0" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Email" />
+                            <TextView android:textSize="13.0sp" android:textColor="#c0d8ff" android:id="@id/tv_profile_email" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="..." />
+                        </LinearLayout>
+                        <TextView android:textSize="18.0sp" android:id="@id/btn_toggle_email" android:padding="6.0dp" android:focusable="true" android:clickable="true" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="👁" />
+                    </LinearLayout>
+                </LinearLayout>
+                <LinearLayout android:orientation="vertical" android:background="@drawable/card_accent" android:padding="22.0dp" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginBottom="14.0dp" android:elevation="6.0dp">
+                    <TextView android:textSize="13.0sp" android:textColor="#a0c4ff" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginBottom="4.0dp" android:text="💰 Balance" />
+                    <TextView android:textSize="32.0sp" android:textStyle="bold" android:textColor="#ffffff" android:id="@id/tv_balance" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginBottom="14.0dp" android:text="0.0000 $" />
+                    <LinearLayout android:orientation="horizontal" android:layout_width="match_parent" android:layout_height="wrap_content">
+                        <LinearLayout android:orientation="vertical" android:layout_width="0.0dp" android:layout_height="wrap_content" android:layout_weight="1.0">
+                            <TextView android:textSize="11.0sp" android:textColor="#7090b0" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Total gagné" />
+                            <TextView android:textSize="15.0sp" android:textStyle="bold" android:textColor="#50dd99" android:id="@id/tv_earned" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0.0000 $" />
+                        </LinearLayout>
+                        <LinearLayout android:orientation="vertical" android:layout_width="0.0dp" android:layout_height="wrap_content" android:layout_weight="1.0">
+                            <TextView android:textSize="11.0sp" android:textColor="#7090b0" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Streak" />
+                            <TextView android:textSize="15.0sp" android:textStyle="bold" android:textColor="#ffd700" android:id="@id/tv_streak" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0 jour(s)" />
+                        </LinearLayout>
+                    </LinearLayout>
+                </LinearLayout>
+                <LinearLayout android:orientation="horizontal" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginBottom="14.0dp">
+                    <LinearLayout android:gravity="center" android:orientation="vertical" android:background="@drawable/card_bg" android:padding="14.0dp" android:layout_width="0.0dp" android:layout_height="wrap_content" android:layout_weight="1.0" android:layout_marginEnd="6.0dp">
+                        <TextView android:textSize="18.0sp" android:textColor="#50dd99" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="✔" />
+                        <TextView android:textSize="22.0sp" android:textStyle="bold" android:textColor="#ffffff" android:id="@id/tv_approved" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0" />
+                        <TextView android:textSize="10.0sp" android:textColor="#7090b0" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Approuvées" />
+                    </LinearLayout>
+                    <LinearLayout android:gravity="center" android:orientation="vertical" android:background="@drawable/card_bg" android:padding="14.0dp" android:layout_width="0.0dp" android:layout_height="wrap_content" android:layout_weight="1.0" android:layout_marginStart="6.0dp" android:layout_marginEnd="6.0dp">
+                        <TextView android:textSize="18.0sp" android:textColor="#ffd700" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="⏳" />
+                        <TextView android:textSize="22.0sp" android:textStyle="bold" android:textColor="#ffffff" android:id="@id/tv_pending" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0" />
+                        <TextView android:textSize="10.0sp" android:textColor="#7090b0" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="En attente" />
+                    </LinearLayout>
+                    <LinearLayout android:gravity="center" android:orientation="vertical" android:background="@drawable/card_bg" android:padding="14.0dp" android:layout_width="0.0dp" android:layout_height="wrap_content" android:layout_weight="1.0" android:layout_marginStart="6.0dp">
+                        <TextView android:textSize="18.0sp" android:textColor="#ff6b6b" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="✘" />
+                        <TextView android:textSize="22.0sp" android:textStyle="bold" android:textColor="#ffffff" android:id="@id/tv_abandoned" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0" />
+                        <TextView android:textSize="10.0sp" android:textColor="#7090b0" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Abandonnées" />
+                    </LinearLayout>
+                </LinearLayout>
+                <LinearLayout android:orientation="vertical" android:background="@drawable/card_bg" android:padding="18.0dp" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginBottom="14.0dp">
+                    <TextView android:textSize="14.0sp" android:textStyle="bold" android:textColor="#ffffff" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginBottom="14.0dp" android:text="📅 Statistiques" />
+                    <LinearLayout android:orientation="horizontal" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginBottom="8.0dp">
+                        <TextView android:textSize="12.0sp" android:textColor="#7090b0" android:layout_width="80.0dp" android:layout_height="wrap_content" android:text="Aujourd'hui" />
+                        <TextView android:textSize="13.0sp" android:textColor="#c0d8ff" android:id="@id/tv_today_tasks" android:layout_width="0.0dp" android:layout_height="wrap_content" android:text="0 tâches" android:layout_weight="1.0" />
+                        <TextView android:textSize="13.0sp" android:textColor="#50dd99" android:id="@id/tv_today_earned" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0.0000 $" />
+                    </LinearLayout>
+                    <LinearLayout android:orientation="horizontal" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginBottom="8.0dp">
+                        <TextView android:textSize="12.0sp" android:textColor="#7090b0" android:layout_width="80.0dp" android:layout_height="wrap_content" android:text="Semaine" />
+                        <TextView android:textSize="13.0sp" android:textColor="#c0d8ff" android:id="@id/tv_week_tasks" android:layout_width="0.0dp" android:layout_height="wrap_content" android:text="0 tâches" android:layout_weight="1.0" />
+                        <TextView android:textSize="13.0sp" android:textColor="#50dd99" android:id="@id/tv_week_earned" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0.0000 $" />
+                    </LinearLayout>
+                    <LinearLayout android:orientation="horizontal" android:layout_width="match_parent" android:layout_height="wrap_content">
+                        <TextView android:textSize="12.0sp" android:textColor="#7090b0" android:layout_width="80.0dp" android:layout_height="wrap_content" android:text="Ce mois" />
+                        <TextView android:textSize="13.0sp" android:textColor="#c0d8ff" android:id="@id/tv_month_tasks" android:layout_width="0.0dp" android:layout_height="wrap_content" android:text="0 tâches" android:layout_weight="1.0" />
+                        <TextView android:textSize="13.0sp" android:textColor="#50dd99" android:id="@id/tv_month_earned" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0.0000 $" />
+                    </LinearLayout>
+                </LinearLayout>
+                <LinearLayout android:orientation="vertical" android:background="@drawable/card_accent" android:padding="16.0dp" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginBottom="14.0dp" android:elevation="4.0dp">
+                    <LinearLayout android:gravity="center_vertical" android:orientation="horizontal" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginBottom="12.0dp">
+                        <TextView android:textSize="15.0sp" android:textStyle="bold" android:textColor="#ffffff" android:layout_width="0.0dp" android:layout_height="wrap_content" android:text="🚀 Multi-Lancement" android:layout_weight="1.0" />
+                        <TextView android:textSize="11.0sp" android:textColor="#a0b0cc" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Lancez tous les réseaux activés" />
+                    </LinearLayout>
+                    <LinearLayout android:orientation="vertical" android:id="@id/multi_toggles_container" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginBottom="12.0dp" />
+                    <Button android:textSize="14.0sp" android:textStyle="bold" android:textColor="#ffffff" android:id="@id/btn_multi_launch" android:background="@drawable/btn_primary" android:layout_width="match_parent" android:layout_height="48.0dp" android:layout_marginBottom="10.0dp" android:text="🚀 Lancer tout" />
+                    <LinearLayout android:gravity="center_vertical" android:orientation="horizontal" android:id="@id/multi_log_header" android:visibility="gone" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginBottom="2.0dp">
+                        <TextView android:textSize="11.0sp" android:textColor="#8080cc" android:layout_width="0.0dp" android:layout_height="wrap_content" android:text="📋 Journal multi-lancement" android:layout_weight="1.0" />
+                        <TextView android:textSize="10.0sp" android:textColor="#5050aa" android:id="@id/tv_multi_log_clear" android:padding="4.0dp" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Effacer" />
+                    </LinearLayout>
+                    <androidx.core.widget.NestedScrollView android:id="@id/multi_log_scroll" android:background="#0d0d1a" android:visibility="gone" android:layout_width="match_parent" android:layout_height="180.0dp" android:fillViewport="true">
+                        <LinearLayout android:orientation="vertical" android:id="@id/multi_log_container" android:padding="6.0dp" android:layout_width="match_parent" android:layout_height="wrap_content" />
+                    </androidx.core.widget.NestedScrollView>
+                </LinearLayout>
+                <LinearLayout android:gravity="center" android:orientation="vertical" android:id="@id/multi_overlay" android:background="#aa000011" android:focusable="true" android:visibility="gone" android:clickable="true" android:layout_width="match_parent" android:layout_height="wrap_content">
+                    <TextView android:textSize="13.0sp" android:textStyle="bold" android:textColor="#ffffff" android:padding="12.0dp" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="🚀 Multi-lancement en cours..." />
+                </LinearLayout>
+                <TextView android:textSize="15.0sp" android:textStyle="bold" android:textColor="#ffffff" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginBottom="10.0dp" android:text="🌐 Réseaux Sociaux" />
+                <LinearLayout android:orientation="vertical" android:background="@drawable/card_bg" android:padding="16.0dp" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginBottom="10.0dp">
+                    <LinearLayout android:gravity="center_vertical" android:orientation="horizontal" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginBottom="10.0dp">
+                        <TextView android:textSize="14.0sp" android:textStyle="bold" android:textColor="#ffffff" android:layout_width="0.0dp" android:layout_height="wrap_content" android:text="📷 Instagram" android:layout_weight="1.0" />
+                        <TextView android:textSize="12.0sp" android:textColor="#a0b0cc" android:id="@id/tv_insta_status" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Vérification..." />
+                    </LinearLayout>
+                    <Button android:textSize="13.0sp" android:textColor="#ffffff" android:id="@id/btn_instagram_account" android:background="@drawable/btn_instagram" android:layout_width="match_parent" android:layout_height="44.0dp" android:layout_marginBottom="10.0dp" android:text="📷 Ouvrir Instagram" />
+                    <Button android:textSize="13.0sp" android:textColor="#ffffff" android:id="@id/btn_load_tasks" android:background="@drawable/btn_primary" android:layout_width="match_parent" android:layout_height="44.0dp" android:layout_marginBottom="8.0dp" android:text="▶️ Lancer" />
+                    <LinearLayout android:gravity="center_vertical" android:orientation="horizontal" android:id="@id/task_log_header" android:visibility="gone" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginBottom="2.0dp">
+                        <TextView android:textSize="11.0sp" android:textColor="#8080cc" android:layout_width="0.0dp" android:layout_height="wrap_content" android:text="📋 Journal des actions" android:layout_weight="1.0" />
+                        <TextView android:textSize="10.0sp" android:textColor="#5050aa" android:id="@id/tv_log_clear" android:padding="4.0dp" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Effacer" />
+                    </LinearLayout>
+                    <androidx.core.widget.NestedScrollView android:id="@id/task_log_scroll" android:background="#0d0d1a" android:visibility="gone" android:layout_width="match_parent" android:layout_height="160.0dp" android:layout_marginBottom="6.0dp" android:fillViewport="true">
+                        <LinearLayout android:orientation="vertical" android:id="@id/task_log_container" android:padding="6.0dp" android:layout_width="match_parent" android:layout_height="wrap_content" />
+                    </androidx.core.widget.NestedScrollView>
+                    <ProgressBar android:layout_gravity="center" android:id="@id/task_progress" android:visibility="gone" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginBottom="6.0dp" android:indeterminateTint="#7c4dff" />
+                    <LinearLayout android:orientation="vertical" android:id="@id/task_list_container" android:layout_width="match_parent" android:layout_height="wrap_content" />
+                </LinearLayout>
+                <LinearLayout android:orientation="vertical" android:background="@drawable/card_bg" android:padding="16.0dp" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginBottom="10.0dp">
+                    <LinearLayout android:gravity="center_vertical" android:orientation="horizontal" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginBottom="10.0dp">
+                        <TextView android:textSize="14.0sp" android:textStyle="bold" android:textColor="#ffffff" android:layout_width="0.0dp" android:layout_height="wrap_content" android:text="🎵 TikTok" android:layout_weight="1.0" />
+                        <TextView android:textSize="12.0sp" android:textColor="#a0b0cc" android:id="@id/tv_tiktok_status" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Vérification..." />
+                    </LinearLayout>
+                    <Button android:textSize="13.0sp" android:textColor="#ffffff" android:id="@id/btn_tiktok_account" android:background="@drawable/btn_tiktok" android:layout_width="match_parent" android:layout_height="44.0dp" android:layout_marginBottom="10.0dp" android:text="🎵 Ouvrir TikTok" />
+                    <Button android:textSize="13.0sp" android:textColor="#ffffff" android:id="@id/btn_load_tiktok_tasks" android:background="@drawable/btn_tiktok" android:layout_width="match_parent" android:layout_height="44.0dp" android:layout_marginBottom="8.0dp" android:text="▶️ Lancer" />
+                    <LinearLayout android:gravity="center_vertical" android:orientation="horizontal" android:id="@id/task_log_header_tiktok" android:visibility="gone" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginBottom="2.0dp">
+                        <TextView android:textSize="11.0sp" android:textColor="#8080cc" android:layout_width="0.0dp" android:layout_height="wrap_content" android:text="📋 Journal des actions" android:layout_weight="1.0" />
+                        <TextView android:textSize="10.0sp" android:textColor="#5050aa" android:id="@id/tv_log_clear_tiktok" android:padding="4.0dp" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Effacer" />
+                    </LinearLayout>
+                    <androidx.core.widget.NestedScrollView android:id="@id/task_log_scroll_tiktok" android:background="#0d0d1a" android:visibility="gone" android:layout_width="match_parent" android:layout_height="160.0dp" android:layout_marginBottom="6.0dp" android:fillViewport="true">
+                        <LinearLayout android:orientation="vertical" android:id="@id/task_log_container_tiktok" android:padding="6.0dp" android:layout_width="match_parent" android:layout_height="wrap_content" />
+                    </androidx.core.widget.NestedScrollView>
+                    <ProgressBar android:layout_gravity="center" android:id="@id/task_progress_tiktok" android:visibility="gone" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginBottom="6.0dp" android:indeterminateTint="#ee1d52" />
+                    <LinearLayout android:orientation="vertical" android:id="@id/task_list_tiktok" android:layout_width="match_parent" android:layout_height="wrap_content" />
+                </LinearLayout>
+                <LinearLayout android:orientation="vertical" android:background="@drawable/card_bg" android:padding="16.0dp" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginBottom="10.0dp">
+                    <LinearLayout android:gravity="center_vertical" android:orientation="horizontal" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginBottom="10.0dp">
+                        <TextView android:textSize="14.0sp" android:textStyle="bold" android:textColor="#ffffff" android:layout_width="0.0dp" android:layout_height="wrap_content" android:text="🧵 Threads" android:layout_weight="1.0" />
+                        <TextView android:textSize="12.0sp" android:textColor="#a0b0cc" android:id="@id/tv_threads_status" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Vérification..." />
+                    </LinearLayout>
+                    <Button android:textSize="13.0sp" android:textColor="#ffffff" android:id="@id/btn_threads_account" android:background="@drawable/btn_threads" android:layout_width="match_parent" android:layout_height="44.0dp" android:layout_marginBottom="10.0dp" android:text="🧵 Ouvrir Threads" />
+                    <Button android:textSize="13.0sp" android:textColor="#ffffff" android:id="@id/btn_load_threads_tasks" android:background="@drawable/btn_threads" android:layout_width="match_parent" android:layout_height="44.0dp" android:layout_marginBottom="8.0dp" android:text="▶️ Lancer" />
+                    <LinearLayout android:gravity="center_vertical" android:orientation="horizontal" android:id="@id/task_log_header_threads" android:visibility="gone" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginBottom="2.0dp">
+                        <TextView android:textSize="11.0sp" android:textColor="#8080cc" android:layout_width="0.0dp" android:layout_height="wrap_content" android:text="📋 Journal des actions" android:layout_weight="1.0" />
+                        <TextView android:textSize="10.0sp" android:textColor="#5050aa" android:id="@id/tv_log_clear_threads" android:padding="4.0dp" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Effacer" />
+                    </LinearLayout>
+                    <androidx.core.widget.NestedScrollView android:id="@id/task_log_scroll_threads" android:background="#0d0d1a" android:visibility="gone" android:layout_width="match_parent" android:layout_height="160.0dp" android:layout_marginBottom="6.0dp" android:fillViewport="true">
+                        <LinearLayout android:orientation="vertical" android:id="@id/task_log_container_threads" android:padding="6.0dp" android:layout_width="match_parent" android:layout_height="wrap_content" />
+                    </androidx.core.widget.NestedScrollView>
+                    <ProgressBar android:layout_gravity="center" android:id="@id/task_progress_threads" android:visibility="gone" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginBottom="6.0dp" android:indeterminateTint="#ffffff" />
+                    <LinearLayout android:orientation="vertical" android:id="@id/task_list_threads" android:layout_width="match_parent" android:layout_height="wrap_content" />
+                </LinearLayout>
+                <LinearLayout android:orientation="vertical" android:background="@drawable/card_bg" android:padding="16.0dp" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginBottom="20.0dp">
+                    <LinearLayout android:gravity="center_vertical" android:orientation="horizontal" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginBottom="10.0dp">
+                        <TextView android:textSize="14.0sp" android:textStyle="bold" android:textColor="#ffffff" android:layout_width="0.0dp" android:layout_height="wrap_content" android:text="▶ YouTube" android:layout_weight="1.0" />
+                        <TextView android:textSize="12.0sp" android:textColor="#a0b0cc" android:id="@id/tv_youtube_status" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Vérification..." />
+                    </LinearLayout>
+                    <Button android:textSize="13.0sp" android:textColor="#ffffff" android:id="@id/btn_youtube_account" android:background="@drawable/btn_youtube" android:layout_width="match_parent" android:layout_height="44.0dp" android:layout_marginBottom="10.0dp" android:text="▶ Ouvrir YouTube" />
+                    <Button android:textSize="13.0sp" android:textColor="#ffffff" android:id="@id/btn_load_youtube_tasks" android:background="@drawable/btn_youtube" android:layout_width="match_parent" android:layout_height="44.0dp" android:layout_marginBottom="8.0dp" android:text="▶️ Lancer" />
+                    <LinearLayout android:gravity="center_vertical" android:orientation="horizontal" android:id="@id/task_log_header_youtube" android:visibility="gone" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginBottom="2.0dp">
+                        <TextView android:textSize="11.0sp" android:textColor="#8080cc" android:layout_width="0.0dp" android:layout_height="wrap_content" android:text="📋 Journal des actions" android:layout_weight="1.0" />
+                        <TextView android:textSize="10.0sp" android:textColor="#5050aa" android:id="@id/tv_log_clear_youtube" android:padding="4.0dp" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Effacer" />
+                    </LinearLayout>
+                    <androidx.core.widget.NestedScrollView android:id="@id/task_log_scroll_youtube" android:background="#0d0d1a" android:visibility="gone" android:layout_width="match_parent" android:layout_height="160.0dp" android:layout_marginBottom="6.0dp" android:fillViewport="true">
+                        <LinearLayout android:orientation="vertical" android:id="@id/task_log_container_youtube" android:padding="6.0dp" android:layout_width="match_parent" android:layout_height="wrap_content" />
+                    </androidx.core.widget.NestedScrollView>
+                    <ProgressBar android:layout_gravity="center" android:id="@id/task_progress_youtube" android:visibility="gone" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginBottom="6.0dp" android:indeterminateTint="#ff0000" />
+                    <LinearLayout android:orientation="vertical" android:id="@id/task_list_youtube" android:layout_width="match_parent" android:layout_height="wrap_content" />
+                </LinearLayout>
+                <LinearLayout android:orientation="vertical" android:background="#111e33" android:padding="16.0dp" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginBottom="20.0dp">
+                    <LinearLayout android:gravity="center_vertical" android:orientation="horizontal" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginBottom="10.0dp">
+                        <TextView android:textSize="14.0sp" android:textStyle="bold" android:textColor="#ffffff" android:layout_width="0.0dp" android:layout_height="wrap_content" android:text="✈ Telegram" android:layout_weight="1.0" />
+                        <TextView android:textSize="12.0sp" android:textColor="#a0b0cc" android:id="@id/tv_telegram_status" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Non configuré" />
+                    </LinearLayout>
+                    <Button android:textSize="13.0sp" android:textColor="#ffffff" android:id="@id/btn_telegram_web" android:background="@drawable/btn_telegram_web" android:layout_width="match_parent" android:layout_height="44.0dp" android:layout_marginBottom="8.0dp" android:text="🌐 Telegram Web" />
+                    <Button android:textSize="13.0sp" android:textColor="#ffffff" android:id="@id/btn_telegram_account" android:background="@drawable/btn_telegram_app" android:layout_width="match_parent" android:layout_height="44.0dp" android:layout_marginBottom="10.0dp" android:text="✈ Telegram App" />
+                    <Button android:textSize="13.0sp" android:textColor="#ffffff" android:id="@id/btn_load_telegram_tasks" android:background="@drawable/btn_primary" android:layout_width="match_parent" android:layout_height="44.0dp" android:layout_marginBottom="8.0dp" android:text="▶️ Lancer" />
+                    <LinearLayout android:gravity="center_vertical" android:orientation="horizontal" android:id="@id/task_log_header_telegram" android:visibility="gone" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginBottom="2.0dp">
+                        <TextView android:textSize="11.0sp" android:textColor="#3a6a9a" android:layout_width="0.0dp" android:layout_height="wrap_content" android:text="📋 Journal des actions" android:layout_weight="1.0" />
+                        <TextView android:textSize="10.0sp" android:textColor="#2a5a8a" android:id="@id/tv_log_clear_telegram" android:padding="4.0dp" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Effacer" />
+                    </LinearLayout>
+                    <androidx.core.widget.NestedScrollView android:id="@id/task_log_scroll_telegram" android:background="#060d1a" android:visibility="gone" android:layout_width="match_parent" android:layout_height="160.0dp" android:layout_marginBottom="6.0dp" android:fillViewport="true">
+                        <LinearLayout android:orientation="vertical" android:id="@id/task_log_container_telegram" android:padding="6.0dp" android:layout_width="match_parent" android:layout_height="wrap_content" />
+                    </androidx.core.widget.NestedScrollView>
+                    <ProgressBar android:layout_gravity="center" android:id="@id/task_progress_telegram" android:visibility="gone" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginBottom="6.0dp" android:indeterminateTint="#54a9eb" />
+                    <LinearLayout android:orientation="vertical" android:id="@id/task_list_telegram" android:layout_width="match_parent" android:layout_height="wrap_content" />
+                </LinearLayout>
+            </LinearLayout>
+        </ScrollView>
+    </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+</FrameLayout>

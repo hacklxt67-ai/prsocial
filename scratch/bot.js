@@ -1,0 +1,1 @@
+if (window.__autoTasksBotLoaded) return;window.__autoTasksBotLoaded = true;window.__autoPlayActive = 

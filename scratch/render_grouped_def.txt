@@ -1,0 +1,64 @@
+function renderGroupedTasks(tasks, totalCount) {
+    // If a specific action tab is selected, render flat list (no group headers)
+    if (currentAction !== 'all') {
+      return tasks.map(renderTaskCard).join('');
+    }
+
+    // "All" tab: group by action with collapsible headers showing count
+    const groups = {};
+    const actionOrder = ['follow', 'subscribe', 'like', 'comment', 'view', 'retweet', 'share', 'join', 'connection'];
+    for (const task of tasks) {
+      const a = task.action;
+      if (!groups[a]) groups[a] = [];
+      groups[a].push(task);
+    }
+    const sortedActions = Object.keys(groups).sort((a, b) => {
+      const ia = actionOrder.indexOf(a), ib = actionOrder.indexOf(b);
+      return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+    });
+    // If only 1 group, skip header
+    if (sortedActions.length <= 1) return tasks.map(renderTaskCard).join('');
+    // Render with headers
+    let html = '';
+    for (const action of sortedActions) {
+      const groupTasks = groups[action];
+      const label = t('action_group_' + action) || action;
+      const icon = ACTION_ICONS[action] || '';
+      html += `<div class="task-group-header">${icon}<span>${label}</span><span class="task-group-count">${groupTasks.length}</span></div>`;
+      html += groupTasks.map(renderTaskCard).join('');
+    }
+    return html;
+  }
+
+  // Platform chips click handler
+  document.getElementById('platformChips').addEventListener('click', (e) => {
+    const chip = e.target.closest('.platform-chip');
+    if (!chip) return;
+    const platform = chip.dataset.platform;
+    document.querySelectorAll('.platform-chip').forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
+    currentPlatform = platform;
+    currentAction = 'all'; // reset action filter on platform change
+
+    // If platform is locked (not linked), show link prompt
+    if (!linkedPlatforms.has(platform)) {
+      showLinkPrompt(platform);
+      return;
+    }
+    currentPage = 1;
+    loadTasks();
+  });
+
+  // Action tabs click handler
+  document.getElementById('actionTabs').addEventListener('click', (e) => {
+    const tab = e.target.closest('.action-tab');
+    if (!tab) return;
+    document.querySelectorAll('.action-tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    currentAction = tab.dataset.action;
+    visibleCount = PAGE_SIZE; // reset pagination on action change
+    renderVisibleTasks();
+  });
+
+  // Load more button — fetch next page from server
+  docume

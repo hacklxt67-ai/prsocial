@@ -1,0 +1,60 @@
+function renderTaskCard(task) {
+  const color = PLATFORM_COLORS[task.platform] || '#ea580c';
+  const icon = PLATFORM_ICONS[task.platform] || '';
+  const remaining = task.total_count - task.completed_count;
+  const label = getTaskLabel(task);
+
+  return `
+  <div class="task-card" onclick="openTask(${task.id})">
+    <div class="task-card-row">
+      <div class="tc-icon" style="color:${color}">${icon}</div>
+      <div class="tc-body">
+        <div class="tc-name">${escHtml(label)}</div>
+        <div class="tc-sub">${escHtml(task.target_username || '')} <span class="tc-rem">· ${remaining} ${t('tasks_remaining')}</span></div>
+      </div>
+      <div class="tc-reward">${fmtPrice(task.worker_reward || task.cost_per_task)}</div>
+    </div>
+  </div>`;
+}
+
+// === TASK MODAL ===
+async function openTask(taskId) {
+  try {
+    const data = await API.request('GET', '/tasks/' + taskId);
+    applyApiCheckFlag(data);
+    showTaskModal(data.task, data.completion);
+  } catch (e) { showToast(e.message, 'error'); }
+}
+
+function showTaskModal(task, completion) {
+  const color = PLATFORM_COLORS[task.platform] || '#ea580c';
+  const icon = PLATFORM_ICONS[task.platform] || '';
+  const remaining = task.total_count - task.completed_count;
+  const status = completion?.status || 'none';
+  // Some legacy orders store target_url without protocol (e.g. "www.tiktok.com/@user").
+  // The SPA router only skips links starting with "http", so a protocol-less href
+  // would be intercepted and resolved as an internal route → fallback to dashboard.
+  const targetHref = /^https?:\/\//i.test(task.target_url || '') ? task.target_url : 'https://' + (task.target_url || '');
+
+  document.getElementById('taskModal')?.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'taskModal';
+  modal.className = 'modal-overlay';
+  modal.innerHTML = `
+  <div class="modal-content task-modal">
+    <button class="modal-close" onclick="closeTaskModal()">&times;</button>
+
+    <!-- Header -->
+    <div class="tm-header" style="border-left:4px solid ${color}">
+      <div class="task-platform-icon" style="color:${color};width:40px;height:40px">${icon}</div>
+      <div style="flex:1;min-width:0">
+        <div class="tm-title">${escHtml(getTaskLabel(task))}</div>
+        <div class="tm-target">${escHtml(task.target_username || '')}</div>
+      </div>
+    </div>
+
+    <!-- Info grid -->
+    <div class="tm-info-grid">
+      <div class="tm-info-item">
+        <div class="tm-info-value" style="color:var(--accent)">${

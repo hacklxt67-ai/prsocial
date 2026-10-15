@@ -1,0 +1,356 @@
+{
+  "/api/...": {
+    "methods": [
+      "METHOD"
+    ],
+    "files_count": 2,
+    "files": [
+      "scratch\\comprehensive_scan.py",
+      "scratch\\scan_endpoints.py"
+    ],
+    "sample": "# Pattern 3: fetch('/api/...' or fetch('/api' + ...)"
+  },
+  "/api/PATH": {
+    "methods": [
+      "METHOD"
+    ],
+    "files_count": 1,
+    "files": [
+      "scratch\\comprehensive_scan.py"
+    ],
+    "sample": "# Pattern 1: self.request(\"METHOD\", \"PATH\", ...)"
+  },
+  "/api/auth/login": {
+    "methods": [
+      "POST"
+    ],
+    "files_count": 1,
+    "files": [
+      "scratch\\api.js"
+    ],
+    "sample": "const data = await this.request('POST', '/auth/login', { email, password, cfToken, fingerprint });"
+  },
+  "/api/auth/logout": {
+    "methods": [
+      "POST"
+    ],
+    "files_count": 1,
+    "files": [
+      "scratch\\api.js"
+    ],
+    "sample": "await this.request('POST', '/auth/logout');"
+  },
+  "/api/auth/me": {
+    "methods": [
+      "GET"
+    ],
+    "files_count": 3,
+    "files": [
+      "pc_bot\\http_action_engine.py",
+      "pc_bot\\pr_api.py",
+      "scratch\\api.js"
+    ],
+    "sample": "return self.request(\"GET\", \"/auth/me\")"
+  },
+  "/api/auth/register": {
+    "methods": [
+      "POST"
+    ],
+    "files_count": 1,
+    "files": [
+      "scratch\\api.js"
+    ],
+    "sample": "const data = await this.request('POST', '/auth/register', body);"
+  },
+  "/api/auth/verify-2fa": {
+    "methods": [
+      "POST"
+    ],
+    "files_count": 1,
+    "files": [
+      "scratch\\api.js"
+    ],
+    "sample": "const data = await this.request('POST', '/auth/verify-2fa', { session_id: sessionId, code });"
+  },
+  "/api/autoearn/accounts/": {
+    "methods": [
+      "GET/POST"
+    ],
+    "files_count": 1,
+    "files": [
+      "scratch\\pages_autoearn.js"
+    ],
+    "sample": "window.open('/api/autoearn/accounts/' + id + '/download', '_blank');"
+  },
+  "/api/premium/counter": {
+    "methods": [
+      "GET/POST"
+    ],
+    "files_count": 1,
+    "files": [
+      "scratch\\components_platforms.js"
+    ],
+    "sample": "fetch('/api/premium/counter',    { credentials: 'same-origin' }).then(r => r.json()).catch(() => ({ "
+  },
+  "/api/premium/visibility": {
+    "methods": [
+      "GET/POST"
+    ],
+    "files_count": 1,
+    "files": [
+      "scratch\\components_platforms.js"
+    ],
+    "sample": "fetch('/api/premium/visibility', { credentials: 'same-origin' }).then(r => r.json()).catch(() => ({ "
+  },
+  "/api/profile/socials": {
+    "methods": [
+      "GET"
+    ],
+    "files_count": 3,
+    "files": [
+      "pc_bot\\http_action_engine.py",
+      "pc_bot\\pr_api.py",
+      "scratch\\pages_tasks.js"
+    ],
+    "sample": "return self.request(\"GET\", \"/profile/socials\")"
+  },
+  "/api/tasks/": {
+    "methods": [
+      "GET",
+      "POST"
+    ],
+    "files_count": 14,
+    "files": [
+      "scratch\\bot_clean.js",
+      "scratch\\comprehensive_scan.py",
+      "scratch\\eval_test.js",
+      "scratch\\eval_test2.js"
+    ],
+    "sample": "fetch('/api/tasks/' + taskId + '/cancel', {"
+  },
+  "/api/tasks/active": {
+    "methods": [
+      "GET/POST"
+    ],
+    "files_count": 1,
+    "files": [
+      "scratch\\test_active.py"
+    ],
+    "sample": "'/tasks/active',"
+  },
+  "/api/tasks/api-check-enabled": {
+    "methods": [
+      "GET"
+    ],
+    "files_count": 3,
+    "files": [
+      "pc_bot\\pr_api.py",
+      "scratch\\pages_tasks.js",
+      "scratch\\test_real_tasks_logic.py"
+    ],
+    "sample": "status, data = self.request(\"GET\", \"/tasks/api-check-enabled\")"
+  },
+  "/api/tasks/available": {
+    "methods": [
+      "GET"
+    ],
+    "files_count": 5,
+    "files": [
+      "pc_bot\\http_action_engine.py",
+      "pc_bot\\pr_api.py",
+      "scratch\\check_active_task_detail.py",
+      "scratch\\pages_tasks.js"
+    ],
+    "sample": "return self.request(\"GET\", \"/tasks/available\", params={\"platform\": platform, \"sort\": \"reward\", \"limi"
+  },
+  "/api/tasks/completions": {
+    "methods": [
+      "GET/POST"
+    ],
+    "files_count": 1,
+    "files": [
+      "scratch\\test_active.py"
+    ],
+    "sample": "'/tasks/completions',"
+  },
+  "/api/tasks/current": {
+    "methods": [
+      "GET/POST"
+    ],
+    "files_count": 1,
+    "files": [
+      "scratch\\test_active.py"
+    ],
+    "sample": "'/tasks/current',"
+  },
+  "/api/tasks/in-progress": {
+    "methods": [
+      "GET/POST"
+    ],
+    "files_count": 1,
+    "files": [
+      "scratch\\test_active.py"
+    ],
+    "sample": "'/tasks/in-progress',"
+  },
+  "/api/tasks/my": {
+    "methods": [
+      "GET/POST"
+    ],
+    "files_count": 1,
+    "files": [
+      "scratch\\test_active.py"
+    ],
+    "sample": "'/tasks/my',"
+  },
+  "/api/tasks/my-active": {
+    "methods": [
+      "GET/POST"
+    ],
+    "files_count": 1,
+    "files": [
+      "scratch\\test_active.py"
+    ],
+    "sample": "'/tasks/my-active',"
+  },
+  "/api/tasks/my/history": {
+    "methods": [
+      "GET"
+    ],
+    "files_count": 1,
+    "files": [
+      "pc_bot\\pr_api.py"
+    ],
+    "sample": "return self.request(\"GET\", \"/tasks/my/history\", params={\"limit\": 10, \"status\": \"in_progress\"})"
+  },
+  "/api/tasks/my/list": {
+    "methods": [
+      "GET"
+    ],
+    "files_count": 15,
+    "files": [
+      "pc_bot\\http_action_engine.py",
+      "scratch\\bot_clean.js",
+      "scratch\\check_active_task_detail.py",
+      "scratch\\eval_test.js"
+    ],
+    "sample": "return self.request(\"GET\", \"/tasks/my/list\", params={\"status\": \"in_progress\"})"
+  },
+  "/api/tasks/my/rates": {
+    "methods": [
+      "GET"
+    ],
+    "files_count": 1,
+    "files": [
+      "scratch\\pages_my_tasks.js"
+    ],
+    "sample": "const d = await API.request('GET', '/tasks/my/rates');"
+  },
+  "/api/tasks/my/summary": {
+    "methods": [
+      "GET"
+    ],
+    "files_count": 3,
+    "files": [
+      "scratch\\check_active_task_detail.py",
+      "scratch\\pages_my_tasks.js",
+      "scratch\\test_active_api.py"
+    ],
+    "sample": "'/tasks/my/summary',"
+  },
+  "/api/tasks/{...}": {
+    "methods": [
+      "GET/POST"
+    ],
+    "files_count": 1,
+    "files": [
+      "scratch\\comprehensive_scan.py"
+    ],
+    "sample": "# Pattern 5: template literals with `/api/tasks/${...}` or `f\"/tasks/{...}\"`"
+  },
+  "/api/tasks/{task_id}": {
+    "methods": [
+      "GET/POST"
+    ],
+    "files_count": 1,
+    "files": [
+      "scratch\\scan_endpoints.py"
+    ],
+    "sample": "clean_ep = '/api/tasks/{task_id}'"
+  },
+  "/api/tasks/{task_id}/...": {
+    "methods": [
+      "GET/POST"
+    ],
+    "files_count": 1,
+    "files": [
+      "scratch\\scan_endpoints.py"
+    ],
+    "sample": "# 4. f\"/tasks/{task_id}/...\""
+  },
+  "/api/tasks/{task_id}/abandon": {
+    "methods": [
+      "GET/POST"
+    ],
+    "files_count": 1,
+    "files": [
+      "pc_bot\\pr_api.py"
+    ],
+    "sample": "for ep in [f\"/tasks/{task_id}/cancel\", f\"/tasks/{task_id}/abandon\", f\"/tasks/{task_id}/skip\"]:"
+  },
+  "/api/tasks/{task_id}/api-check": {
+    "methods": [
+      "GET/POST"
+    ],
+    "files_count": 3,
+    "files": [
+      "pc_bot\\http_action_engine.py",
+      "pc_bot\\pr_api.py",
+      "scratch\\test_real_tasks_logic.py"
+    ],
+    "sample": "return self.request(\"POST\", f\"/tasks/{task_id}/api-check\")"
+  },
+  "/api/tasks/{task_id}/cancel": {
+    "methods": [
+      "GET/POST"
+    ],
+    "files_count": 2,
+    "files": [
+      "pc_bot\\http_action_engine.py",
+      "pc_bot\\pr_api.py"
+    ],
+    "sample": "return self.request(\"POST\", f\"/tasks/{task_id}/cancel\")"
+  },
+  "/api/tasks/{task_id}/report-task": {
+    "methods": [
+      "GET/POST"
+    ],
+    "files_count": 1,
+    "files": [
+      "pc_bot\\pr_api.py"
+    ],
+    "sample": "return self.request(\"POST\", f\"/tasks/{task_id}/report-task\", json_data={})"
+  },
+  "/api/tasks/{task_id}/skip": {
+    "methods": [
+      "GET/POST"
+    ],
+    "files_count": 1,
+    "files": [
+      "pc_bot\\pr_api.py"
+    ],
+    "sample": "for ep in [f\"/tasks/{task_id}/cancel\", f\"/tasks/{task_id}/abandon\", f\"/tasks/{task_id}/skip\"]:"
+  },
+  "/api/tasks/{task_id}/start": {
+    "methods": [
+      "GET/POST"
+    ],
+    "files_count": 3,
+    "files": [
+      "pc_bot\\http_action_engine.py",
+      "pc_bot\\pr_api.py",
+      "scratch\\test_real_tasks_logic.py"
+    ],
+    "sample": "return self.request(\"POST\", f\"/tasks/{task_id}/start\", json_data=body)"
+  }
+}

@@ -1,0 +1,395 @@
+import os
+import json
+import time
+import threading
+import customtkinter as ctk
+from datetime import datetime
+from typing import Optional
+
+from .pr_api import PrSocialAPI
+from .browser_bot import BrowserBot
+from .automation_engine import AutomationEngine
+
+CONFIG_FILE = r"D:\social_pc_bot\config.json"
+os.makedirs(r"D:\social_pc_bot", exist_ok=True)
+
+class PRSocialApp(ctk.CTk):
+    def __init__(self):
+        super().__init__()
+
+        # Configuration de la fenêtre principale
+        self.title("PR.Social Bot PC - Édition Professionnelle v1.2.0")
+        self.geometry("1100, 720")
+        self.minsize(950, 650)
+        ctk.set_appearance_mode("dark")
+        ctk.set_default_color_theme("blue")
+
+        # Initialisation composants métier
+        self.config = self.load_config()
+        self.api = PrSocialAPI(
+            token=self.config.get("token", ""),
+            cf_clearance=self.config.get("cf_clearance", "")
+        )
+        self.browser_bot = BrowserBot(
+            headless=self.config.get("headless", False)
+        )
+        self.engine = AutomationEngine(self.api, self.browser_bot)
+
+        # Connecter les callbacks de l'engine
+        self.engine.cb_log = self.gui_log
+        self.engine.cb_balance = self.update_balance_display
+        self.engine.cb_stats = self.update_stats_display
+        self.engine.cb_status = self.update_status_display
+
+        # Construire l'interface
+        self._build_ui()
+
+        # Tester la connexion au démarrage
+        self.after(500, self.test_connection_startup)
+
+    def load_config(self) -> dict:
+        if os.path.exists(CONFIG_FILE):
+            try:
+                with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+                    return json.load(f)
+            except Exception:
+                pass
+        return {"token": "", "cf_clearance": "", "headless": False, "delay_min": 5, "delay_max": 12}
+
+    def save_config(self):
+        try:
+            with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+                json.dump(self.config, f, indent=2)
+        except Exception:
+            pass
+
+    def _build_ui(self):
+        self.grid_columnconfigure(0, weight=1)
+        self.grid_rowconfigure(2, weight=1)
+
+        # 1. HEADER BAR
+        header_frame = ctk.CTkFrame(self, height=70, corner_radius=10, fg_color="#181926")
+        header_frame.grid(row=0, column=0, sticky="ew", padx=15, pady=(15, 10))
+        header_frame.grid_columnconfigure(1, weight=1)
+
+        # Titre et Version
+        title_label = ctk.CTkLabel(
+            header_frame,
+            text="⚡ PR.Social Bot PC",
+            font=ctk.CTkFont(size=22, weight="bold"),
+            text_color="#38bdf8"
+        )
+        title_label.grid(row=0, column=0, padx=20, pady=15, sticky="w")
+
+        # Indicateur de Statut Compte
+        self.lbl_auth_status = ctk.CTkLabel(
+            header_frame,
+            text="🔴 Déconnecté",
+            font=ctk.CTkFont(size=14, weight="bold"),
+            text_color="#ef4444"
+        )
+        self.lbl_auth_status.grid(row=0, column=2, padx=15, pady=15)
+
+        # Solde Actuel
+        self.lbl_balance = ctk.CTkLabel(
+            header_frame,
+            text="Solde: $0.000",
+            font=ctk.CTkFont(size=18, weight="bold"),
+            text_color="#10b981"
+        )
+        self.lbl_balance.grid(row=0, column=3, padx=20, pady=15)
+
+        # 2. STATS CARDS
+        stats_frame = ctk.CTkFrame(self, fg_color="transparent")
+        stats_frame.grid(row=1, column=0, sticky="ew", padx=15, pady=5)
+        for i in range(4):
+            stats_frame.grid_columnconfigure(i, weight=1)
+
+        self.card_tasks_ok = self._create_stat_card(stats_frame, 0, "Tâches Réussies", "0", "#10b981")
+        self.card_tasks_err = self._create_stat_card(stats_frame, 1, "Échecs / Ignorées", "0", "#f59e0b")
+        self.card_earnings = self._create_stat_card(stats_frame, 2, "Gains Session", "$0.000", "#38bdf8")
+        self.card_status = self._create_stat_card(stats_frame, 3, "État du Bot", "En veille", "#94a3b8")
+
+        # 3. MAIN WORKSPACE (Controls + Logs)
+        main_workspace = ctk.CTkFrame(self, fg_color="transparent")
+        main_workspace.grid(row=2, column=0, sticky="nsew", padx=15, pady=10)
+        main_workspace.grid_columnconfigure(0, weight=1)
+        main_workspace.grid_columnconfigure(1, weight=2)
+        main_workspace.grid_rowconfigure(0, weight=1)
+
+        # Panneau de contrôle gauche
+        left_panel = ctk.CTkFrame(main_workspace, fg_color="#1e1e2e", corner_radius=10)
+        left_panel.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
+
+        # 1. Section Connexion & Session
+        auth_box = ctk.CTkFrame(left_panel, fg_color="#181926", corner_radius=8)
+        auth_box.pack(fill="x", padx=12, pady=(12, 8))
+
+        lbl_auth_box = ctk.CTkLabel(
+            auth_box,
+            text="🔑 Connexion Compte PR.Social",
+            font=ctk.CTkFont(size=13, weight="bold"),
+            text_color="#38bdf8"
+        )
+        lbl_auth_box.pack(padx=10, pady=(8, 4), anchor="w")
+
+        self.entry_token = ctk.CTkEntry(
+            auth_box,
+            placeholder_text="Coller votre Token ici...",
+            height=30,
+            font=ctk.CTkFont(size=11)
+        )
+        if self.config.get("token"):
+            self.entry_token.insert(0, self.config.get("token"))
+        self.entry_token.pack(fill="x", padx=10, pady=4)
+
+        btn_auth_row = ctk.CTkFrame(auth_box, fg_color="transparent")
+        btn_auth_row.pack(fill="x", padx=10, pady=(4, 8))
+        btn_auth_row.grid_columnconfigure(0, weight=1)
+        btn_auth_row.grid_columnconfigure(1, weight=1)
+
+        self.btn_save_token = ctk.CTkButton(
+            btn_auth_row,
+            text="💾 Valider Token",
+            font=ctk.CTkFont(size=11, weight="bold"),
+            fg_color="#059669",
+            hover_color="#047857",
+            height=30,
+            command=self.action_save_manual_token
+        )
+        self.btn_save_token.grid(row=0, column=0, padx=(0, 4), sticky="ew")
+
+        self.btn_login_chrome = ctk.CTkButton(
+            btn_auth_row,
+            text="🌐 Ouvrir Chrome",
+            font=ctk.CTkFont(size=11, weight="bold"),
+            fg_color="#6366f1",
+            hover_color="#4f46e5",
+            height=30,
+            command=self.action_login_chrome
+        )
+        self.btn_login_chrome.grid(row=0, column=1, padx=(4, 0), sticky="ew")
+
+        # 2. Section Actions & Exécution
+        lbl_controls = ctk.CTkLabel(left_panel, text="🎮 Actions & Lancement", font=ctk.CTkFont(size=14, weight="bold"))
+        lbl_controls.pack(padx=15, pady=(8, 6), anchor="w")
+
+        # Bouton Principal Lancer Tout
+        self.btn_start_all = ctk.CTkButton(
+            left_panel,
+            text="🚀 LANCER TOUT (AUTO)",
+            font=ctk.CTkFont(size=14, weight="bold"),
+            fg_color="#10b981",
+            hover_color="#059669",
+            height=40,
+            command=self.action_start_all
+        )
+        self.btn_start_all.pack(fill="x", padx=15, pady=4)
+
+        # Bouton Arrêt
+        self.btn_stop = ctk.CTkButton(
+            left_panel,
+            text="⏹️ ARRÊTER LE BOT",
+            font=ctk.CTkFont(size=13, weight="bold"),
+            fg_color="#ef4444",
+            hover_color="#dc2626",
+            height=34,
+            state="disabled",
+            command=self.action_stop
+        )
+        self.btn_stop.pack(fill="x", padx=15, pady=4)
+
+        # Séparateur
+        sep = ctk.CTkFrame(left_panel, height=2, fg_color="#313244")
+        sep.pack(fill="x", padx=15, pady=8)
+
+        # Plateformes individuelles
+        lbl_indiv = ctk.CTkLabel(left_panel, text="Lancer une plateforme :", font=ctk.CTkFont(size=12, weight="bold"), text_color="#a6adc8")
+        lbl_indiv.pack(padx=15, pady=(0, 4), anchor="w")
+
+        self.btn_tt = self._create_platform_btn(left_panel, "🎵 TikTok", "tiktok")
+        self.btn_fb = self._create_platform_btn(left_panel, "📘 Facebook", "facebook")
+        self.btn_ig = self._create_platform_btn(left_panel, "📸 Instagram", "instagram")
+        self.btn_yt = self._create_platform_btn(left_panel, "▶️ YouTube", "youtube")
+        self.btn_tg = self._create_platform_btn(left_panel, "✈️ Telegram", "telegram")
+        self.btn_threads = self._create_platform_btn(left_panel, "🧵 Threads", "threads")
+        self.btn_reddit = self._create_platform_btn(left_panel, "🟠 Reddit", "reddit")
+
+        # Options rapides
+        sep2 = ctk.CTkFrame(left_panel, height=2, fg_color="#313244")
+        sep2.pack(fill="x", padx=15, pady=8)
+
+        self.chk_headless = ctk.CTkCheckBox(
+            left_panel,
+            text="Cacher Chrome (Mode invisible)",
+            command=self.toggle_headless
+        )
+        if self.config.get("headless", False):
+            self.chk_headless.select()
+        self.chk_headless.pack(padx=15, pady=(2, 10), anchor="w")
+
+        # Panneau de droite : Console de logs
+        right_panel = ctk.CTkFrame(main_workspace, fg_color="#1e1e2e", corner_radius=10)
+        right_panel.grid(row=0, column=1, sticky="nsew")
+        right_panel.grid_columnconfigure(0, weight=1)
+        right_panel.grid_rowconfigure(1, weight=1)
+
+        log_header = ctk.CTkFrame(right_panel, fg_color="transparent")
+        log_header.grid(row=0, column=0, sticky="ew", padx=15, pady=10)
+        log_header.grid_columnconfigure(0, weight=1)
+
+        lbl_log_title = ctk.CTkLabel(log_header, text="📜 Journal d'Exécution en Direct", font=ctk.CTkFont(size=16, weight="bold"))
+        lbl_log_title.grid(row=0, column=0, sticky="w")
+
+        btn_clear_log = ctk.CTkButton(
+            log_header,
+            text="Effacer logs",
+            width=90,
+            height=28,
+            fg_color="#313244",
+            hover_color="#45475a",
+            command=self.clear_logs
+        )
+        btn_clear_log.grid(row=0, column=1, sticky="e")
+
+        self.log_textbox = ctk.CTkTextbox(
+            right_panel,
+            font=ctk.CTkFont(family="Consolas", size=12),
+            fg_color="#11111b",
+            text_color="#cdd6f4",
+            wrap="word"
+        )
+        self.log_textbox.grid(row=1, column=0, sticky="nsew", padx=15, pady=(0, 15))
+
+    def _create_stat_card(self, parent, col, title, initial_val, color):
+        card = ctk.CTkFrame(parent, fg_color="#1e1e2e", corner_radius=8, height=65)
+        card.grid(row=0, column=col, sticky="ew", padx=5)
+        card.grid_columnconfigure(0, weight=1)
+
+        lbl_t = ctk.CTkLabel(card, text=title, font=ctk.CTkFont(size=11), text_color="#a6adc8")
+        lbl_t.pack(pady=(8, 0))
+
+        lbl_v = ctk.CTkLabel(card, text=initial_val, font=ctk.CTkFont(size=16, weight="bold"), text_color=color)
+        lbl_v.pack(pady=(0, 8))
+        return lbl_v
+
+    def _create_platform_btn(self, parent, text, platform):
+        btn = ctk.CTkButton(
+            parent,
+            text=text,
+            height=30,
+            fg_color="#313244",
+            hover_color="#45475a",
+            anchor="w",
+            command=lambda p=platform: self.action_start_single(p)
+        )
+        btn.pack(fill="x", padx=15, pady=3)
+        return btn
+
+    def gui_log(self, message: str, level: str = "info"):
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        prefix = {
+            "success": "[SUCCÈS]",
+            "error": "[ERREUR]",
+            "warning": "[ATTENTION]",
+            "info": "[INFO]"
+        }.get(level, "[INFO]")
+
+        log_line = f"[{timestamp}] {prefix} {message}\n"
+
+        def _append():
+            self.log_textbox.insert("end", log_line)
+            self.log_textbox.see("end")
+
+        self.after(0, _append)
+
+    def update_balance_display(self, balance: float):
+        self.after(0, lambda: self.lbl_balance.configure(text=f"Solde: ${balance:.3f}"))
+
+    def update_stats_display(self, success: int, failed: int, earnings: float):
+        def _update():
+            self.card_tasks_ok.configure(text=str(success))
+            self.card_tasks_err.configure(text=str(failed))
+            self.card_earnings.configure(text=f"${earnings:.3f}")
+        self.after(0, _update)
+
+    def update_status_display(self, is_running: bool):
+        def _update():
+            if is_running:
+                self.card_status.configure(text="En cours...", text_color="#10b981")
+                self.btn_start_all.configure(state="disabled")
+                self.btn_stop.configure(state="normal")
+            else:
+                self.card_status.configure(text="En veille", text_color="#94a3b8")
+                self.btn_start_all.configure(state="normal")
+                self.btn_stop.configure(state="disabled")
+        self.after(0, _update)
+
+    def clear_logs(self):
+        self.log_textbox.delete("1.0", "end")
+
+    def toggle_headless(self):
+        val = bool(self.chk_headless.get())
+        self.browser_bot.headless = val
+        self.config["headless"] = val
+        self.save_config()
+        state = "Activé (Chrome tournera en arrière-plan)" if val else "Désactivé (Chrome s'ouvrira visible à l'écran)"
+        self.gui_log(f"Mode discret : {state}", "info")
+
+    def test_connection_startup(self):
+        def _test():
+            self.gui_log("Vérification de la session PR.Social...", "info")
+            status, me = self.api.get_me()
+            if status == 200 and me.get("user"):
+                u = me["user"]
+                bal = float(u.get("balance", 0.0))
+                self.lbl_auth_status.configure(text=f"🟢 @{u.get('username')}", text_color="#10b981")
+                self.lbl_balance.configure(text=f"Solde: ${bal:.3f}")
+                self.gui_log(f"Session validée avec succès pour @{u.get('username')} (Solde: ${bal:.3f}).", "success")
+            else:
+                self.lbl_auth_status.configure(text="🔴 Déconnecté", text_color="#ef4444")
+                self.gui_log("Non connecté. Saisissez votre Token ci-dessus ou cliquez sur 'Ouvrir Chrome'.", "warning")
+
+        threading.Thread(target=_test, daemon=True).start()
+
+    def action_save_manual_token(self):
+        tok = self.entry_token.get().strip()
+        if not tok:
+            self.gui_log("Veuillez saisir ou coller un Token PR.Social.", "warning")
+            return
+        self.config["token"] = tok
+        self.save_config()
+        self.api.update_credentials(tok, self.config.get("cf_clearance", ""))
+        self.gui_log("Token enregistré manuellement. Vérification du compte...", "info")
+        self.test_connection_startup()
+
+    def action_login_chrome(self):
+        def _do_login():
+            try:
+                self.gui_log("Lancement de Chrome pour connexion automatique...", "info")
+                creds = self.browser_bot.capture_login_session(timeout_seconds=180, log_cb=self.gui_log)
+                if creds and creds.get("token"):
+                    tok = creds["token"]
+                    self.config["token"] = tok
+                    self.config["cf_clearance"] = creds.get("cf_clearance", "")
+                    self.save_config()
+                    self.api.update_credentials(tok, creds.get("cf_clearance", ""))
+                    self.after(0, lambda: self.entry_token.delete(0, "end"))
+                    self.after(0, lambda: self.entry_token.insert(0, tok))
+                    self.gui_log("Connexion réussie ! Session enregistrée.", "success")
+                    self.test_connection_startup()
+                else:
+                    self.gui_log("Connexion non finalisée. Vous pouvez coller votre jeton manuellement dans le champ prévu.", "warning")
+            except Exception as e:
+                self.gui_log(f"Erreur Chrome : {str(e)}", "error")
+
+        threading.Thread(target=_do_login, daemon=True).start()
+
+    def action_start_all(self):
+        self.engine.start(["tiktok", "facebook", "instagram", "youtube", "telegram"])
+
+    def action_start_single(self, platform: str):
+        self.engine.start([platform])
+
+    def action_stop(self):
+        self.engine.stop()

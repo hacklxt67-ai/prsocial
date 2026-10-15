@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PR.SOCIAL — Earn from Social Media</title>
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- Non-Latin scripts: Arabic (ar/ur/ps), Bengali (bn), Gurmukhi (pa), Japanese (ja), Korean (ko) -->
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Arabic:wght@400;500;600;700&family=Noto+Sans+Bengali:wght@400;500;600;700&family=Noto+Sans+Gurmukhi:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+  <!-- Theme init — synchronous (no defer) so theme is set BEFORE first paint -->
+  <script src="/js/theme-init.js?v=1778760946"></script>
+  <script src="/js/version-check.js?v=1778192681" defer></script>
+  <link rel="stylesheet" href="/css/variables.css?v=rel20260811i">
+  <link rel="stylesheet" href="/css/main.css?v=rel20260811u">
+  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
+  <!-- MOBILE OVERRIDES — MUST be AFTER main.css -->
+  <style id="mobile-fix">
+    @media (max-width: 1024px) {
+      /* === LAYOUT === */
+      body { overflow-x: hidden !important; }
+      .app-layout { display: block !important; width: 100% !important; }
+      .main-content { margin-left: 0 !important; width: 100% !important; max-width: 100vw !important; }
+      .sidebar { transform: translateX(-100%) !important; position: fixed !important; top: 0 !important; left: 0 !important; height: 100dvh !important; height: 100vh !important; width: var(--sidebar-width, 240px) !important; z-index: 1000 !important; overflow-y: auto !important; }
+      .sidebar.open { transform: translateX(0) !important; }
+      /* RTL — Arabic/Urdu/Pashto: sidebar mirrored to the right */
+      html[dir="rtl"] .sidebar { transform: translateX(100%) !important; left: auto !important; right: 0 !important; border-right: none !important; border-left: 1px solid var(--border) !important; }
+      html[dir="rtl"] .sidebar.open { transform: translateX(0) !important; }
+      .sidebar-overlay { z-index: 999 !important; }
+      .hamburger { display: flex !important; }
+
+      /* === PAGE HEADER — hamburger + title in one row === */
+      .page-header {
+        display: flex !important;
+        align-items: center !important;
+        gap: 10px !important;
+        padding: 10px 12px 6px !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+      }
+      .page-header-text { flex: 1 !important; min-width: 0 !important; }
+      .page-header h1 { font-size: 1.05rem !important; line-height: 1.2 !important; }
+      .page-header p { font-size: 0.65rem !important; margin-top: 0 !important; opacity: 0.7 !important; }
+      .page-content { padding: 6px 10px 10px !important; width: 100% !important; box-sizing: border-box !important; }
+
+      /* === TASK TOOLBAR — one line: chips + sort === */
+      .task-toolbar {
+        display: flex !important;
+        align-items: center !important;
+        gap: 4px !important;
+        margin-bottom: 8px !important;
+        position: relative !important;
+      }
+      .task-toolbar .platform-chips {
+        display: flex !important;
+        flex: 1 !important;
+        flex-wrap: nowrap !important;
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+        scrollbar-width: none !important;
+        gap: 3px !important;
+        margin-bottom: 0 !important;
+        padding-bottom: 0 !important;
+        padding-right: 8px !important;
+        mask-image: linear-gradient(to right, #000 85%, transparent 100%) !important;
+        -webkit-mask-image: linear-gradient(to right, #000 85%, transparent 100%) !important;
+      }
+      .task-toolbar .platform-chips::-webkit-scrollbar { display: none !important; }
+      .task-toolbar .platform-chip {
+        padding: 5px 6px !important;
+        font-size: 0.6rem !important;
+        border-radius: 10px !important;
+        white-space: nowrap !important;
+        flex-shrink: 0 !important;
+        display: flex !important;
+        align-items: center !important;
+        gap: 2px !important;
+        border: 1.5px solid var(--border, rgba(255,255,255,.12)) !important;
+        background: transparent !important;
+        color: var(--text-muted, #999) !important;
+        cursor: pointer !important;
+        transition: all .15s !important;
+      }
+      .task-toolbar .platform-chip svg { width: 14px !important; height: 14px !important; flex-shrink: 0 !important; }
+      .task-toolbar .platform-chip.active {
+        border-color: var(--pc, #ea580c) !important;
+        color: var(--pc, #ea580c) !important;
+        background: color-mix(in srgb, var(--pc, #ea580c) 10%, transparent) !important;
+      }
+      .chip-count {
+        font-size: 0.5rem !important;
+        opacity: 0.6 !important;
+        font-weight: 600 !important;
+        letter-spacing: -0.02em !important;
+      }
+      .task-toolbar .platform-chip.active .chip-count { opacity: 0.9 !important; }
+
+      .sort-toggle {
+        display: flex !important;
+        gap: 2px !important;
+        flex-shrink: 0 !important;
+        border-left: 1px solid var(--border, rgba(255,255,255,.1)) !important;
+        padding-left: 4px !important;
+      }
+      .sort-toggle .sort-btn {
+        width: 30px !important;
+        height: 30px !important;
+        padding: 0 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        border-radius: 8px !important;
+        border: 1.5px solid var(--border, rgba(255,255,255,.12)) !important;
+        background: transparent !important;
+        color: var(--text-muted, #999) !important;
+        cursor: pointer !important;
+        transition: all .15s !important;
+      }
+      .sort-toggle .sort-btn svg { width: 14px !important; height: 14px !important; }
+      .sort-toggle .sort-btn.active {
+        border-color: var(--accent, #ea580c) !important;
+        color: var(--accent, #ea580c) !important;
+        background: color-mix(in srgb, var(--accent, #ea580c) 10%, transparent) !important;
+      }
+
+      /* My-tasks filter chips */
+      .my-filter-chips {
+        display: flex !important;
+        flex-wrap: nowrap !important;
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+        scrollbar-width: none !important;
+        gap: 4px !important;
+        margin-bottom: 6px !important;
+      }
+      .my-filter-chips::-webkit-scrollbar { display: none !important; }
+      .my-filter-chips .platform-chip { padding: 4px 8px !important; font-size: 0.65rem !important; flex-shrink: 0 !important; }
+
+      /* Hide old sort-bar if cached JS renders it */
+      .sort-bar { display: none !important; }
+
+      /* === TASK CARDS — compact rows === */
+      .tasks-grid { display: flex !important; flex-direction: column !important; gap: 5px !important; }
+      .task-card {
+        padding: 9px 10px !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+        border-radius: 10px !important;
+      }
+      .task-card:hover { transform: none !important; }
+
+      /* Old markup: .task-card-top > .task-platform-icon + .task-info + .task-reward-pill */
+      .task-card-top { display: flex !important; align-items: center !important; gap: 8px !important; margin-bottom: 0 !important; }
+      .task-platform-icon { width: 30px !important; height: 30px !important; flex-shrink: 0 !important; }
+      .task-info { flex: 1 !important; min-width: 0 !important; overflow: hidden !important; }
+      .task-label { font-size: 0.78rem !important; font-weight: 600 !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; }
+      .task-target { font-size: 0.65rem !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; }
+      .task-reward-pill {
+        flex-shrink: 0 !important;
+        font-size: 0.9rem !important;
+        font-weight: 800 !important;
+        padding: 3px 8px !important;
+        background: transparent !important;
+        color: #ea580c !important;
+      }
+      .task-reward-pill small { font-size: 0.55rem !important; opacity: 0.5 !important; display: inline !important; }
+      .task-desc { display: none !important; }
+      .task-card-bottom { display: none !important; }
+
+      /* New markup: .task-card-row > .tc-icon + .tc-body + .tc-reward */
+      .task-card-row { display: flex !important; align-items: center !important; gap: 8px !important; }
+      .tc-icon { width: 30px !important; height: 30px !important; flex-shrink: 0 !important; }
+      .tc-icon svg { width: 100% !important; height: 100% !important; }
+      .tc-body { flex: 1 !important; min-width: 0 !important; overflow: hidden !important; }
+      .tc-name { font-size: 0.78rem !important; font-weight: 600 !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; }
+      .tc-sub { font-size: 0.65rem !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; }
+      .tc-rem { display: inline !important; }
+      .tc-reward { flex-shrink: 0 !important; font-size: 0.95rem !important; font-weight: 800 !important; color: #ea580c !important; }
+      .tc-reward span { font-size: 0.55rem !important; opacity: .5 !important; }
+      .task-card-extra { display: none !important; }
+
+      /* Task group headers */
+      .task-group-header { padding: 10px 2px 2px !important; font-size: 0.6rem !important; }
+      .task-group-header svg { width: 12px !important; height: 12px !important; }
+
+      /* === MODAL — bottom sheet === */
+      .modal-overlay { align-items: flex-end !important; padding: 0 !important; }
+      .modal-content { max-width: 100% !important; max-height: 92vh !important; border-radius: 16px 16px 0 0 !important; border-bottom: none !important; }
+      .task-modal { padding: 12px 12px 16px !important; }
+      .modal-close { top: 4px !important; right: 8px !important; }
+
+      /* === MY TASKS === */
+      .my-stats { grid-template-columns: repeat(2, 1fr) !important; gap: 5px !important; }
+      .my-stat-card { padding: 8px 6px !important; }
+      .my-stat-value { font-size: 1.1rem !important; }
+      .my-stat-label { font-size: 0.6rem !important; }
+      .my-task-row { padding: 8px 10px !important; gap: 8px !important; margin-bottom: 4px !important; }
+      .my-task-icon { width: 24px !important; height: 24px !important; }
+      .my-task-name { font-size: 0.72rem !important; }
+      .my-task-reward small { display: none !important; }
+
+      /* === WALLET — mobile === */
+      .w-balance-card { padding: 16px 12px !important; margin-bottom: 10px !important; }
+      .w-balance-amount { font-size: 2rem !important; margin-bottom: 12px !important; }
+      .w-stat { padding: 0 8px !important; }
+      .w-stat-val { font-size: 0.75rem !important; }
+      .w-stat-lbl { font-size: 0.6rem !important; }
+      .w-actions { gap: 8px !important; margin-bottom: 4px !important; }
+      .w-action-btn { padding: 12px !important; font-size: 0.8rem !important; }
+      .w-tx-icon { width: 32px !important; height: 32px !important; }
+      .w-tx-label { font-size: 0.78rem !important; }
+
+      /* === STATS/DASHBOARD === */
+      .stats-grid { grid-template-columns: repeat(2, 1fr) !important; }
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <div id="toast-container"></div>
+  <script src="/js/theme.js?v=1773561239" defer></script>
+  <script src="/js/api.js?v=1777830640" defer></script>
+  <script src="/js/i18n.js?v=wdreason20260811d" defer></script>
+  <script src="/js/router.js?v=1780882234" defer></script>
+  <script src="/js/components/toast.js?v=1773073066" defer></script>
+  <script src="/js/components/header.js?v=1773073078" defer></script>
+  <script src="/js/components/platforms.js?v=1777638238" defer></script>
+  <script src="/js/components/sidebar.js?v=rel20260811b" defer></script>
+  <!-- Peter I (AI support widget) — TEMPORARILY DISABLED 2026-05-04 to test DB load impact.
+       To re-enable: uncomment the line below (or restore from .bak.peter-disable-20260504). -->
+  <!-- <script src="/js/components/ai-widget.js?v=notools20260809" defer></script> -->
+  <script src="/js/pages/landing.js?v=noapk20260809" defer></script>
+  <script src="/js/pages/login.js?v=1777407933" defer></script>
+  <script src="/js/pages/reset-password.js?v=1773664400" defer></script>
+  <script src="/js/pages/register.js?v=1777407933" defer></script>
+  <script src="/js/pages/dashboard.js?v=1778368301" defer></script>
+  <script src="/js/pages/tasks.js?v=ach20260811c" defer></script>
+  <script src="/js/pages/premium.js?v=ach20260811h" defer></script>
+  <script src="/js/pages/recovery.js?v=1780558661" defer></script>
+  <script src="/js/pages/my-tasks.js?v=appsync20260811h" defer></script>
+  <script src="/js/pages/orders.js?v=1778368303" defer></script>
+  <script src="/js/pages/wallet.js?v=wdreason20260811d" defer></script>
+  <script src="/js/data/countries.js?v=1778355392" defer></script>
+  <script src="/js/pages/profile.js?v=rel20260811j" defer></script>
+  <script src="/js/pages/referrals.js?v=1775578996" defer></script>
+  <script src="/js/pages/leaderboard.js?v=fresh20260809a" defer></script>
+  <script src="/js/pages/tools.js?v=twwver20260821" defer></script>
+  <script src="/js/pages/autoearn.js?v=twwshare20260821i" defer></script>
+  <script src="/js/pages/faq.js?v=1775593817" defer></script>
+  <script src="/js/pages/support.js?v=catgate20260806" defer></script>
+  <script src="/js/pages/verify-email.js?v=1773105241" defer></script>
+  <script src="/js/pages/legal.js?v=1780254001" defer></script>
+  <script src="/js/pages/guides.js?v=1776931376" defer></script>
+  <script src="/js/pages/admin.js?v=fincheck20260919" defer></script>
+  <script src="/js/pages/admin-app.js?v=appsync20260813c" defer></script>
+  <script src="/js/app.js?v=1773073367" defer></script>
+<noscript><a href="/privacy">Privacy Policy</a> | <a href="/terms">Terms of Service</a></noscript>
+<div style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0"><a href="/privacy">Privacy Policy</a> <a href="/terms">Terms of Service</a></div>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a3de50ffeaacaf07',t:'MTc4OTg4MDk0OQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>

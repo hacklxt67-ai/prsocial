@@ -1,0 +1,115 @@
+{
+  "/api/autoearn/accounts/": {
+    "methods": [
+      "GET (ou inconnu)"
+    ],
+    "files": [
+      "scratch\\pages_autoearn.js"
+    ]
+  },
+  "/api/premium/counter": {
+    "methods": [
+      "GET (ou inconnu)"
+    ],
+    "files": [
+      "scratch\\components_platforms.js"
+    ]
+  },
+  "/api/premium/visibility": {
+    "methods": [
+      "GET (ou inconnu)"
+    ],
+    "files": [
+      "scratch\\components_platforms.js"
+    ]
+  },
+  "/api/profile/socials": {
+    "methods": [
+      "GET (ou inconnu)"
+    ],
+    "files": [
+      "scratch\\test_fb_check.py",
+      "scratch\\test_submit_proof.py"
+    ]
+  },
+  "/api/tasks/": {
+    "methods": [
+      "POST"
+    ],
+    "files": [
+      "scratch\\bot_clean.js",
+      "scratch\\eval_test.js",
+      "scratch\\eval_test2.js"
+    ]
+  },
+  "/api/tasks/available": {
+    "methods": [
+      "GET (ou inconnu)"
+    ],
+    "files": [
+      "scratch\\check_all_platforms.py",
+      "scratch\\check_api_check_all.py",
+      "scratch\\test_fb_check.py"
+    ]
+  },
+  "/api/tasks/my/list": {
+    "methods": [
+      "POST"
+    ],
+    "files": [
+      "scratch\\bot_clean.js",
+      "scratch\\check_all_completions.py",
+      "scratch\\check_my_active.py"
+    ]
+  },
+  "/api/tasks/{task_id}/start": {
+    "methods": [
+      "GET (ou inconnu)"
+    ],
+    "files": [
+      "scratch\\test_start_api.py"
+    ]
+  },
+  "/api/tasks/{tid}": {
+    "methods": [
+      "GET (ou inconnu)"
+    ],
+    "files": [
+      "scratch\\check_api_check_all.py",
+      "scratch\\test_tasks_check.py"
+    ]
+  },
+  "/api/tasks/{tid}/api-check": {
+    "methods": [
+      "GET (ou inconnu)"
+    ],
+    "files": [
+      "scratch\\test_fb_check.py"
+    ]
+  },
+  "/api/tasks/{tid}/cancel": {
+    "methods": [
+      "GET (ou inconnu)"
+    ],
+    "files": [
+      "scratch\\test_fb_check.py"
+    ]
+  },
+  "/api/tasks/{tid}/start": {
+    "methods": [
+      "GET (ou inconnu)"
+    ],
+    "files": [
+      "scratch\\test_fb_check.py",
+      "scratch\\test_submit_proof.py"
+    ]
+  },
+  "/api/tasks/{tid}/submit": {
+    "methods": [
+      "GET (ou inconnu)"
+    ],
+    "files": [
+      "scratch\\test_submit_proof.py"
+    ]
+  }
+}

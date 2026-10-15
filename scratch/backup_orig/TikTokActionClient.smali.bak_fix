@@ -1,0 +1,308 @@
+.class public final Lcom/prsocial/app/TikTokActionClient;
+.super Ljava/lang/Object;
+.source "TikTokActionClient.java"
+
+
+# static fields
+.field public static final ACTION_CHECK_LOGIN:Ljava/lang/String; = "check_login"
+
+.field public static final ACTION_DOM_SNAPSHOT:Ljava/lang/String; = "dom_snapshot"
+
+.field public static final ACTION_FOLLOW:Ljava/lang/String; = "follow"
+
+.field public static final ACTION_LIKE:Ljava/lang/String; = "like"
+
+.field public static final ACTION_PAGE_SCAN:Ljava/lang/String; = "page_scan"
+
+.field public static final ACTION_VERIFY_FOLLOW:Ljava/lang/String; = "verify_follow"
+
+.field public static final ACTION_VERIFY_LIKE:Ljava/lang/String; = "verify_like"
+
+.field public static final ACTION_WAIT_BTN:Ljava/lang/String; = "wait_btn"
+
+.field public static final DOM_MAX_WAIT_MS:J = 0x4e20L
+
+.field public static final DOM_POLL_INTERVAL_MS:J = 0x64L
+
+.field public static final JS_CHECK_LOGIN:Ljava/lang/String; = "var liSelectors=[  \'[data-e2e=\"nav-avatar\"]\',  \'[data-e2e=\"user-avatar\"]\',  \'[data-e2e=\"profile-icon\"]\',  \'[data-e2e=\"upload-icon\"]\',  \'[data-e2e=\"message-icon\"]\',  \'[data-e2e=\"inbox-icon\"]\',  \'[data-e2e=\"nav-upload\"]\',  \'[data-e2e=\"nav-profile\"]\',  \'[data-e2e=\"nav-messages\"]\',  \'[data-e2e=\"nav-activity\"]\',  \'a[href=\"/inbox\"]\'];var li=liSelectors.some(function(s){return document.querySelector(s)!==null;});var lo=[  document.querySelector(\'[data-e2e=\"nav-login-button\"]\'),  document.querySelector(\'a[href*=\"/login\"][data-e2e]\'),  document.querySelector(\'button[class*=\"loginButton\"]\'),  document.querySelector(\'[class*=\"loginButton\"]\')].some(function(el){return el!==null;});if(!li){  var allE2e=Array.from(document.querySelectorAll(\'[data-e2e]\')).map(function(n){return n.getAttribute(\'data-e2e\');});  var loggedInKeys=[\'profile-icon\',\'upload-icon\',\'inbox-icon\',\'nav-upload\',\'nav-profile\',\'nav-messages\',\'nav-activity\',\'user-avatar\',\'nav-avatar\'];  li=loggedInKeys.some(function(k){return allE2e.indexOf(k)!==-1;});}if(li){  var loginTexts=[\'se connecter\',\'log in\',\'sign in\',\'connexion\',\'\u767b\u5f55\'];  var visibleBtns=Array.from(document.querySelectorAll(\'button,[role=\"button\"],a\'));  var hasLoginBtn=visibleBtns.some(function(b){    var rc=b.getBoundingClientRect();    if(rc.width===0||rc.height===0)return false;    var t=(b.textContent||b.innerText||\'\').trim().toLowerCase();    return loginTexts.some(function(lt){return t===lt;});  });  if(hasLoginBtn){li=false;lo=true;}}alert(\'TGAPP|\'+(li?\'logged_in\':(lo?\'logged_out\':\'unknown\')));"
+
+.field public static final JS_DOM_SNAPSHOT:Ljava/lang/String; = "var nodes=document.querySelectorAll(\'[data-e2e]\');var snap=Array.from(nodes).map(function(n){return n.getAttribute(\'data-e2e\');}).join(\',\');alert(\'TGAPP|snap|\'+snap);"
+
+.field public static final JS_DOUBLE_CLICK_VIDEO:Ljava/lang/String; = "(function() {  var target = null;  var vid = document.querySelector(\'video\');  if (vid) {    var p = vid.parentElement;    for (var i = 0; i < 4 && p; i++) {      var st = window.getComputedStyle(p);      if (st.position !== \'static\' || p.getAttribute(\'role\') === \'button\') {        target = p; break;      }      p = p.parentElement;    }    if (!target) target = vid;  }  if (!target) {    var sel = [\'[data-e2e=\"browse-video\"]\',\'[data-e2e=\"video-player\"]\',\'[data-e2e=\"feed-video\"]\'];    for (var s = 0; s < sel.length; s++) {      var el = document.querySelector(sel[s]);      if (el) { target = el; break; }    }  }  if (!target) { alert(\'TGAPP|video_not_found\'); return; }  var rect = target.getBoundingClientRect();  if (rect.width === 0 || rect.height === 0) { alert(\'TGAPP|video_not_visible\'); return; }  var cx = rect.left + rect.width / 2;  var cy = rect.top + rect.height / 2;  function mkPtr(type, detail) {    return new PointerEvent(type, {bubbles:true,cancelable:true,view:window,      clientX:cx,clientY:cy,screenX:cx,screenY:cy,      pointerId:1,pointerType:\'touch\',isPrimary:true,detail:detail||0});  }  function mkMouse(type, detail) {    return new MouseEvent(type, {bubbles:true,cancelable:true,view:window,      clientX:cx,clientY:cy,screenX:cx,screenY:cy,detail:detail||1});  }  target.dispatchEvent(mkPtr(\'pointerdown\',1));  target.dispatchEvent(mkMouse(\'mousedown\',1));  target.dispatchEvent(mkPtr(\'pointerup\',1));  target.dispatchEvent(mkMouse(\'mouseup\',1));  target.dispatchEvent(mkMouse(\'click\',1));  setTimeout(function() {    target.dispatchEvent(mkPtr(\'pointerdown\',2));    target.dispatchEvent(mkMouse(\'mousedown\',2));    target.dispatchEvent(mkPtr(\'pointerup\',2));    target.dispatchEvent(mkMouse(\'mouseup\',2));    target.dispatchEvent(mkMouse(\'click\',2));    target.dispatchEvent(new MouseEvent(\'dblclick\',{bubbles:true,cancelable:true,      view:window,clientX:cx,clientY:cy,screenX:cx,screenY:cy,detail:2}));    alert(\'TGAPP|video_double_clicked\');  }, 200);})();"
+
+.field public static final JS_PAGE_SCAN:Ljava/lang/String; = "(function(){var body=(document.body||document.documentElement);var txt=(body.innerText||body.textContent||\'\').toLowerCase().substring(0,500);alert(\'TGAPP|page_scan_txt|\'+txt);})();"
+
+.field public static final MAX_ACTION_ATTEMPTS:I = 0x5
+
+.field public static final MAX_SESSION_RELOADS:I = 0x3
+
+.field public static final SCAN_CAPTCHA:Ljava/lang/String; = "captcha"
+
+.field public static final SCAN_NOT_FOUND:Ljava/lang/String; = "not_found"
+
+.field public static final SCAN_OK:Ljava/lang/String; = "ok"
+
+.field public static final SCAN_UNAVAILABLE:Ljava/lang/String; = "unavailable"
+
+.field private static final TAG:Ljava/lang/String; = "PRSocial_TT_JS"
+
+.field public static final TGAPP_PREFIX:Ljava/lang/String; = "TGAPP|"
+
+
+# direct methods
+.method public constructor <init>()V
+    .locals 0
+
+    .line 11
+    invoke-direct {p0}, Ljava/lang/Object;-><init>()V
+
+    return-void
+.end method
+
+.method public static buildClickFollowJS()Ljava/lang/String;
+    .locals 3
+
+    .line 279
+    const-string v0, "followBtn"
+
+    invoke-static {v0}, Lcom/prsocial/app/TikTokActionClient;->simulateClickJS(Ljava/lang/String;)Ljava/lang/String;
+
+    move-result-object v0
+
+    .line 280
+    new-instance v1, Ljava/lang/StringBuilder;
+
+    const-string v2, "var followBtn=null;var e2eList=[\'[data-e2e=\"follow-button\"]\',\'[data-e2e=\"user-follow-button\"]\',  \'[data-e2e=\"profile-follow-btn\"]\',\'[data-e2e=\"profile-action-item-follow\"]\',  \'[data-e2e=\"video-author-follow\"]\',\'[data-e2e=\"browse-follow-button\"]\',  \'[data-e2e=\"follow-button-click\"]\',\'[data-e2e=\"user-page-follow-button\"]\',  \'[data-e2e=\"profile-follow\"]\',\'[data-e2e=\"follow\"]\'];for(var i=0;i<e2eList.length;i++){  var el=document.querySelector(e2eList[i]);  if(el){followBtn=(el.tagName===\'BUTTON\')?el:(el.querySelector(\'button\')||el.closest(\'button\')||el);break;}}if(!followBtn){  var toFollowTxts=[\'suivre\',\'follow\',\'abonner\',\"s\'abonner\",\'\u5173\u6ce8\',\'subscribe\'];  var ab=document.querySelectorAll(\'button,[role=\"button\"]\');  for(var b=0;b<ab.length;b++){    var rc=ab[b].getBoundingClientRect();    if(rc.width===0||rc.height===0)continue;    var txt=(ab[b].textContent||ab[b].innerText||\'\').trim().toLowerCase();    for(var t=0;t<toFollowTxts.length;t++){if(txt.indexOf(toFollowTxts[t])!==-1){followBtn=ab[b];break;}}    if(followBtn)break;  }}if(!followBtn){  var ab3=document.querySelectorAll(\'button,[role=\"button\"]\');  for(var b3=0;b3<ab3.length;b3++){    var lbl3=(ab3[b3].getAttribute(\'aria-label\')||\'\').toLowerCase();    if(lbl3.indexOf(\'follow\')!==-1||lbl3.indexOf(\'suivre\')!==-1||lbl3.indexOf(\'abonner\')!==-1){      var rc3=ab3[b3].getBoundingClientRect();      if(rc3.width>0&&rc3.height>0){followBtn=ab3[b3];break;}    }  }}if(!followBtn){  var debug=[];var dbab=document.querySelectorAll(\'button,[role=\"button\"]\');  for(var d=0;d<dbab.length&&d<25;d++){    var drc=dbab[d].getBoundingClientRect();    if(drc.width===0||drc.height===0)continue;    var dtxt=(dbab[d].textContent||\'\').trim().substring(0,20);    var de2e=dbab[d].getAttribute(\'data-e2e\')||\'\';    debug.push((de2e?\'[\'+de2e+\']\':\'\')+dtxt);  }  alert(\'TGAPP|not_found|\'+debug.join(\';;;\'));} else {  var btnTxt=(followBtn.textContent||followBtn.innerText||\'\').trim().toLowerCase();  var ariaLbl=(followBtn.getAttribute(\'aria-label\')||\'\').toLowerCase();  var ap=followBtn.getAttribute(\'aria-pressed\');  var cls=(followBtn.getAttribute(\'class\')||\'\').toLowerCase();  var alreadyList=[\'suivi\',\'following\',\'amis\',\'friends\',\'abonn\u00e9\',\'abonne\',\'unfollow\',\'ne plus suivre\',    \'\u5df2\u5173\u6ce8\',\'\u5173\u6ce8\u4e2d\',\'\u4e92\u76f8\u5173\u6ce8\',\'\u597d\u53cb\'];  var isFollowing=ap===\'true\'||cls.indexOf(\'following\')!==-1;  for(var al=0;al<alreadyList.length;al++){    if(btnTxt===alreadyList[al]||btnTxt.indexOf(alreadyList[al])!==-1||ariaLbl.indexOf(alreadyList[al])!==-1){isFollowing=true;break;}  }  if(isFollowing){alert(\'TGAPP|already_following|\'+btnTxt);}  else{"
+
+    invoke-direct {v1, v2}, Ljava/lang/StringBuilder;-><init>(Ljava/lang/String;)V
+
+    invoke-virtual {v1, v0}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+
+    const-string v0, " alert(\'TGAPP|clicked|\'+btnTxt);}}"
+
+    invoke-virtual {v1, v0}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+
+    invoke-virtual {v1}, Ljava/lang/StringBuilder;->toString()Ljava/lang/String;
+
+    move-result-object v0
+
+    return-object v0
+.end method
+
+.method public static buildClickLikeJS()Ljava/lang/String;
+    .locals 3
+
+    .line 222
+    const-string v0, "btn"
+
+    invoke-static {v0}, Lcom/prsocial/app/TikTokActionClient;->simulateClickJS(Ljava/lang/String;)Ljava/lang/String;
+
+    move-result-object v0
+
+    .line 223
+    new-instance v1, Ljava/lang/StringBuilder;
+
+    const-string v2, "var likeEl=null;var sel=[\'[data-e2e=\"like-icon\"]\',\'[data-e2e=\"browse-like-icon\"]\',  \'[data-e2e=\"video-like-button\"]\',\'[data-e2e=\"like-button\"]\'];for(var s=0;s<sel.length;s++){var f=document.querySelector(sel[s]);if(f){likeEl=f;break;}}if(!likeEl){  var ab=document.querySelectorAll(\'button,[role=\"button\"]\');  for(var b=0;b<ab.length;b++){    var lbl=(ab[b].getAttribute(\'aria-label\')||\'\').toLowerCase();    if(lbl.indexOf(\'like\')!==-1||lbl.indexOf(\"j\'aime\")!==-1||lbl.indexOf(\'aimer\')!==-1){      var rc=ab[b].getBoundingClientRect();      if(rc.width>0&&rc.height>0){likeEl=ab[b];break;}    }  }}if(!likeEl){alert(\'TGAPP|not_found\');}else{  var btn=(likeEl.tagName===\'BUTTON\')?likeEl:(likeEl.closest(\'button\')||likeEl);  var ap=btn.getAttribute(\'aria-pressed\');  var al=(btn.getAttribute(\'aria-label\')||\'\').toLowerCase();  var cl=(btn.getAttribute(\'class\')||\'\').toLowerCase();  var isLiked=ap===\'true\'||cl.indexOf(\'liked\')!==-1||al.indexOf(\'unlike\')!==-1    ||al.indexOf(\'retirer\')!==-1||al.indexOf(\'supprimer\')!==-1;  if(isLiked){alert(\'TGAPP|already_liked\');}  else{"
+
+    invoke-direct {v1, v2}, Ljava/lang/StringBuilder;-><init>(Ljava/lang/String;)V
+
+    invoke-virtual {v1, v0}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+
+    const-string v0, " alert(\'TGAPP|clicked\');}}"
+
+    invoke-virtual {v1, v0}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+
+    invoke-virtual {v1}, Ljava/lang/StringBuilder;->toString()Ljava/lang/String;
+
+    move-result-object v0
+
+    return-object v0
+.end method
+
+.method public static buildVerifyFollowJS()Ljava/lang/String;
+    .locals 1
+
+    .line 339
+    const-string v0, "var followBtn=null;var e2eList=[\'[data-e2e=\"follow-button\"]\',\'[data-e2e=\"user-follow-button\"]\',  \'[data-e2e=\"profile-follow-btn\"]\',\'[data-e2e=\"profile-action-item-follow\"]\',  \'[data-e2e=\"video-author-follow\"]\',\'[data-e2e=\"browse-follow-button\"]\',  \'[data-e2e=\"follow-button-click\"]\',\'[data-e2e=\"user-page-follow-button\"]\',  \'[data-e2e=\"profile-follow\"]\',\'[data-e2e=\"follow\"]\'];for(var i=0;i<e2eList.length;i++){  var el=document.querySelector(e2eList[i]);  if(el){followBtn=(el.tagName===\'BUTTON\')?el:(el.querySelector(\'button\')||el.closest(\'button\')||el);break;}}if(!followBtn){  var relevantTxts=[\'suivre\',\'follow\',\'abonner\',\"s\'abonner\",\'suivi\',\'following\',\'amis\',\'friends\',\'abonn\u00e9\',\'abonne\',\'\u5173\u6ce8\',\'\u5df2\u5173\u6ce8\',\'subscribe\'];  var ab=document.querySelectorAll(\'button,[role=\"button\"]\');  for(var b=0;b<ab.length;b++){    var rc=ab[b].getBoundingClientRect();    if(rc.width===0||rc.height===0)continue;    var txt=(ab[b].textContent||\'\').trim().toLowerCase();    for(var t=0;t<relevantTxts.length;t++){if(txt.indexOf(relevantTxts[t])!==-1){followBtn=ab[b];break;}}    if(followBtn)break;  }}if(!followBtn){alert(\'TGAPP|not_found|\');}else{  var btnTxt=(followBtn.textContent||followBtn.innerText||\'\').trim().toLowerCase();  var ariaLbl=(followBtn.getAttribute(\'aria-label\')||\'\').toLowerCase();  var ap=followBtn.getAttribute(\'aria-pressed\');  var cls=(followBtn.getAttribute(\'class\')||\'\').toLowerCase();  var alreadyList=[\'suivi\',\'following\',\'amis\',\'friends\',\'abonn\u00e9\',\'abonne\',\'unfollow\',\'ne plus suivre\',    \'\u5df2\u5173\u6ce8\',\'\u5173\u6ce8\u4e2d\',\'\u4e92\u76f8\u5173\u6ce8\',\'\u597d\u53cb\'];  var isFollowing=ap===\'true\'||cls.indexOf(\'following\')!==-1;  for(var al=0;al<alreadyList.length;al++){    if(btnTxt===alreadyList[al]||btnTxt.indexOf(alreadyList[al])!==-1||ariaLbl.indexOf(alreadyList[al])!==-1){isFollowing=true;break;}  }  alert(\'TGAPP|\'+(isFollowing?\'confirmed\':\'failed\')+\'|\'+btnTxt);}"
+
+    return-object v0
+.end method
+
+.method public static buildVerifyLikeJS()Ljava/lang/String;
+    .locals 1
+
+    .line 252
+    const-string v0, "var likeEl=null;var sel=[\'[data-e2e=\"like-icon\"]\',\'[data-e2e=\"browse-like-icon\"]\',  \'[data-e2e=\"video-like-button\"]\',\'[data-e2e=\"like-button\"]\'];for(var s=0;s<sel.length;s++){var f=document.querySelector(sel[s]);if(f){likeEl=f;break;}}if(!likeEl){  var ab=document.querySelectorAll(\'button,[role=\"button\"]\');  for(var b=0;b<ab.length;b++){    var lbl=(ab[b].getAttribute(\'aria-label\')||\'\').toLowerCase();    if(lbl.indexOf(\'like\')!==-1||lbl.indexOf(\"j\'aime\")!==-1){      var rc=ab[b].getBoundingClientRect();      if(rc.width>0&&rc.height>0){likeEl=ab[b];break;}    }  }}if(!likeEl){alert(\'TGAPP|not_found\');}else{  var btn=(likeEl.tagName===\'BUTTON\')?likeEl:(likeEl.closest(\'button\')||likeEl);  var ap=btn.getAttribute(\'aria-pressed\');  var al=(btn.getAttribute(\'aria-label\')||\'\').toLowerCase();  var cl=(btn.getAttribute(\'class\')||\'\').toLowerCase();  var isLiked=ap===\'true\'||cl.indexOf(\'liked\')!==-1||al.indexOf(\'unlike\')!==-1||al.indexOf(\'retirer\')!==-1;  alert(\'TGAPP|\'+(isLiked?\'confirmed\':\'failed\'));}"
+
+    return-object v0
+.end method
+
+.method public static buildWaitForFollowButtonJS()Ljava/lang/String;
+    .locals 1
+
+    .line 62
+    const-string v0, "(function(){var followBtn=null;var e2eList=[\'[data-e2e=\"follow-button\"]\',\'[data-e2e=\"user-follow-button\"]\',  \'[data-e2e=\"profile-follow-btn\"]\',\'[data-e2e=\"profile-action-item-follow\"]\',  \'[data-e2e=\"video-author-follow\"]\',\'[data-e2e=\"browse-follow-button\"]\',  \'[data-e2e=\"follow-button-click\"]\',\'[data-e2e=\"user-page-follow-button\"]\',  \'[data-e2e=\"profile-follow\"]\',\'[data-e2e=\"follow\"]\'];for(var i=0;i<e2eList.length;i++){  var el=document.querySelector(e2eList[i]);  if(el){followBtn=(el.tagName===\'BUTTON\')?el:(el.querySelector(\'button\')||el.closest(\'button\')||el);break;}}if(!followBtn){  var txts=[\'suivre\',\'follow\',\'abonner\',\"s\'abonner\",\'\u5173\u6ce8\',\'subscribe\'];  var ab=document.querySelectorAll(\'button,[role=\"button\"]\');  for(var b=0;b<ab.length;b++){    var rc=ab[b].getBoundingClientRect();    if(rc.width===0||rc.height===0)continue;    var txt=(ab[b].textContent||\'\').trim().toLowerCase();    for(var t=0;t<txts.length;t++){if(txt.indexOf(txts[t])!==-1){followBtn=ab[b];break;}}    if(followBtn)break;  }}if(!followBtn){  var ab2=document.querySelectorAll(\'button,[role=\"button\"]\');  for(var b2=0;b2<ab2.length;b2++){    var lbl=(ab2[b2].getAttribute(\'aria-label\')||\'\').toLowerCase();    if(lbl.indexOf(\'follow\')!==-1||lbl.indexOf(\'suivre\')!==-1||lbl.indexOf(\'abonner\')!==-1){      var rc2=ab2[b2].getBoundingClientRect();      if(rc2.width>0&&rc2.height>0){followBtn=ab2[b2];break;}    }  }}if(followBtn){  var r=followBtn.getBoundingClientRect();  if(r.width>0&&r.height>0){alert(\'TGAPP|btn_ready|\'+(followBtn.textContent||\'\').trim().toLowerCase());return;}}alert(\'TGAPP|btn_not_ready|\');})();"
+
+    return-object v0
+.end method
+
+.method public static buildWaitForLikeButtonJS()Ljava/lang/String;
+    .locals 1
+
+    .line 104
+    const-string v0, "(function(){var likeEl=null;var sel=[\'[data-e2e=\"like-icon\"]\',\'[data-e2e=\"browse-like-icon\"]\',  \'[data-e2e=\"video-like-button\"]\',\'[data-e2e=\"like-button\"]\'];for(var s=0;s<sel.length;s++){var f=document.querySelector(sel[s]);if(f){likeEl=f;break;}}if(!likeEl){  var ab=document.querySelectorAll(\'button,[role=\"button\"]\');  for(var b=0;b<ab.length;b++){    var lbl=(ab[b].getAttribute(\'aria-label\')||\'\').toLowerCase();    if(lbl.indexOf(\'like\')!==-1||lbl.indexOf(\"j\'aime\")!==-1){      var rc=ab[b].getBoundingClientRect();      if(rc.width>0&&rc.height>0){likeEl=ab[b];break;}    }  }}if(likeEl){  var r=likeEl.getBoundingClientRect();  if(r.width>0&&r.height>0){alert(\'TGAPP|btn_ready|\');return;}}alert(\'TGAPP|btn_not_ready|\');})();"
+
+    return-object v0
+.end method
+
+.method static synthetic lambda$runJS$0(Lorg/mozilla/geckoview/GeckoSession;Ljava/lang/String;)V
+    .locals 2
+
+    .line 405
+    new-instance v0, Ljava/lang/StringBuilder;
+
+    const-string v1, "javascript:(function(){"
+
+    invoke-direct {v0, v1}, Ljava/lang/StringBuilder;-><init>(Ljava/lang/String;)V
+
+    invoke-virtual {v0, p1}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+
+    const-string p1, "})();"
+
+    invoke-virtual {v0, p1}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+
+    invoke-virtual {v0}, Ljava/lang/StringBuilder;->toString()Ljava/lang/String;
+
+    move-result-object p1
+
+    invoke-virtual {p0, p1}, Lorg/mozilla/geckoview/GeckoSession;->loadUri(Ljava/lang/String;)V
+
+    return-void
+.end method
+
+.method public static runJS(Lorg/mozilla/geckoview/GeckoSession;Ljava/lang/String;)V
+    .locals 2
+
+    .line 396
+    invoke-virtual {p0}, Lorg/mozilla/geckoview/GeckoSession;->isOpen()Z
+
+    move-result v0
+
+    if-nez v0, :cond_0
+
+    .line 397
+    const-string p0, "PRSocial_TT_JS"
+
+    const-string p1, "runJS: session not open"
+
+    invoke-static {p0, p1}, Landroid/util/Log;->w(Ljava/lang/String;Ljava/lang/String;)I
+
+    return-void
+
+    .line 400
+    :cond_0
+    const-string v0, "\r\n"
+
+    .line 401
+    const-string v1, " "
+
+    invoke-virtual {p1, v0, v1}, Ljava/lang/String;->replace(Ljava/lang/CharSequence;Ljava/lang/CharSequence;)Ljava/lang/String;
+
+    move-result-object p1
+
+    const-string v0, "\n"
+
+    .line 402
+    invoke-virtual {p1, v0, v1}, Ljava/lang/String;->replace(Ljava/lang/CharSequence;Ljava/lang/CharSequence;)Ljava/lang/String;
+
+    move-result-object p1
+
+    const-string v0, "\r"
+
+    .line 403
+    invoke-virtual {p1, v0, v1}, Ljava/lang/String;->replace(Ljava/lang/CharSequence;Ljava/lang/CharSequence;)Ljava/lang/String;
+
+    move-result-object p1
+
+    .line 404
+    new-instance v0, Landroid/os/Handler;
+
+    invoke-static {}, Landroid/os/Looper;->getMainLooper()Landroid/os/Looper;
+
+    move-result-object v1
+
+    invoke-direct {v0, v1}, Landroid/os/Handler;-><init>(Landroid/os/Looper;)V
+
+    new-instance v1, Lcom/prsocial/app/TikTokActionClient$$ExternalSyntheticLambda0;
+
+    invoke-direct {v1, p0, p1}, Lcom/prsocial/app/TikTokActionClient$$ExternalSyntheticLambda0;-><init>(Lorg/mozilla/geckoview/GeckoSession;Ljava/lang/String;)V
+
+    invoke-virtual {v0, v1}, Landroid/os/Handler;->post(Ljava/lang/Runnable;)Z
+
+    return-void
+.end method
+
+.method public static simulateClickJS(Ljava/lang/String;)Ljava/lang/String;
+    .locals 2
+
+    .line 378
+    new-instance v0, Ljava/lang/StringBuilder;
+
+    const-string v1, "var __r=("
+
+    invoke-direct {v0, v1}, Ljava/lang/StringBuilder;-><init>(Ljava/lang/String;)V
+
+    invoke-virtual {v0, p0}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+
+    const-string v1, ").getBoundingClientRect();var __cx=__r.left+__r.width/2;var __cy=__r.top+__r.height/2;var __po=function(t){return new PointerEvent(t,{bubbles:true,cancelable:true,view:window,  clientX:__cx,clientY:__cy,screenX:__cx,screenY:__cy,  pointerId:1,pointerType:\'mouse\',isPrimary:true});};var __mo=function(t){return new MouseEvent(t,{bubbles:true,cancelable:true,view:window,  clientX:__cx,clientY:__cy,screenX:__cx,screenY:__cy});};("
+
+    invoke-virtual {v0, v1}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+
+    invoke-virtual {v0, p0}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+
+    const-string v1, ").dispatchEvent(__po(\'pointerover\'));("
+
+    invoke-virtual {v0, v1}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+
+    invoke-virtual {v0, p0}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+
+    const-string v1, ").dispatchEvent(__mo(\'mouseover\'));("
+
+    invoke-virtual {v0, v1}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+
+    invoke-virtual {v0, p0}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+
+    const-string v1, ").dispatchEvent(__po(\'pointerdown\'));("
+
+    invoke-virtual {v0, v1}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+
+    invoke-virtual {v0, p0}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+
+    const-string v1, ").dispatchEvent(__mo(\'mousedown\'));("
+
+    invoke-virtual {v0, v1}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+
+    invoke-virtual {v0, p0}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+
+    const-string v1, ").dispatchEvent(__po(\'pointerup\'));("
+
+    invoke-virtual {v0, v1}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+
+    invoke-virtual {v0, p0}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+
+    const-string v1, ").dispatchEvent(__mo(\'mouseup\'));("
+
+    invoke-virtual {v0, v1}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+
+    invoke-virtual {v0, p0}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+
+    const-string p0, ").dispatchEvent(__mo(\'click\'));"
+
+    invoke-virtual {v0, p0}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+
+    invoke-virtual {v0}, Ljava/lang/StringBuilder;->toString()Ljava/lang/String;
+
+    move-result-object p0
+
+    return-object p0
+.end method

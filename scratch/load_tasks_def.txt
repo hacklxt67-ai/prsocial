@@ -1,0 +1,49 @@
+function loadTasks(append = false) {
+  await ensureApiCheckFlag();
+    // If platform not linked → link prompt (resets state)
+    if (!linkedPlatforms.has(currentPlatform)) {
+      showLinkPrompt(currentPlatform);
+      return;
+    }
+    if (!append) {
+      currentPage = 1;
+      allTasks = [];
+      visibleCount = PAGE_SIZE;
+    }
+    const params = new URLSearchParams({
+      platform: currentPlatform,
+      sort: currentSort,
+      page: String(currentPage),
+      limit: '500',
+    });
+    try {
+      const data = await API.request('GET', '/tasks/available?' + params);
+      const newTasks = data.tasks || [];
+      if (append) {
+        allTasks = allTasks.concat(newTasks);
+        visibleCount += PAGE_SIZE;
+      } else {
+        allTasks = newTasks;
+      }
+      // Build action tabs from currently loaded tasks
+      buildActionTabs(allTasks);
+      renderVisibleTasks();
+      // Update chip counts — show counts only for linked platforms (data has aggregated platformCounts)
+      const counts = {};
+      for (const pc of (data.platformCounts || [])) counts[pc.platform] = pc.count;
+      for (const [p, n] of Object.entries(counts)) {
+        const el = document.getElementById('cnt-' + p);
+        if (el) {
+          const display = linkedPlatforms.has(p) ? n : 0;
+          el.textContent = fmtCount(display);
+          // Keep raw value in data-count so inline decrement after claim can read
+          // the exact number (textContent may be "1.2K" after fmtCount formatting).
+          el.dataset.count = String(display);
+        }
+      }
+      // Hide loadMore if backend returned less than page size — no more pages
+      const loadMoreWrap = document.getElementById('tasksLoadMore');
+      if (loadMoreWrap) loadMoreWrap.style.display = newTasks.length < PAGE_SIZE ? 'none' : '';
+      // Hourly-cap banner — server tells us which (platform,action) pairs are
+      // currently capped for this user, with retry-after minutes. Shows above
+      // the toolbar so users k

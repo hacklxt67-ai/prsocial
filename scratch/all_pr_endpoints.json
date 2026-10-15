@@ -1,0 +1,311 @@
+[
+  {
+    "endpoint": "/api/auth/login",
+    "methods": [
+      "POST"
+    ],
+    "files": [
+      "scratch/api.js"
+    ]
+  },
+  {
+    "endpoint": "/api/auth/logout",
+    "methods": [
+      "POST"
+    ],
+    "files": [
+      "scratch/api.js"
+    ]
+  },
+  {
+    "endpoint": "/api/auth/me",
+    "methods": [
+      "GET"
+    ],
+    "files": [
+      "pc_bot/http_action_engine.py",
+      "pc_bot/pr_api.py",
+      "scratch/api.js"
+    ]
+  },
+  {
+    "endpoint": "/api/auth/register",
+    "methods": [
+      "POST"
+    ],
+    "files": [
+      "scratch/api.js"
+    ]
+  },
+  {
+    "endpoint": "/api/auth/verify-2fa",
+    "methods": [
+      "POST"
+    ],
+    "files": [
+      "scratch/api.js"
+    ]
+  },
+  {
+    "endpoint": "/api/autoearn/accounts/",
+    "methods": [
+      "GET"
+    ],
+    "files": [
+      "scratch/pages_autoearn.js"
+    ]
+  },
+  {
+    "endpoint": "/api/autoearn/accounts/{id}",
+    "methods": [
+      "GET"
+    ],
+    "files": [
+      "scratch/pages_autoearn.js"
+    ]
+  },
+  {
+    "endpoint": "/api/autoearn/accounts/{id}/pause",
+    "methods": [
+      "POST"
+    ],
+    "files": [
+      "scratch/pages_autoearn.js"
+    ]
+  },
+  {
+    "endpoint": "/api/autoearn/accounts/{id}/remove",
+    "methods": [
+      "POST"
+    ],
+    "files": [
+      "scratch/pages_autoearn.js"
+    ]
+  },
+  {
+    "endpoint": "/api/autoearn/accounts/{id}/resume",
+    "methods": [
+      "POST"
+    ],
+    "files": [
+      "scratch/pages_autoearn.js"
+    ]
+  },
+  {
+    "endpoint": "/api/autoearn/accounts/{id}/withdraw",
+    "methods": [
+      "POST"
+    ],
+    "files": [
+      "scratch/pages_autoearn.js"
+    ]
+  },
+  {
+    "endpoint": "/api/autoearn/login/code",
+    "methods": [
+      "POST"
+    ],
+    "files": [
+      "scratch/pages_autoearn.js"
+    ]
+  },
+  {
+    "endpoint": "/api/autoearn/login/password",
+    "methods": [
+      "POST"
+    ],
+    "files": [
+      "scratch/pages_autoearn.js"
+    ]
+  },
+  {
+    "endpoint": "/api/autoearn/login/start",
+    "methods": [
+      "POST"
+    ],
+    "files": [
+      "scratch/pages_autoearn.js"
+    ]
+  },
+  {
+    "endpoint": "/api/autoearn/login/{id}",
+    "methods": [
+      "GET"
+    ],
+    "files": [
+      "scratch/pages_autoearn.js"
+    ]
+  },
+  {
+    "endpoint": "/api/autoearn/login/{id}/cancel",
+    "methods": [
+      "POST"
+    ],
+    "files": [
+      "scratch/pages_autoearn.js"
+    ]
+  },
+  {
+    "endpoint": "/api/autoearn/status",
+    "methods": [
+      "GET"
+    ],
+    "files": [
+      "scratch/pages_autoearn.js"
+    ]
+  },
+  {
+    "endpoint": "/api/autoearn/upload",
+    "methods": [
+      "POST"
+    ],
+    "files": [
+      "scratch/pages_autoearn.js"
+    ]
+  },
+  {
+    "endpoint": "/api/premium/counter",
+    "methods": [
+      "GET"
+    ],
+    "files": [
+      "scratch/components_platforms.js"
+    ]
+  },
+  {
+    "endpoint": "/api/premium/visibility",
+    "methods": [
+      "GET"
+    ],
+    "files": [
+      "scratch/components_platforms.js"
+    ]
+  },
+  {
+    "endpoint": "/api/profile/socials",
+    "methods": [
+      "GET"
+    ],
+    "files": [
+      "pc_bot/http_action_engine.py",
+      "pc_bot/pr_api.py",
+      "scratch/pages_tasks.js"
+    ]
+  },
+  {
+    "endpoint": "/api/tasks/",
+    "methods": [
+      "GET",
+      "POST"
+    ],
+    "files": [
+      "scratch/pages_tasks.js"
+    ]
+  },
+  {
+    "endpoint": "/api/tasks/api-check-enabled",
+    "methods": [
+      "GET"
+    ],
+    "files": [
+      "pc_bot/pr_api.py",
+      "scratch/pages_tasks.js"
+    ]
+  },
+  {
+    "endpoint": "/api/tasks/available",
+    "methods": [
+      "GET"
+    ],
+    "files": [
+      "pc_bot/http_action_engine.py",
+      "pc_bot/pr_api.py",
+      "scratch/pages_tasks.js"
+    ]
+  },
+  {
+    "endpoint": "/api/tasks/my/history",
+    "methods": [
+      "GET"
+    ],
+    "files": [
+      "pc_bot/pr_api.py"
+    ]
+  },
+  {
+    "endpoint": "/api/tasks/my/list",
+    "methods": [
+      "GET"
+    ],
+    "files": [
+      "pc_bot/http_action_engine.py",
+      "scratch/pages_my_tasks.js"
+    ]
+  },
+  {
+    "endpoint": "/api/tasks/my/rates",
+    "methods": [
+      "GET"
+    ],
+    "files": [
+      "scratch/pages_my_tasks.js"
+    ]
+  },
+  {
+    "endpoint": "/api/tasks/my/summary",
+    "methods": [
+      "GET"
+    ],
+    "files": [
+      "scratch/pages_my_tasks.js"
+    ]
+  },
+  {
+    "endpoint": "/api/tasks/{task_id}/api-check",
+    "methods": [
+      "POST"
+    ],
+    "files": [
+      "pc_bot/http_action_engine.py",
+      "pc_bot/pr_api.py"
+    ]
+  },
+  {
+    "endpoint": "/api/tasks/{task_id}/cancel",
+    "methods": [
+      "POST"
+    ],
+    "files": [
+      "pc_bot/http_action_engine.py"
+    ]
+  },
+  {
+    "endpoint": "/api/tasks/{task_id}/report-task",
+    "methods": [
+      "POST"
+    ],
+    "files": [
+      "pc_bot/pr_api.py"
+    ]
+  },
+  {
+    "endpoint": "/api/tasks/{task_id}/start",
+    "methods": [
+      "POST"
+    ],
+    "files": [
+      "pc_bot/http_action_engine.py",
+      "pc_bot/pr_api.py"
+    ]
+  },
+  {
+    "endpoint": "/api/tasks/{task_id}/submit",
+    "methods": [
+      "POST"
+    ],
+    "files": [
+      "pc_bot/http_action_engine.py",
+      "pc_bot/pr_api.py"
+    ]
+  }
+]
