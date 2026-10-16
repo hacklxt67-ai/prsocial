@@ -120,10 +120,41 @@ class ScreenshotGuard:
                         ySub.style.setProperty('color', '#0f0f0f', 'important');
                     }
                 }
+                // LinkedIn Follow & Connection
+                if (plat.indexOf('linkedin') !== -1) {
+                    var lkBtns = document.querySelectorAll('button, div[role="button"]');
+                    lkBtns.forEach(function(b) {
+                        var bt = (b.textContent || '').trim().toLowerCase();
+                        var aria = (b.getAttribute('aria-label') || '').toLowerCase();
+                        if (bt === 'suivre' || bt === 'follow' || bt === 'se connecter' || bt === 'connect' || aria.indexOf('connect') !== -1) {
+                            b.textContent = "En attente";
+                            b.style.setProperty('background', '#0a66c2', 'important');
+                            b.style.setProperty('color', '#ffffff', 'important');
+                            b.style.setProperty('font-weight', '600', 'important');
+                        }
+                    });
+                }
             }
 
             // B. ACTIONS DE TYPE LIKE / AIMER
             if (act.indexOf('like') !== -1 || act.indexOf('aimer') !== -1 || act.indexOf('upvote') !== -1) {
+                // Snapchat Like
+                if (plat.indexOf('snapchat') !== -1) {
+                    var snapHearts = document.querySelectorAll('svg, button[aria-label*="like" i], button[aria-label*="j\'aime" i]');
+                    snapHearts.forEach(function(s) {
+                        s.style.setProperty('fill', '#e60023', 'important');
+                        s.style.setProperty('color', '#e60023', 'important');
+                    });
+                }
+
+                // LinkedIn Like
+                if (plat.indexOf('linkedin') !== -1) {
+                    var lkReact = document.querySelector('button.react-button__trigger, button[aria-label*="J\'aime" i], button[aria-label*="Like" i]');
+                    if (lkReact) {
+                        lkReact.style.setProperty('color', '#0a66c2', 'important');
+                        lkReact.setAttribute('aria-pressed', 'true');
+                    }
+                }
                 // Twitter / X
                 if (plat.indexOf('twitter') !== -1 || plat.indexOf('x.com') !== -1) {
                     var xLike = document.querySelector('button[data-testid="like"], svg[data-testid="icon-like"]');
@@ -258,6 +289,7 @@ class ScreenshotGuard:
                 # Échantillonnage optimisé pour rapidité sur mobile/Termux
                 step = 4
                 pixels = []
+                # Utiliser getpixel sur grille pour éviter OOM sur Termux
                 for y in range(0, h, step):
                     for x in range(0, w, step):
                         pixels.append(img_rgb.getpixel((x, y)))

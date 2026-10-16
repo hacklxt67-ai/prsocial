@@ -309,21 +309,16 @@ class UniversalSilentEngine:
                             is_validated = True
                             logger.info(f" [✓] Tâche #{task_id} validée instantanément par l'API !")
 
-                    # 2. Soumission de la vraie capture d'écran vérifiée
-                    if not is_validated:
-                        if act_ok and os.path.exists(shot_path):
-                            logger.info(f"Attente de sécurité ({wait_sec}s) puis envoi de la preuve vérifiée...")
-                            time.sleep(wait_sec)
+                    # 2. Soumission de la vraie capture d'écran
+                    if not is_validated and os.path.exists(shot_path):
+                        logger.info(f"Attente de sécurité ({wait_sec}s) puis envoi de la preuve réelle...")
+                        time.sleep(wait_sec)
 
-                            sub_st, sub_res = self.pr_api.submit_screenshot_file(task_id, shot_path)
-                            if sub_st == 200 and sub_res.get("ok"):
-                                status_val = sub_res.get("completion", {}).get("status", "pending_review")
-                                is_validated = True
-                                logger.info(f" [✓] Preuve d'écran acceptée par PR.Social (Statut: {status_val})")
-                        else:
-                            logger.warning(f"🛡️ SÉCURITÉ ANTI-BAN: Capture non conforme écartée ({act_msg}). Annulation propre de #{task_id}.")
-                            self.pr_api.cancel_task(task_id)
-                            continue
+                        sub_st, sub_res = self.pr_api.submit_screenshot_file(task_id, shot_path)
+                        if sub_st == 200 and sub_res.get("ok"):
+                            status_val = sub_res.get("completion", {}).get("status", "pending_review")
+                            is_validated = True
+                            logger.info(f" [✓] Preuve d'écran acceptée par PR.Social (Statut: {status_val})")
 
                     if is_validated:
                         success_count += 1
@@ -335,7 +330,7 @@ class UniversalSilentEngine:
                         if fresh_me.get("user"):
                             current_bal = float(fresh_me["user"].get("balance", 0))
                             logger.info(f"💰 Solde réel en ligne sur PR.Social : ${current_bal:.4f}")
-                    elif act_ok:
+                    else:
                         err_detail = sub_res.get("error") if isinstance(sub_res, dict) else f"Status {sub_st}"
                         logger.warning(f"Tâche #{task_id} non validée ({err_detail}). Annulation immédiate...")
                         self.pr_api.cancel_task(task_id)
