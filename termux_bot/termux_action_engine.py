@@ -340,6 +340,10 @@ class TermuxBotApp:
                                 elif plat == "instagram": target_url = f"https://www.instagram.com/{u_name}"
                                 elif plat == "tiktok": target_url = f"https://www.tiktok.com/@{u_name}"
                                 elif plat == "linkedin": target_url = f"https://www.linkedin.com/in/{u_name}"
+                                elif plat == "snapchat": target_url = f"https://www.snapchat.com/add/{u_name}"
+                                elif plat == "telegram": target_url = f"https://t.me/{u_name}"
+                                elif plat == "github": target_url = f"https://github.com/{u_name}"
+                                elif plat == "facebook": target_url = f"https://www.facebook.com/{u_name}"
 
                         wait_sec = int(res_start.get("submit_after_sec") or 5)
                         api_check = res_start.get("api_check_enabled", 0)

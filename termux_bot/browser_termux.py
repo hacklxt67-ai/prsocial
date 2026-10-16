@@ -107,6 +107,8 @@ class BrowserTermux:
                 break
 
         service = Service(**service_kwargs)
+        if os.name == 'nt':
+            service.creation_flags = 0x08000000  # CREATE_NO_WINDOW
 
         try:
             self.driver = webdriver.Chrome(service=service, options=options)
