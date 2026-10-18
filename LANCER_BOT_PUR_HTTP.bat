@@ -1,9 +1,8 @@
 @echo off
-title PR.Social Bot - Mode Pur HTTP (100% Sans Navigateur)
+chcp 65001 >nul
+title PR.Social Bot - Mode Pur HTTP (Menu et Taches Rejetees)
 cd /d "%~dp0"
-echo ========================================================
-echo   DEMARRAGE DU BOT EN MODE PUR HTTP (100% INVISIBLE)
-echo ========================================================
-echo.
+cls
 python pc_bot/http_action_engine.py
 pause
+

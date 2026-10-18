@@ -42,4 +42,5 @@ social_bot_data/
 screenshots/
 chrome_profile/
 chromium_profile/
+scratch/
 *.log

@@ -33,6 +33,10 @@ except ImportError:
         from pc_bot.pr_api import PrSocialAPI
 
 from browser_termux import BrowserTermux
+try:
+    from rejected_tasks_manager import TermuxRejectedTasksManager
+except ImportError:
+    from termux_bot.rejected_tasks_manager import TermuxRejectedTasksManager
 
 # Couleurs ANSI
 RESET = "\033[0m"
@@ -137,6 +141,8 @@ class TermuxBotApp:
         self.current_user = ""
         self.current_balance = 0.0
         self.approved_accounts = {}
+        self.failed_tasks = set()
+        self.rejected_manager = TermuxRejectedTasksManager(self.api, self.browser)
 
     def print_logo(self):
         print(f"""{CYAN}{BOLD}
@@ -246,21 +252,24 @@ class TermuxBotApp:
         print(f"{BLUE}│{RESET}  🕒 {WHITE}Date et Heure        :{RESET} {CYAN}{now_str:<32}{RESET} {BLUE}│{RESET}")
         print(f"{BLUE}╰─────────────────────────────────────────────────────────────╯{RESET}")
 
-        # Menu à 4 choix clairs
+        # Menu à 5 choix clairs
         print(f"\n{CYAN}┌─────────────────────────────────────────────────────────────┐{RESET}")
         print(f"{CYAN}│{RESET}  {GREEN}{BOLD}[1]{RESET} 🚀 {WHITE}{BOLD}Start Tout (Auto-Bot + Déblocage Auto Tâches){RESET}       {CYAN}│{RESET}")
-        print(f"{CYAN}│{RESET}  {CYAN}{BOLD}[2]{RESET} 🔗 {WHITE}Comptes Liés{RESET}                                          {CYAN}│{RESET}")
-        print(f"{CYAN}│{RESET}  {YELLOW}{BOLD}[3]{RESET} 🔑 {WHITE}Changer de Cookie / Déconnexion{RESET}                       {CYAN}│{RESET}")
-        print(f"{CYAN}│{RESET}  {RED}{BOLD}[4]{RESET} 🚪 {WHITE}Quitter Bot{RESET}                                           {CYAN}│{RESET}")
+        print(f"{CYAN}│{RESET}  {MAGENTA}{BOLD}[2]{RESET} 🔄 {WHITE}{BOLD}Récupérer & Réessayer les Tâches Rejetées{RESET}         {CYAN}│{RESET}")
+        print(f"{CYAN}│{RESET}  {CYAN}{BOLD}[3]{RESET} 🔗 {WHITE}Comptes Liés{RESET}                                          {CYAN}│{RESET}")
+        print(f"{CYAN}│{RESET}  {YELLOW}{BOLD}[4]{RESET} 🔑 {WHITE}Changer de Cookie / Déconnexion{RESET}                       {CYAN}│{RESET}")
+        print(f"{CYAN}│{RESET}  {RED}{BOLD}[5]{RESET} 🚪 {WHITE}Quitter Bot{RESET}                                           {CYAN}│{RESET}")
         print(f"{CYAN}└─────────────────────────────────────────────────────────────┘{RESET}")
 
-        choice = input(f"\n{BOLD}Votre choix [1-4] : {RESET}").strip()
+        choice = input(f"\n{BOLD}Votre choix [1-5] : {RESET}").strip()
 
         if choice == "1":
             self.start_all_tasks()
         elif choice == "2":
-            self.show_linked_accounts()
+            self.recover_rejected_tasks()
         elif choice == "3":
+            self.show_linked_accounts()
+        elif choice == "4":
             print(f"\n{YELLOW}Déconnexion en cours...{RESET}")
             clear_saved_session()
             self.token = ""
@@ -271,7 +280,7 @@ class TermuxBotApp:
             self.api.update_credentials("", "")
             print(f"{GREEN}✓ Déconnecté. La session précédente a été réinitialisée.{RESET}")
             time.sleep(1.5)
-        elif choice == "4":
+        elif choice == "5":
             print(f"\n{CYAN}Arrêt du bot. À bientôt ! 👋{RESET}\n")
             self.browser.stop_driver()
             sys.exit(0)
@@ -290,7 +299,7 @@ class TermuxBotApp:
         if unblocked == 0:
             print(f"{GREEN}✓ Aucune tâche orpheline bloquante. Prêt pour l'automatisation.{RESET}")
 
-        target_platforms = ["threads", "reddit", "tiktok", "instagram", "youtube", "facebook", "linkedin", "telegram", "twitter", "snapchat", "github", "discord", "spotify"]
+        target_platforms = ["threads", "reddit", "pinterest", "soundcloud", "bluesky", "tiktok", "instagram", "youtube", "facebook", "linkedin", "telegram", "twitter", "snapchat", "github", "discord", "spotify"]
         active_list = [p for p in target_platforms if p in self.approved_accounts] if self.approved_accounts else target_platforms
 
         print(f"{WHITE}Réseaux surveillés : {', '.join([f'{CYAN}{p.upper()}{RESET}' for p in active_list])}\n")
@@ -312,6 +321,9 @@ class TermuxBotApp:
 
                     for t in tasks:
                         task_id = t["id"]
+                        if task_id in self.failed_tasks:
+                            continue
+
                         action = (t.get("action") or "FOLLOW").upper()
                         reward = float(t.get("worker_reward") or t.get("cost_per_task") or 0.0)
                         tasks_found += 1
@@ -327,9 +339,10 @@ class TermuxBotApp:
                                 print(f"  {YELLOW}⚠️ Tâche bloquante détectée. Déblocage automatique...{RESET}")
                                 self.auto_unblock_tasks()
                                 time.sleep(1)
+                            self.failed_tasks.add(task_id)
                             continue
 
-                        # Résolution URL cible (Threads / Reddit / LinkedIn / etc.)
+                        # Résolution URL cible (Threads / Reddit / LinkedIn / Pinterest / etc.)
                         target_url = res_start.get("task", {}).get("target_url") or t.get("target_url") or ""
                         if not target_url:
                             u_name = (res_start.get("task", {}).get("target_username") or t.get("target_username") or "").strip().lstrip("@")
@@ -344,6 +357,11 @@ class TermuxBotApp:
                                 elif plat == "telegram": target_url = f"https://t.me/{u_name}"
                                 elif plat == "github": target_url = f"https://github.com/{u_name}"
                                 elif plat == "facebook": target_url = f"https://www.facebook.com/{u_name}"
+                                elif plat == "pinterest": target_url = f"https://www.pinterest.com/{u_name}/"
+                                elif plat in ["soundcloud", "sound_cloud"]: target_url = f"https://soundcloud.com/{u_name}"
+                                elif plat in ["bluesky", "bsky"]:
+                                    bsky_handle = u_name if "." in u_name else f"{u_name}.bsky.social"
+                                    target_url = f"https://bsky.app/profile/{bsky_handle}"
 
                         wait_sec = int(res_start.get("submit_after_sec") or 5)
                         api_check = res_start.get("api_check_enabled", 0)
@@ -422,6 +440,7 @@ class TermuxBotApp:
                                 print(f"  ⚠️ {YELLOW}Raison : {msg_act}{RESET}")
                                 print(f"  🛡️ {CYAN}Annulation propre de la tâche #{task_id} pour empêcher tout ban PR.Social.{RESET}")
                                 self.api.cancel_task(task_id)
+                                self.failed_tasks.add(task_id)
 
                         if is_valid:
                             _, fresh = self.api.get_me()
@@ -431,6 +450,7 @@ class TermuxBotApp:
                         elif ok_act:
                             print(f"  {YELLOW}⚠️ Non validée. Déblocage automatique de sécurité...{RESET}")
                             self.api.cancel_task(task_id)
+                            self.failed_tasks.add(task_id)
 
                         tasks_completed_count += 1
                         if tasks_completed_count % 4 == 0:
@@ -451,7 +471,71 @@ class TermuxBotApp:
             time.sleep(1.5)
 
     # ==========================================================================
-    # OPTION 2 : COMPTES LIÉS
+    # OPTION 2 : RÉCUPÉRATION DES TÂCHES REJETÉES (MODE STRICT)
+    # ==========================================================================
+    def recover_rejected_tasks(self):
+        clear_screen()
+        self.print_logo()
+        print(f"\n{MAGENTA}{BOLD}🔄 GESTIONNAIRE DE RÉCUPÉRATION DES TÂCHES REJETÉES (MODE STRICT){RESET}\n")
+        
+        tasks = self.rejected_manager.fetch_rejected_tasks(max_pages=5)
+        if not tasks:
+            print(f"\n{GREEN}✓ Aucune tâche rejetée trouvée sur votre compte PR.Social.{RESET}")
+            input(f"\n{CYAN}Appuyez sur Entrée pour retourner au menu...{RESET}")
+            return
+
+        print(f"\n{YELLOW}{BOLD}📋 Tâches Rejetées Trouvées ({len(tasks)}) :{RESET}")
+        print(f"{CYAN}┌────────────┬─────────────┬─────────────┬─────────────┬────────────────────────────────────────┐{RESET}")
+        print(f"{CYAN}│{RESET} {BOLD}{'ID':<10}{RESET} {CYAN}│{RESET} {BOLD}{'Plateforme':<11}{RESET} {CYAN}│{RESET} {BOLD}{'Action':<11}{RESET} {CYAN}│{RESET} {BOLD}{'Gain':<11}{RESET} {CYAN}│{RESET} {BOLD}{'Diagnostic & Motif':<38}{RESET} {CYAN}│{RESET}")
+        print(f"{CYAN}├────────────┼─────────────┼─────────────┼─────────────┼────────────────────────────────────────┤{RESET}")
+        
+        for t in tasks:
+            tid = str(t['id'])[:10]
+            plat = str(t['platform']).upper()[:11]
+            act = str(t['action'])[:11]
+            rew = f"+${t['reward']:.4f}"[:11]
+            diag = str(t['diagnosis'])[:38]
+            color = GREEN if t.get('recoverable') else RED
+            print(f"{CYAN}│{RESET} {tid:<10} {CYAN}│{RESET} {plat:<11} {CYAN}│{RESET} {act:<11} {CYAN}│{RESET} {color}{rew:<11}{RESET} {CYAN}│{RESET} {diag:<38} {CYAN}│{RESET}")
+        print(f"{CYAN}└────────────┴─────────────┴─────────────┴─────────────┴────────────────────────────────────────┘{RESET}")
+
+        print(f"\n{CYAN}Options disponibles :{RESET}")
+        print(f" {GREEN}[1]{RESET} 🚀 Réessayer TOUTES les tâches récupérables (Mode Strict)")
+        print(f" {BLUE}[2]{RESET} 🎯 Réessayer une tâche spécifique par son ID")
+        print(f" {RED}[3]{RESET} ↩️ Retour au menu principal")
+
+        opt = input(f"\n{BOLD}Votre choix [1-3] : {RESET}").strip()
+
+        if opt == "1":
+            print(f"\n{MAGENTA}🚀 Lancement de la récupération automatique de toutes les tâches éligibles...{RESET}")
+            success_count = 0
+            for t in tasks:
+                if not t.get("recoverable"):
+                    print(f"\n{YELLOW}⏩ Tâche #{t['id']} écartée car jugée non récupérable ({t['diagnosis']}){RESET}")
+                    continue
+                ok, msg = self.rejected_manager.retry_single_task(t, self.approved_accounts)
+                if ok:
+                    success_count += 1
+                time.sleep(random.uniform(4.0, 7.0))
+            
+            print(f"\n{GREEN}{BOLD}🎉 Récupération terminée : {success_count} tâche(s) validée(s) avec succès !{RESET}")
+            input(f"\n{CYAN}Appuyez sur Entrée pour retourner au menu...{RESET}")
+
+        elif opt == "2":
+            target_id = input(f"\n{CYAN}Entrez l'ID de la tâche à récupérer : {RESET}").strip()
+            matched = next((t for t in tasks if str(t['id']) == target_id), None)
+            if not matched:
+                print(f"{RED}✖ Tâche #{target_id} introuvable dans la liste des tâches rejetées.{RESET}")
+            else:
+                ok, msg = self.rejected_manager.retry_single_task(matched, self.approved_accounts)
+                if ok:
+                    print(f"\n{GREEN}{BOLD}✓ Tâche #{target_id} récupérée avec succès !{RESET}")
+                else:
+                    print(f"\n{YELLOW}⚠️ La tâche #{target_id} n'a pas pu être validée : {msg}{RESET}")
+            input(f"\n{CYAN}Appuyez sur Entrée pour retourner au menu...{RESET}")
+
+    # ==========================================================================
+    # OPTION 3 : COMPTES LIÉS
     # ==========================================================================
     def show_linked_accounts(self):
         clear_screen()

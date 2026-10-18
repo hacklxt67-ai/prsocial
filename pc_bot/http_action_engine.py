@@ -132,6 +132,8 @@ class UniversalSilentEngine:
         self.stop_requested = False
         self.delay_min = 5.0
         self.delay_max = 9.0
+        self.failed_tasks: Dict[int, float] = {}
+        self.COOLDOWN_FAILED_SECONDS = 900  # 15 minutes d'exclusion anti-répétition
 
     def auto_unblock_active_tasks(self) -> int:
         """Détecte et annule toute tâche bloquante en 'in_progress' sur PR.Social."""
@@ -197,7 +199,7 @@ class UniversalSilentEngine:
                         approved_accounts[p] = acc
                         logger.info(f"Compte approuvé : [{p.upper()}] @{acc.get('username')}")
 
-        target_platforms = platforms or ["threads", "reddit", "twitter", "snapchat", "github", "discord", "youtube", "facebook", "instagram", "tiktok", "telegram"]
+        target_platforms = platforms or ["threads", "reddit", "pinterest", "soundcloud", "bluesky", "twitter", "snapchat", "github", "discord", "youtube", "linkedin", "facebook", "instagram", "tiktok", "telegram"]
         active_list = [p for p in target_platforms if p in approved_accounts] if approved_accounts else target_platforms
         logger.info(f"Plateformes actives prêtes : {', '.join([p.upper() for p in active_list])}")
 
@@ -224,6 +226,13 @@ class UniversalSilentEngine:
                         break
 
                     task_id = t["id"]
+                    # Filtre anti-répétition : si déjà tentée ou échouée récemment, on passe
+                    if task_id in self.failed_tasks:
+                        if time.time() - self.failed_tasks[task_id] < self.COOLDOWN_FAILED_SECONDS:
+                            continue
+                        else:
+                            del self.failed_tasks[task_id]
+
                     action = (t.get("action") or "FOLLOW").upper()
                     reward = float(t.get("worker_reward") or t.get("cost_per_task") or 0.0)
 
@@ -238,6 +247,7 @@ class UniversalSilentEngine:
                     if start_st != 200 or not start_res.get("ok"):
                         err_msg = str(start_res.get("error", ""))
                         logger.warning(f"Impossible de démarrer #{task_id}: {err_msg}")
+                        self.failed_tasks[task_id] = time.time()
                         if "active task" in err_msg.lower() or "task_in_progress" in err_msg.lower():
                             logger.info("Déblocage automatique de la tâche bloquante...")
                             self.auto_unblock_active_tasks()
@@ -258,6 +268,13 @@ class UniversalSilentEngine:
                                 target_url = f"https://www.instagram.com/{u_name}"
                             elif plat == "tiktok":
                                 target_url = f"https://www.tiktok.com/@{u_name}"
+                            elif plat == "pinterest":
+                                target_url = f"https://www.pinterest.com/{u_name}/"
+                            elif plat in ["soundcloud", "sound_cloud"]:
+                                target_url = f"https://soundcloud.com/{u_name}"
+                            elif plat in ["bluesky", "bsky"]:
+                                bsky_handle = u_name if "." in u_name else f"{u_name}.bsky.social"
+                                target_url = f"https://bsky.app/profile/{bsky_handle}"
 
                     wait_sec = int(start_res.get("submit_after_sec") or 5)
                     api_check_enabled = start_res.get("api_check_enabled", 0)
@@ -323,6 +340,7 @@ class UniversalSilentEngine:
                     if is_validated:
                         success_count += 1
                         session_earnings += reward
+                        self.failed_tasks[task_id] = time.time() + 86400  # Marquer comme réussie définitivement
                         logger.info(f"🎉 SUCCÈS: Tâche #{task_id} validée ! +${reward:.3f} (Total session: ${session_earnings:.3f})")
 
                         # Vérification du solde réel en ligne
@@ -333,6 +351,8 @@ class UniversalSilentEngine:
                     else:
                         err_detail = sub_res.get("error") if isinstance(sub_res, dict) else f"Status {sub_st}"
                         logger.warning(f"Tâche #{task_id} non validée ({err_detail}). Annulation immédiate...")
+                        self.failed_tasks[task_id] = time.time()
+                        logger.info(f"[ANTI-RÉPÉTITION] Tâche #{task_id} écartée pendant 15 min.")
                         self.pr_api.cancel_task(task_id)
 
                     delay = random.uniform(self.delay_min, self.delay_max)
@@ -350,9 +370,38 @@ class UniversalSilentEngine:
 
 
 # ==============================================================================
-# 3. POINT D'ENTRÉE AUTONOME
+# 3. POINT D'ENTRÉE AUTONOME & MENU TERMINAL
 # ==============================================================================
+class ANSI:
+    RESET   = "\033[0m"
+    BOLD    = "\033[1m"
+    RED     = "\033[91m"
+    GREEN   = "\033[92m"
+    YELLOW  = "\033[93m"
+    BLUE    = "\033[94m"
+    MAGENTA = "\033[95m"
+    CYAN    = "\033[96m"
+    WHITE   = "\033[97m"
+    GRAY    = "\033[90m"
+
+LOGO_HTTP = f"""{ANSI.CYAN}{ANSI.BOLD}
+  ██████╗ ██████╗       ███████╗ ██████╗  ██████╗██╗ █████╗ ██╗     
+  ██╔══██╗██╔══██╗      ██╔════╝██╔═══██╗██╔════╝██║██╔══██╗██║     
+  ██████╔╝██████╔╝█████╗███████╗██║   ██║██║     ██║███████║██║     
+  ██╔═══╝ ██╔══██╗╚════╝╚════██║██║   ██║██║     ██║██╔══██║██║     
+  ██║     ██║  ██║      ███████║╚██████╔╝╚██████╗██║██║  ██║███████╗
+  ╚═╝     ╚═╝  ╚═╝      ╚══════╝ ╚═════╝  ╚═════╝╚═╝╚═╝  ╚═╝╚══════╝{ANSI.RESET}
+         {ANSI.MAGENTA}{ANSI.BOLD}⚡ L'argent c'est une chiffre⚡{ANSI.RESET}
+{ANSI.GRAY}  ─────────────────────────────────────────────────────────────{ANSI.RESET}"""
+
 def main():
+    if os.name == 'nt':
+        os.system('color')
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+    except Exception:
+        pass
+
     config_file = r"D:\social_pc_bot\config.json"
     cfg = {}
     if os.path.exists(config_file):
@@ -362,40 +411,171 @@ def main():
         except Exception:
             pass
 
-    token = cfg.get("token", "")
-    cf = cfg.get("cf_clearance", "")
+    token = cfg.get("token", "").strip()
+    cf = cfg.get("cf_clearance", "").strip()
     ig_cookies = cfg.get("instagram_cookies", "")
     yt_cookies = cfg.get("youtube_cookies", "")
     tt_cookies = cfg.get("tiktok_cookies", "")
 
-    client_test = PrSocialClient(token, cf)
-    st, me = client_test.get_me() if token else (0, {})
-    if st != 200:
-        print("\n" + "="*60)
-        print(" [!] Le jeton PR.Social actuel est absent ou a expiré.")
-        print("="*60)
-        new_tok = input("Collez votre nouveau jeton PR.Social : ").strip()
-        if new_tok:
-            token = new_tok
-            cfg["token"] = token
-            try:
-                os.makedirs(os.path.dirname(config_file), exist_ok=True)
-                with open(config_file, "w", encoding="utf-8") as f:
-                    json.dump(cfg, f, indent=2)
-            except Exception:
-                pass
+    client = PrSocialClient(token, cf)
 
-    engine = UniversalSilentEngine(
-        pr_token=token,
-        cf_clearance=cf,
-        ig_cookies=ig_cookies,
-        yt_cookies=yt_cookies,
-        tt_cookies=tt_cookies
-    )
-    try:
-        engine.run_all()
-    finally:
-        engine.browser_bot.stop_driver()
+    while True:
+        os.system('cls' if os.name == 'nt' else 'clear')
+        print(LOGO_HTTP)
+
+        st, me = client.get_me() if token else (0, {})
+        if st == 200 and me.get("user"):
+            u = me["user"]
+            bal = float(u.get("balance", 0.0))
+            print(f"  {ANSI.GREEN}{ANSI.BOLD}● CONNECTÉ : @{u.get('username')}{ANSI.RESET}  |  {ANSI.YELLOW}{ANSI.BOLD}💰 Solde : ${bal:.4f}{ANSI.RESET}  |  {ANSI.CYAN}Mode : Silencieux{ANSI.RESET}")
+        else:
+            print(f"  {ANSI.RED}{ANSI.BOLD}● NON CONNECTÉ (Jeton absent ou expiré){ANSI.RESET}")
+
+        print(f"{ANSI.GRAY}  ─────────────────────────────────────────────────────────────{ANSI.RESET}\n")
+
+        print(f"  {ANSI.WHITE}{ANSI.BOLD}┌── MENU MODE PUR HTTP (SILENCIEUX) ────────────────────────┐{ANSI.RESET}")
+        print(f"  {ANSI.WHITE}{ANSI.BOLD}│{ANSI.RESET}                                                            {ANSI.WHITE}{ANSI.BOLD}│{ANSI.RESET}")
+        print(f"  {ANSI.WHITE}{ANSI.BOLD}│{ANSI.RESET}   {ANSI.GREEN}{ANSI.BOLD}[ 1 ] 🚀 START{ANSI.RESET}  - Lancer le Bot Silencieux (Tâches Auto)   {ANSI.WHITE}{ANSI.BOLD}│{ANSI.RESET}")
+        print(f"  {ANSI.WHITE}{ANSI.BOLD}│{ANSI.RESET}   {ANSI.YELLOW}{ANSI.BOLD}[ 2 ] 🔄 RÉCUPÉRER & RÉESSAYER LES TÂCHES REJETÉES{ANSI.RESET}      {ANSI.WHITE}{ANSI.BOLD}│{ANSI.RESET}")
+        print(f"  {ANSI.WHITE}{ANSI.BOLD}│{ANSI.RESET}   {ANSI.CYAN}{ANSI.BOLD}[ 3 ] 🔑 Changer / Valider Token PR.Social{ANSI.RESET}           {ANSI.WHITE}{ANSI.BOLD}│{ANSI.RESET}")
+        print(f"  {ANSI.WHITE}{ANSI.BOLD}│{ANSI.RESET}   {ANSI.RED}{ANSI.BOLD}[ 4 ] ❌ EXIT (Quitter){ANSI.RESET}                                {ANSI.WHITE}{ANSI.BOLD}│{ANSI.RESET}")
+        print(f"  {ANSI.WHITE}{ANSI.BOLD}│{ANSI.RESET}                                                            {ANSI.WHITE}{ANSI.BOLD}│{ANSI.RESET}")
+        print(f"  {ANSI.WHITE}{ANSI.BOLD}└─── Entrez votre choix (1, 2, 3, 4) ───────────────────────┘{ANSI.RESET}\n")
+
+        try:
+            choice = input(f"  {ANSI.BOLD}{ANSI.CYAN}Votre sélection [1-4] : {ANSI.RESET}").strip()
+        except (KeyboardInterrupt, EOFError):
+            break
+
+        if choice == "1":
+            if st != 200:
+                print(f"\n  {ANSI.RED}Veuillez d'abord configurer un Token valide (Option 3).{ANSI.RESET}")
+                time.sleep(2)
+                continue
+
+            print(f"\n  {ANSI.GREEN}{ANSI.BOLD}=== DÉMARRAGE DU BOT PUR HTTP SILENCIEUX ==={ANSI.RESET}")
+            print(f"  {ANSI.GRAY}Appuyez sur {ANSI.WHITE}{ANSI.BOLD}Ctrl + C{ANSI.RESET}{ANSI.GRAY} pour arrêter et revenir au menu.{ANSI.RESET}\n")
+            engine = UniversalSilentEngine(
+                pr_token=token,
+                cf_clearance=cf,
+                ig_cookies=ig_cookies,
+                yt_cookies=yt_cookies,
+                tt_cookies=tt_cookies
+            )
+            try:
+                engine.run_all()
+            except KeyboardInterrupt:
+                print(f"\n  {ANSI.YELLOW}Arrêt demandé par l'utilisateur...{ANSI.RESET}")
+                engine.stop_requested = True
+            finally:
+                engine.browser_bot.stop_driver()
+            input(f"\n  Appuyez sur {ANSI.BOLD}Entrée{ANSI.RESET} pour revenir au menu...")
+
+        elif choice == "2":
+            if st != 200:
+                print(f"\n  {ANSI.RED}Veuillez d'abord configurer un Token valide (Option 3).{ANSI.RESET}")
+                time.sleep(2)
+                continue
+
+            try:
+                from pc_bot.pr_api import PrSocialAPI
+                from pc_bot.browser_bot import BrowserBot
+                from pc_bot.rejected_tasks_manager import RejectedTasksManager
+
+                api_std = PrSocialAPI(token=token, cf_clearance=cf)
+                b_bot = BrowserBot(headless=True)
+                mgr = RejectedTasksManager(api=api_std, browser_bot=b_bot)
+
+                print(f"\n  {ANSI.YELLOW}{ANSI.BOLD}🔍 Récupération des tâches rejetées en cours...{ANSI.RESET}\n")
+                tasks = mgr.fetch_all_rejected_tasks(max_pages=15, log_cb=lambda m, l: print(f"  [{l.upper()}] {m}"))
+
+                if not tasks:
+                    print(f"\n  {ANSI.GREEN}{ANSI.BOLD}🎉 Aucune tâche rejetée trouvée sur votre compte.{ANSI.RESET}\n")
+                    b_bot.stop_driver()
+                    input(f"  Appuyez sur {ANSI.BOLD}Entrée{ANSI.RESET} pour continuer...")
+                    continue
+
+                total_rew = sum(t.get("reward", 0.0) for t in tasks)
+                print(f"\n  {ANSI.WHITE}{ANSI.BOLD}📊 {len(tasks)} Tâche(s) Rejetée(s) | Total à récupérer : ${total_rew:.4f}{ANSI.RESET}\n")
+
+                for i, t in enumerate(tasks[:8], 1):
+                    tid = t["task_id"]
+                    plat = t["platform"].upper()
+                    act = t["action"].upper()
+                    rew = t.get("reward", 0.0)
+                    diag = t.get("analysis", {})
+                    print(f"  {ANSI.BOLD}{i}. [{plat} - {act}] #{tid}{ANSI.RESET} {ANSI.GREEN}+${rew:.3f}{ANSI.RESET}")
+                    print(f"     {ANSI.RED}Erreur :{ANSI.RESET} {diag.get('category')} ({t.get('ai_reason_raw')})")
+                    print(f"     {ANSI.YELLOW}Mesure stricte :{ANSI.RESET} {diag.get('strict_measure')}\n")
+
+                print(f"  {ANSI.WHITE}{ANSI.BOLD}Actions :{ANSI.RESET}")
+                print(f"  {ANSI.GREEN}[ A ] 🚀 Réessayer TOUTES les tâches rejetées en Mode Strict{ANSI.RESET}")
+                print(f"  {ANSI.RED}[ R ] ⬅️  Retour au Menu{ANSI.RESET}\n")
+
+                act_choice = input(f"  {ANSI.BOLD}Votre choix :{ANSI.RESET} ").strip().lower()
+                if act_choice == 'a':
+                    print(f"\n  {ANSI.YELLOW}{ANSI.BOLD}=== DÉMARRAGE DU RÉESSAI EN LOT STRICT ==={ANSI.RESET}\n")
+                    success_cnt = 0
+                    expired_cnt = 0
+                    slots_cnt = 0
+                    try:
+                        for idx, t in enumerate(tasks, 1):
+                            tid = t["task_id"]
+                            print(f"  {ANSI.CYAN}>>> Tâche {idx}/{len(tasks)} : #{tid} [{t['platform'].upper()}]{ANSI.RESET}")
+                            ok, res_msg = mgr.retry_single_task(t, log_cb=lambda m, l: print(f"      [{l.upper()}] {m}"))
+                            if ok:
+                                success_cnt += 1
+                                print(f"      {ANSI.GREEN}✅ Validée et resoumise avec succès !{ANSI.RESET}\n")
+                                time.sleep(random.uniform(4.0, 7.0))
+                            else:
+                                if "expirée" in res_msg.lower() or "not_found" in res_msg.lower():
+                                    expired_cnt += 1
+                                elif "places" in res_msg.lower() or "slots" in res_msg.lower():
+                                    slots_cnt += 1
+                                print(f"      {ANSI.YELLOW}⚠️ {t.get('status_retry', res_msg)}{ANSI.RESET}\n")
+                                time.sleep(0.5)
+                    except KeyboardInterrupt:
+                        print(f"\n  {ANSI.YELLOW}Arrêt demandé par l'utilisateur.{ANSI.RESET}")
+
+                    print(f"\n  {ANSI.WHITE}{ANSI.BOLD}=== RÉCAPITULATIF DU RÉESSAI EN LOT ==={ANSI.RESET}")
+                    print(f"  {ANSI.GREEN}✓ {success_cnt} tâche(s) relancée(s) et validée(s) avec succès !{ANSI.RESET}")
+                    print(f"  {ANSI.YELLOW}⏳ {slots_cnt} tâche(s) temporairement occupées par d'autres ouvriers (SLOTS_TAKEN){ANSI.RESET}")
+                    print(f"  {ANSI.GRAY}❌ {expired_cnt} campagne(s) déjà terminées ou clôturées par l'annonceur{ANSI.RESET}\n")
+
+                b_bot.stop_driver()
+                input(f"\n  Appuyez sur {ANSI.BOLD}Entrée{ANSI.RESET} pour continuer...")
+
+            except Exception as e:
+                print(f"\n  {ANSI.RED}Erreur : {e}{ANSI.RESET}")
+                input(f"  Appuyez sur {ANSI.BOLD}Entrée{ANSI.RESET} pour continuer...")
+
+        elif choice == "3":
+            print(f"\n  {ANSI.CYAN}=== MODIFICATION DU TOKEN PR.SOCIAL ==={ANSI.RESET}\n")
+            new_t = input(f"  Collez votre nouveau Token : ").strip()
+            if new_t:
+                if new_t.startswith("token="):
+                    new_t = new_t[6:]
+                token = new_t.strip()
+                cfg["token"] = token
+                try:
+                    os.makedirs(os.path.dirname(config_file), exist_ok=True)
+                    with open(config_file, "w", encoding="utf-8") as f:
+                        json.dump(cfg, f, indent=2)
+                except Exception:
+                    pass
+                client.update_token(token, cf)
+                print(f"\n  {ANSI.GREEN}✓ Token mis à jour avec succès !{ANSI.RESET}")
+            else:
+                print(f"\n  {ANSI.GRAY}Annulé.{ANSI.RESET}")
+            time.sleep(1.5)
+
+        elif choice in ["4", "exit", "quit", "q"]:
+            break
+
+    os.system('cls' if os.name == 'nt' else 'clear')
+    print(LOGO_HTTP)
+    print(f"  {ANSI.GREEN}{ANSI.BOLD}Session terminée. À bientôt !{ANSI.RESET}\n")
 
 if __name__ == "__main__":
     main()
+

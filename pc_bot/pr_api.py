@@ -127,3 +127,12 @@ class PrSocialAPI:
 
     def report_task(self, task_id: int) -> Tuple[int, Dict[str, Any]]:
         return self.request("POST", f"/tasks/{task_id}/report-task", json_data={})
+
+    def get_rejected_tasks(self, page: int = 1, limit: int = 50, scope: str = "manual") -> Tuple[int, Dict[str, Any]]:
+        """Récupère la liste des tâches rejetées pour le compte actuel."""
+        return self.request("GET", "/tasks/my/list", params={"status": "rejected", "scope": scope, "page": page, "limit": limit})
+
+    def get_task_details(self, task_id: int) -> Tuple[int, Dict[str, Any]]:
+        """Récupère les détails complets d'une tâche (incluant la completion et la raison du rejet ai_reason)."""
+        return self.request("GET", f"/tasks/{task_id}")
+

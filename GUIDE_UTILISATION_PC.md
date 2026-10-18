@@ -17,9 +17,17 @@ Vous avez deux façons simples de démarrer l'application depuis votre dossier :
    - Double-cliquez sur : **`LANCER_PR_SOCIAL_PC.bat`**
 
 3. **Lancement Mode Pur HTTP (100% Invisible / Sans Navigateur) :**
-   - Double-cliquez sur : **`LANCER_BOT_PUR_HTTP.bat`**
-   - Ce mode fonctionne en tâche de fond uniquement avec des requêtes HTTP (zéro fenêtre de navigateur ouverte, ultra-léger et rapide).
+   - Double-cliquez sur : **`http.bat`** ou **`LANCER_BOT_PUR_HTTP.bat`**
+   - Ce mode fonctionne en tâche de fond avec menu interactif stylé, récupération des rejets, requêtes HTTP rapides et ultra-légères.
    - Intègre un système de déblocage automatique anti-blocage (annule toute tâche bloquée instantanément).
+
+4. **Lancement Menu Terminal Stylé (Console Interactive) :**
+   - Double-cliquez sur : **`LANCER_MENU_TERMINAL.bat`**
+   - Affiche le logo ASCII art, le solde en direct et un menu interactif :
+     * `[ 1 ] START` : Démarre l'automatisation en continu avec logs colorés.
+     * `[ 2 ] RÉCUPÉRER & RÉESSAYER LES TÂCHES REJETÉES` : Analyse les rejets et relance en mode strict.
+     * `[ 3 ] Changer Token` / `[ 4 ] Mode Invisible` / `[ 5 ] Quitter`.
+
 
 ---
 

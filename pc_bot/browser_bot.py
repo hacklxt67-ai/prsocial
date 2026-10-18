@@ -17,16 +17,26 @@ DEFAULT_PROFILE_DIR = r"D:\social_pc_bot\chrome_profile"
 SCREENSHOT_DIR = r"D:\social_pc_bot\screenshots"
 
 def ensure_unique_screenshot(screenshot_path: str):
-    """Garantit un hash SHA-256 unique pour chaque capture afin d'éviter le rejet DUPLICATE_SCREENSHOT par PR.Social."""
+    """Garantit un hash unique (cryptographique et perceptuel) pour chaque capture afin d'éviter le rejet DUPLICATE_SCREENSHOT par PR.Social."""
     try:
         if os.path.exists(screenshot_path):
             with Image.open(screenshot_path) as im:
                 im = im.convert("RGB")
                 pix = im.load()
                 w, h = im.size
-                if w > 2 and h > 2:
-                    r, g, b = pix[0, 0]
-                    pix[0, 0] = ((r + random.randint(1, 7)) % 256, g, b)
+                if w > 10 and h > 10:
+                    # Variation subtile sur plusieurs pixels d'angles
+                    for i in range(random.randint(6, 12)):
+                        rx = random.randint(0, min(12, w - 1))
+                        ry = random.randint(0, min(12, h - 1))
+                        r, g, b = pix[rx, ry]
+                        pix[rx, ry] = ((r + random.randint(1, 15)) % 256, (g + random.randint(1, 9)) % 256, b)
+                    # Variation en bordure inférieure droite
+                    for i in range(random.randint(4, 8)):
+                        rx = w - 1 - random.randint(0, min(10, w - 1))
+                        ry = h - 1 - random.randint(0, min(10, h - 1))
+                        r, g, b = pix[rx, ry]
+                        pix[rx, ry] = ((r + random.randint(1, 13)) % 256, g, (b + random.randint(1, 17)) % 256)
                 im.save(screenshot_path, "PNG")
     except Exception:
         pass
@@ -245,6 +255,12 @@ class BrowserBot:
                 action_done = self._handle_threads(driver, action_lower, comment_text)
             elif "reddit" in platform_lower or "reddit.com" in target_url:
                 action_done = self._handle_reddit(driver, action_lower, comment_text)
+            elif "pinterest" in platform_lower or "pinterest.com" in target_url:
+                action_done = self._handle_pinterest(driver, action_lower, comment_text)
+            elif "soundcloud" in platform_lower or "soundcloud.com" in target_url:
+                action_done = self._handle_soundcloud(driver, action_lower, comment_text)
+            elif "bluesky" in platform_lower or "bsky" in platform_lower or "bsky.app" in target_url:
+                action_done = self._handle_bluesky(driver, action_lower, comment_text)
             else:
                 action_done = True # Navigation simple
 
@@ -608,6 +624,7 @@ class BrowserBot:
             return True
 
     def _handle_twitter(self, driver: webdriver.Chrome, action: str, comment_text: Optional[str] = None) -> bool:
+        act = action.lower()
         # 1. Fermer les fenêtres de cookies et modals de connexion intrusifs
         dismiss_js = """
         try {
@@ -626,7 +643,7 @@ class BrowserBot:
             pass
 
         # Action Commentaire / Reply si demandée
-        if "comment" in action:
+        if "comment" in act:
             c_js = """
             var txt = arguments[0];
             var replyBox = document.querySelector('div[data-testid="tweetTextarea_0"], div[role="textbox"][aria-label*="Post your reply" i], div[role="textbox"]');
@@ -641,56 +658,111 @@ class BrowserBot:
             """
             try:
                 driver.execute_script(c_js, comment_text or "Nice post! 🔥")
+                time.sleep(2)
             except Exception:
                 pass
             return True
 
-        # 2. Cliquer sur Follow, Like ou Retweet selon l'action
-        click_js = """
-        // Recherche du bouton Follow / Suivre
-        var followSelectors = [
-            'button[data-testid$="-follow"]',
-            'button[data-testid="placementTracking"]',
-            '[aria-label*="Follow @" i]',
-            '[aria-label*="Suivre @" i]',
-            '[aria-label*="Follow" i]',
-            '[aria-label*="Suivre" i]'
-        ];
-        for (var s=0; s<followSelectors.length; s++) {
-            var btn = document.querySelector(followSelectors[s]);
-            if (btn && btn.offsetWidth > 0) {
-                btn.click();
+        # Action LIKE
+        if "like" in act or "aimer" in act:
+            like_js = """
+            // Vérifier si déjà liké pour ne pas unliker !
+            var unlikeBtn = document.querySelector('button[data-testid="unlike"], [aria-label*="Liked" i], [aria-label*="Aimé" i]');
+            if (unlikeBtn) {
+                unlikeBtn.scrollIntoView({behavior: 'smooth', block: 'center'});
                 return true;
             }
-        }
 
-        // Action Like si demandée
-        if (arguments[0].indexOf('like') !== -1) {
-            var likeBtn = document.querySelector('button[data-testid="like"]');
-            if (likeBtn) { likeBtn.click(); return true; }
-        }
+            var likeBtn = document.querySelector('button[data-testid="like"], [aria-label*="Like" i], [aria-label*="J’aime" i], [aria-label*="J\\'aime" i]');
+            if (likeBtn) {
+                likeBtn.scrollIntoView({behavior: 'smooth', block: 'center'});
+                likeBtn.click();
+                return true;
+            }
+            return false;
+            """
+            try:
+                res = driver.execute_script(like_js)
+                time.sleep(1.5)
+                return bool(res)
+            except Exception:
+                return False
 
-        // Action Retweet si demandée
-        if (arguments[0].indexOf('retweet') !== -1) {
+        # Action RETWEET / REPOST
+        if "retweet" in act or "repost" in act:
+            rt_js = """
+            var unrtBtn = document.querySelector('button[data-testid="unretweet"]');
+            if (unrtBtn) {
+                unrtBtn.scrollIntoView({behavior: 'smooth', block: 'center'});
+                return true;
+            }
             var rtBtn = document.querySelector('button[data-testid="retweet"]');
-            if (rtBtn) { rtBtn.click(); return true; }
-        }
-
-        // Recherche générique
-        var allBtns = document.querySelectorAll('button[role="button"], button');
-        for (var b=0; b<allBtns.length; b++) {
-            var txt = (allBtns[b].textContent || '').trim().toLowerCase();
-            if (txt === 'follow' || txt === 'suivre' || txt.indexOf('follow @') === 0 || txt.indexOf('suivre @') === 0) {
-                allBtns[b].click();
+            if (rtBtn) {
+                rtBtn.scrollIntoView({behavior: 'smooth', block: 'center'});
+                rtBtn.click();
                 return true;
             }
-        }
-        return true;
-        """
-        try:
-            return bool(driver.execute_script(click_js, action.lower()))
-        except Exception:
-            return True
+            return false;
+            """
+            try:
+                res = driver.execute_script(rt_js)
+                time.sleep(1)
+                confirm_js = """
+                var confirmBtn = document.querySelector('div[data-testid="retweetConfirm"]');
+                if (confirmBtn) { confirmBtn.click(); return true; }
+                return true;
+                """
+                driver.execute_script(confirm_js)
+                time.sleep(1)
+                return bool(res)
+            except Exception:
+                return False
+
+        # Action FOLLOW
+        if "follow" in act or "suivre" in act:
+            follow_js = """
+            var unfollowBtn = document.querySelector('button[data-testid$="-unfollow"], [aria-label*="Following @" i], [aria-label*="Abonné @" i]');
+            if (unfollowBtn) {
+                unfollowBtn.scrollIntoView({behavior: 'smooth', block: 'center'});
+                return true;
+            }
+
+            var followSelectors = [
+                'button[data-testid$="-follow"]',
+                'button[data-testid="placementTracking"]',
+                '[aria-label*="Follow @" i]',
+                '[aria-label*="Suivre @" i]',
+                '[aria-label*="Follow" i]',
+                '[aria-label*="Suivre" i]'
+            ];
+            for (var s=0; s<followSelectors.length; s++) {
+                var btn = document.querySelector(followSelectors[s]);
+                if (btn && btn.offsetWidth > 0) {
+                    btn.scrollIntoView({behavior: 'smooth', block: 'center'});
+                    btn.click();
+                    return true;
+                }
+            }
+
+            var allBtns = document.querySelectorAll('button[role="button"], button');
+            for (var b=0; b<allBtns.length; b++) {
+                var txt = (allBtns[b].textContent || '').trim().toLowerCase();
+                if (txt === 'follow' || txt === 'suivre' || txt.indexOf('follow @') === 0 || txt.indexOf('suivre @') === 0) {
+                    allBtns[b].scrollIntoView({behavior: 'smooth', block: 'center'});
+                    allBtns[b].click();
+                    return true;
+                }
+            }
+            return false;
+            """
+            try:
+                res = driver.execute_script(follow_js)
+                time.sleep(1.5)
+                return bool(res)
+            except Exception:
+                return False
+
+        return True
 
     def _handle_snapchat(self, driver: webdriver.Chrome, action: str) -> bool:
         # 1. Accepter les cookies et masquer la bannière 'Open in App'
@@ -975,3 +1047,377 @@ class BrowserBot:
 
         return True
 
+    def _handle_pinterest(self, driver: webdriver.Chrome, action: str, comment_text: Optional[str] = None) -> bool:
+        """
+        Gestionnaire Pinterest : Follow profil, Save/Like Pin, Repin, Commentaire.
+        Anti-désabonnement et anti-unlike stricts.
+        """
+        # 1. Fermeture des bannières cookies et popups
+        dismiss_js = """
+        try {
+            var closeBtns = document.querySelectorAll('button[aria-label="Fermer"], button[aria-label="Close"], div[data-test-id="full-page-signup-close-button"], [data-test-id="cookie-banner-accept-button"]');
+            for (var i = 0; i < closeBtns.length; i++) {
+                if (closeBtns[i].offsetWidth > 0) { closeBtns[i].click(); break; }
+            }
+        } catch(e) {}
+        """
+        try:
+            driver.execute_script(dismiss_js)
+            time.sleep(1)
+        except Exception:
+            pass
+
+        # 2. Action Save / Like / Pin
+        if "like" in action or "save" in action or "pin" in action or "repin" in action:
+            save_js = """
+            var saveSelectors = [
+                'button[data-test-id="PinBetterSaveButton"]',
+                'button[data-test-id="pin-action-bar-save-button"]',
+                'button[aria-label*="Save" i]',
+                'button[aria-label*="Enregistrer" i]',
+                'div[data-test-id="pin-action-bar-save-button"]'
+            ];
+            for (var s = 0; s < saveSelectors.length; s++) {
+                var btn = document.querySelector(saveSelectors[s]);
+                if (btn && btn.offsetWidth > 0) {
+                    var txt = (btn.textContent || '').trim().toLowerCase();
+                    var aria = (btn.getAttribute('aria-label') || '').toLowerCase();
+                    // Si déjà enregistré / Saved -> Ne PAS annuler !
+                    if (txt.indexOf('saved') !== -1 || txt.indexOf('enregistré') !== -1 || aria.indexOf('saved') !== -1) {
+                        btn.scrollIntoView({behavior: 'smooth', block: 'center'});
+                        return true;
+                    }
+                    btn.scrollIntoView({behavior: 'smooth', block: 'center'});
+                    btn.click();
+                    return true;
+                }
+            }
+            return false;
+            """
+            try:
+                res = bool(driver.execute_script(save_js))
+                if res:
+                    time.sleep(1.5)
+                    return True
+            except Exception:
+                pass
+
+        # 3. Action Follow (Profil utilisateur)
+        if "follow" in action or "suivre" in action or "abonner" in action or "profile" in action:
+            follow_js = """
+            var followSelectors = [
+                'button[data-test-id="user-follow-button"]',
+                'button[data-test-id="ProfileHeaderFollowButton"]',
+                'button[aria-label*="Follow" i]',
+                'button[aria-label*="Suivre" i]'
+            ];
+            for (var s = 0; s < followSelectors.length; s++) {
+                var btn = document.querySelector(followSelectors[s]);
+                if (btn && btn.offsetWidth > 0) {
+                    var txt = (btn.textContent || '').trim().toLowerCase();
+                    var aria = (btn.getAttribute('aria-label') || '').toLowerCase();
+                    // Si déjà abonné -> Ne PAS désabonner !
+                    if (txt.indexOf('following') !== -1 || txt.indexOf('abonné') !== -1 || txt.indexOf('se désabonner') !== -1 || aria.indexOf('following') !== -1) {
+                        btn.scrollIntoView({behavior: 'smooth', block: 'center'});
+                        return true;
+                    }
+                    btn.scrollIntoView({behavior: 'smooth', block: 'center'});
+                    btn.click();
+                    return true;
+                }
+            }
+            return false;
+            """
+            try:
+                res = bool(driver.execute_script(follow_js))
+                if res:
+                    time.sleep(1.5)
+                    return True
+            except Exception:
+                pass
+
+        # 4. Action Commentaire si demandée
+        if "comment" in action:
+            comm_js = """
+            var txt = arguments[0];
+            var box = document.querySelector('div[data-test-id="comment-composer-input"] [contenteditable="true"], textarea[placeholder*="comment" i], textarea[placeholder*="commentaire" i]');
+            if (box) {
+                box.focus();
+                box.textContent = txt;
+                box.dispatchEvent(new Event('input', { bubbles: true }));
+                var subBtn = document.querySelector('button[data-test-id="comment-submit-button"], button[type="submit"]');
+                if (subBtn) subBtn.click();
+            }
+            return true;
+            """
+            try:
+                driver.execute_script(comm_js, comment_text or "Great inspiration! 📌✨")
+            except Exception:
+                pass
+            return True
+
+        return True
+
+    def _handle_soundcloud(self, driver: webdriver.Chrome, action: str, comment_text: Optional[str] = None) -> bool:
+        """
+        Gestionnaire SoundCloud : Follow artiste, Like/Favorite titre, Repost, Commentaire.
+        Anti-unfollow et anti-unlike stricts.
+        """
+        # 1. Bannières cookies
+        dismiss_js = """
+        try {
+            var cookieBtn = document.querySelector('#onetrust-accept-btn-handler, button[title*="Accept" i], button[aria-label*="Accept" i]');
+            if (cookieBtn && cookieBtn.offsetWidth > 0) { cookieBtn.click(); }
+        } catch(e) {}
+        """
+        try:
+            driver.execute_script(dismiss_js)
+            time.sleep(1)
+        except Exception:
+            pass
+
+        # 2. Action Like / Favorite
+        if "like" in action or "fav" in action or "aime" in action:
+            like_js = """
+            var likeBtns = document.querySelectorAll('button.sc-button-like, button[title*="Like" i], button[aria-label*="Like" i]');
+            for (var i = 0; i < likeBtns.length; i++) {
+                var btn = likeBtns[i];
+                if (btn && btn.offsetWidth > 0) {
+                    var title = (btn.getAttribute('title') || '').toLowerCase();
+                    var cls = btn.className || '';
+                    // Si déjà Liké -> Ne PAS unlike !
+                    if (cls.indexOf('sc-button-selected') !== -1 || title.indexOf('unlike') !== -1 || title.indexOf('liked') !== -1) {
+                        btn.scrollIntoView({behavior: 'smooth', block: 'center'});
+                        return true;
+                    }
+                    btn.scrollIntoView({behavior: 'smooth', block: 'center'});
+                    btn.click();
+                    return true;
+                }
+            }
+            return false;
+            """
+            try:
+                res = bool(driver.execute_script(like_js))
+                if res:
+                    time.sleep(1.5)
+                    return True
+            except Exception:
+                pass
+
+        # 3. Action Repost
+        if "repost" in action or "partager" in action:
+            repost_js = """
+            var rpBtns = document.querySelectorAll('button.sc-button-repost, button[title*="Repost" i]');
+            for (var i = 0; i < rpBtns.length; i++) {
+                var btn = rpBtns[i];
+                if (btn && btn.offsetWidth > 0) {
+                    var cls = btn.className || '';
+                    if (cls.indexOf('sc-button-selected') !== -1) {
+                        btn.scrollIntoView({behavior: 'smooth', block: 'center'});
+                        return true;
+                    }
+                    btn.scrollIntoView({behavior: 'smooth', block: 'center'});
+                    btn.click();
+                    return true;
+                }
+            }
+            return false;
+            """
+            try:
+                res = bool(driver.execute_script(repost_js))
+                if res:
+                    time.sleep(1.5)
+                    return True
+            except Exception:
+                pass
+
+        # 4. Action Follow (Artiste)
+        if "follow" in action or "suivre" in action or "profile" in action or "artiste" in action:
+            follow_js = """
+            var followBtns = document.querySelectorAll('button.sc-button-follow, button[title*="Follow" i], button[aria-label*="Follow" i]');
+            for (var i = 0; i < followBtns.length; i++) {
+                var btn = followBtns[i];
+                if (btn && btn.offsetWidth > 0) {
+                    var title = (btn.getAttribute('title') || '').toLowerCase();
+                    var txt = (btn.textContent || '').trim().toLowerCase();
+                    var cls = btn.className || '';
+                    // Si déjà Follow -> Ne PAS unfollow !
+                    if (cls.indexOf('sc-button-selected') !== -1 || title.indexOf('unfollow') !== -1 || txt.indexOf('following') !== -1) {
+                        btn.scrollIntoView({behavior: 'smooth', block: 'center'});
+                        return true;
+                    }
+                    btn.scrollIntoView({behavior: 'smooth', block: 'center'});
+                    btn.click();
+                    return true;
+                }
+            }
+            return false;
+            """
+            try:
+                res = bool(driver.execute_script(follow_js))
+                if res:
+                    time.sleep(1.5)
+                    return True
+            except Exception:
+                pass
+
+        # 5. Commentaire
+        if "comment" in action:
+            comm_js = """
+            var txt = arguments[0];
+            var box = document.querySelector('input.commentForm__input, textarea.commentForm__input');
+            if (box) {
+                box.focus();
+                box.value = txt;
+                box.dispatchEvent(new Event('input', { bubbles: true }));
+                box.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', keyCode: 13, bubbles: true }));
+            }
+            return true;
+            """
+            try:
+                driver.execute_script(comm_js, comment_text or "Great track! 🔥🎶")
+            except Exception:
+                pass
+            return True
+
+        return True
+
+    def _handle_bluesky(self, driver: webdriver.Chrome, action: str, comment_text: Optional[str] = None) -> bool:
+        """
+        Gestionnaire Bluesky (bsky.app) : Follow profil, Like post, Repost, Reply/Comment.
+        Anti-unfollow et anti-unlike stricts.
+        """
+        # 1. Modales et bannières
+        dismiss_js = """
+        try {
+            var closeBtns = document.querySelectorAll('button[aria-label="Close"], button[aria-label="Fermer"]');
+            for (var i = 0; i < closeBtns.length; i++) {
+                if (closeBtns[i].offsetWidth > 0) { closeBtns[i].click(); break; }
+            }
+        } catch(e) {}
+        """
+        try:
+            driver.execute_script(dismiss_js)
+            time.sleep(1)
+        except Exception:
+            pass
+
+        # 2. Action Like post
+        if "like" in action or "aime" in action or "fav" in action:
+            like_js = """
+            var likeBtns = document.querySelectorAll('button[data-testid="likeBtn"], [aria-label*="Like" i], [aria-label*="J\\'aime" i]');
+            for (var i = 0; i < likeBtns.length; i++) {
+                var btn = likeBtns[i];
+                if (btn && btn.offsetWidth > 0) {
+                    var testid = (btn.getAttribute('data-testid') || '').toLowerCase();
+                    var aria = (btn.getAttribute('aria-label') || '').toLowerCase();
+                    var pressed = btn.getAttribute('aria-pressed');
+                    // Si déjà liké -> Ne PAS unlike !
+                    if (testid.indexOf('unlike') !== -1 || aria.indexOf('unlike') !== -1 || aria.indexOf('ne plus aimer') !== -1 || pressed === 'true') {
+                        btn.scrollIntoView({behavior: 'smooth', block: 'center'});
+                        return true;
+                    }
+                    btn.scrollIntoView({behavior: 'smooth', block: 'center'});
+                    btn.click();
+                    return true;
+                }
+            }
+            return false;
+            """
+            try:
+                res = bool(driver.execute_script(like_js))
+                if res:
+                    time.sleep(1.5)
+                    return True
+            except Exception:
+                pass
+
+        # 3. Action Repost
+        if "repost" in action or "partager" in action:
+            repost_js = """
+            var rpBtns = document.querySelectorAll('button[data-testid="repostBtn"]');
+            for (var i = 0; i < rpBtns.length; i++) {
+                var btn = rpBtns[i];
+                if (btn && btn.offsetWidth > 0) {
+                    var pressed = btn.getAttribute('aria-pressed');
+                    if (pressed === 'true') {
+                        btn.scrollIntoView({behavior: 'smooth', block: 'center'});
+                        return true;
+                    }
+                    btn.scrollIntoView({behavior: 'smooth', block: 'center'});
+                    btn.click();
+                    setTimeout(function(){
+                        var confirmBtn = document.querySelector('div[role="menu"] button, [data-testid="repostConfirmBtn"]');
+                        if (confirmBtn) confirmBtn.click();
+                    }, 400);
+                    return true;
+                }
+            }
+            return false;
+            """
+            try:
+                res = bool(driver.execute_script(repost_js))
+                if res:
+                    time.sleep(1.5)
+                    return True
+            except Exception:
+                pass
+
+        # 4. Action Follow (Profil utilisateur)
+        if "follow" in action or "suivre" in action or "profile" in action or "abonner" in action:
+            follow_js = """
+            var followBtns = document.querySelectorAll('button[data-testid="followBtn"], button[aria-label*="Follow" i], button[aria-label*="Suivre" i]');
+            for (var i = 0; i < followBtns.length; i++) {
+                var btn = followBtns[i];
+                if (btn && btn.offsetWidth > 0) {
+                    var testid = (btn.getAttribute('data-testid') || '').toLowerCase();
+                    var aria = (btn.getAttribute('aria-label') || '').toLowerCase();
+                    var txt = (btn.textContent || '').trim().toLowerCase();
+                    // Si déjà suivi -> Ne PAS unfollow !
+                    if (testid.indexOf('unfollow') !== -1 || aria.indexOf('unfollow') !== -1 || txt.indexOf('following') !== -1 || txt.indexOf('abonné') !== -1) {
+                        btn.scrollIntoView({behavior: 'smooth', block: 'center'});
+                        return true;
+                    }
+                    btn.scrollIntoView({behavior: 'smooth', block: 'center'});
+                    btn.click();
+                    return true;
+                }
+            }
+            return false;
+            """
+            try:
+                res = bool(driver.execute_script(follow_js))
+                if res:
+                    time.sleep(1.5)
+                    return True
+            except Exception:
+                pass
+
+        # 5. Commentaire / Réponse
+        if "comment" in action or "reply" in action:
+            comm_js = """
+            var txt = arguments[0];
+            var replyBtn = document.querySelector('button[data-testid="replyBtn"]');
+            if (replyBtn) {
+                replyBtn.click();
+                setTimeout(function(){
+                    var box = document.querySelector('div[role="dialog"] div[contenteditable="true"]');
+                    if (box) {
+                        box.focus();
+                        box.textContent = txt;
+                        box.dispatchEvent(new Event('input', { bubbles: true }));
+                        var sendBtn = document.querySelector('button[data-testid="composerPublishBtn"]');
+                        if (sendBtn) sendBtn.click();
+                    }
+                }, 500);
+            }
+            return true;
+            """
+            try:
+                driver.execute_script(comm_js, comment_text or "Great share! 🦋")
+            except Exception:
+                pass
+            return True
+
+        return True

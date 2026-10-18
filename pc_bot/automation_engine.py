@@ -13,7 +13,7 @@ class AutomationEngine:
         self.worker_thread: Optional[threading.Thread] = None
         
         # Configuration
-        self.selected_platforms = ["threads", "reddit", "tiktok", "facebook", "instagram", "youtube", "telegram", "twitter", "snapchat", "github", "discord"]
+        self.selected_platforms = ["threads", "reddit", "pinterest", "soundcloud", "bluesky", "tiktok", "facebook", "instagram", "youtube", "telegram", "twitter", "snapchat", "github", "discord"]
         self.delay_min = 5.0
         self.delay_max = 12.0
         
@@ -27,6 +27,8 @@ class AutomationEngine:
         self.tasks_success = 0
         self.tasks_failed = 0
         self.earnings_session = 0.0
+        self.failed_tasks: Dict[int, float] = {}
+        self.COOLDOWN_FAILED_SECONDS = 900
 
     def log(self, message: str, level: str = "info"):
         if self.cb_log:
@@ -138,6 +140,12 @@ class AutomationEngine:
                         break
 
                     task_id = task.get("id")
+                    if task_id in self.failed_tasks:
+                        if time.time() - self.failed_tasks[task_id] < self.COOLDOWN_FAILED_SECONDS:
+                            continue
+                        else:
+                            del self.failed_tasks[task_id]
+
                     action = task.get("action", "FOLLOW")
                     reward = float(task.get("worker_reward") or task.get("cost_per_task") or 0.0)
                     acc_info = linked_accounts.get(platform)
@@ -149,6 +157,7 @@ class AutomationEngine:
                     start_st, start_res = self.api.start_task(task_id, social_account_id=acc_id)
                     if start_st != 200 or not start_res.get("ok"):
                         err_msg = start_res.get("error", "Erreur inconnue")
+                        self.failed_tasks[task_id] = time.time()
                         if start_st == 429:
                             self.log(f"Limite horaire atteinte pour [{platform.upper()}]. Pause de 60s activée.", "warning")
                             platform_cooldowns[platform] = time.time() + 60
@@ -175,6 +184,13 @@ class AutomationEngine:
                                 target_url = f"https://www.instagram.com/{u_name}"
                             elif platform == "tiktok":
                                 target_url = f"https://www.tiktok.com/@{u_name}"
+                            elif platform == "pinterest":
+                                target_url = f"https://www.pinterest.com/{u_name}/"
+                            elif platform in ["soundcloud", "sound_cloud"]:
+                                target_url = f"https://soundcloud.com/{u_name}"
+                            elif platform in ["bluesky", "bsky"]:
+                                bsky_handle = u_name if "." in u_name else f"{u_name}.bsky.social"
+                                target_url = f"https://bsky.app/profile/{bsky_handle}"
 
                     if not target_url:
                         self.log(f"Tâche #{task_id}: Aucune URL cible reçue. Annulation.", "warning")
@@ -207,6 +223,7 @@ class AutomationEngine:
                     if is_confirmed:
                         self.tasks_success += 1
                         self.earnings_session += reward
+                        self.failed_tasks[task_id] = time.time() + 86400
                         self.log(f"🎉 SUCCÈS: Tâche #{task_id} validée ! +${reward:.3f} crédités.", "success")
                         
                         # Actualiser le solde
@@ -217,6 +234,7 @@ class AutomationEngine:
                                 self.cb_balance(fresh_bal)
                     else:
                         self.tasks_failed += 1
+                        self.failed_tasks[task_id] = time.time()
                         self.log(f"Tâche #{task_id}: Soumission effectuée (en cours de revue).", "info")
 
                     if self.cb_stats:
