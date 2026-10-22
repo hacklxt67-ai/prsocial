@@ -23,8 +23,19 @@ import random
 import logging
 from typing import Dict, Any, List, Optional, Tuple
 
-from termux_bot.pr_api import PrSocialAPI
-from termux_bot.browser_termux import BrowserTermux, ensure_unique_screenshot
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+if current_dir not in sys.path:
+    sys.path.insert(0, current_dir)
+if parent_dir not in sys.path:
+    sys.path.insert(0, parent_dir)
+
+try:
+    from pr_api import PrSocialAPI
+    from browser_termux import BrowserTermux, ensure_unique_screenshot
+except ImportError:
+    from termux_bot.pr_api import PrSocialAPI
+    from termux_bot.browser_termux import BrowserTermux, ensure_unique_screenshot
 
 # ANSI Colors
 GREEN = "\033[92m"

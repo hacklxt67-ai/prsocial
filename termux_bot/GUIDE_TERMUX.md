@@ -32,11 +32,25 @@ Le script va automatiquement :
 
 ---
 
-## 🎮 3. Connexion et Lancement du Bot
+### 🎮 3. Lancement du Bot & Récupération des Rejets
 
-Pour démarrer le bot à tout moment dans Termux, tapez simplement :
+Termux dispose désormais de deux lanceurs rapides créés dans votre dossier utilisateur :
+
+#### 🚀 Option A : Menu Principal Interactif
 ```bash
 ./lancer_bot.sh
+```
+Ce menu vous donne accès à 5 options claires :
+- `[1]` **Start Tout** : Exécution automatique des tâches multi-plateformes avec déblocage auto des tâches orphelines.
+- `[2]` **Récupérer & Réessayer les Tâches Rejetées** : Analyse en profondeur de toutes vos tâches rejetées, diagnostic intelligent et relance sécurisée en Mode Strict.
+- `[3]` **Comptes Liés** : Liste vos profils sociaux enregistrés et validés sur PR.Social.
+- `[4]` **Changer de Cookie / Déconnexion** : Réinitialise la session pour se connecter à un autre compte.
+- `[5]` **Quitter Bot**
+
+#### ⚡ Option B : Récupération Directe 1-Clic des Rejets
+Si vous voulez uniquement récupérer vos tâches rejetées sans passer par le bot de tâches courantes :
+```bash
+./recuperer_rejets.sh
 ```
 
 ### 🔑 A. Première Utilisation (Login Cookie)
@@ -50,7 +64,7 @@ Pour démarrer le bot à tout moment dans Termux, tapez simplement :
 - Le bot détecte votre session enregistrée, se connecte automatiquement et affiche :  
   `✓ Connexion automatique réussie ! Bienvenue @VotreCompte (Solde: $X.XXXX)`
 - Vous accédez directement au tableau de bord.
-- Si vous souhaitez changer de compte, il vous suffit de choisir l'option **`[3] Changer de Cookie / Déconnexion`**.
+- Si vous souhaitez changer de compte, il vous suffit de choisir l'option **`[4] Changer de Cookie / Déconnexion`**.
 
 ---
 

@@ -53,7 +53,7 @@ proot-distro login debian -- bash -c '
     echo " -> Dépendances Debian installées avec succès !"
 '
 
-# 5. Création du lanceur rapide dans Termux
+# 5. Création des lanceurs rapides dans Termux
 CURRENT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LAUNCHER="$HOME/lancer_bot.sh"
 cat << EOF > "$LAUNCHER"
@@ -77,10 +77,33 @@ proot-distro login debian --bind "\$BOT_DIR":/root/termux_bot -- bash -c "
 EOF
 chmod +x "$LAUNCHER"
 
+LAUNCHER_REJETS="$HOME/recuperer_rejets.sh"
+cat << EOF > "$LAUNCHER_REJETS"
+#!/data/data/com.termux/files/usr/bin/bash
+BOT_DIR="$CURRENT_DIR"
+if [ ! -d "\$BOT_DIR" ]; then
+    if [ -d "\$HOME/prsocial/termux_bot" ]; then
+        BOT_DIR="\$HOME/prsocial/termux_bot"
+    elif [ -d "\$HOME/pr_social/termux_bot" ]; then
+        BOT_DIR="\$HOME/pr_social/termux_bot"
+    fi
+fi
+
+echo "============================================================"
+echo "⚡ Récupération des Tâches Rejetées (Android Debian)"
+echo "============================================================"
+proot-distro login debian --bind "\$BOT_DIR":/root/termux_bot -- bash -c "
+    cd /root/termux_bot
+    python3 recuperer_rejets.py
+"
+EOF
+chmod +x "$LAUNCHER_REJETS"
+
 echo ""
 echo "============================================================"
 echo "✅ INSTALLATION TERMUX TERMINÉE AVEC SUCCÈS !"
 echo "============================================================"
-echo "Pour démarrer votre bot à tout moment dans Termux, tapez :"
-echo "   ./lancer_bot.sh"
+echo "Commandes de lancement directes disponibles dans Termux :"
+echo "   ./lancer_bot.sh         -> Menu principal complet (Auto-Bot + Rejets)"
+echo "   ./recuperer_rejets.sh   -> Récupération directe des tâches rejetées"
 echo "============================================================"
