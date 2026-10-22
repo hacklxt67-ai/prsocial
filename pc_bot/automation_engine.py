@@ -34,6 +34,25 @@ class AutomationEngine:
         if self.cb_log:
             self.cb_log(message, level)
 
+    def interleave_task_actions(self, tasks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Alterne intelligemment les types d'actions (Follow, Like, Comment, etc.) pour varier le travail."""
+        if len(tasks) <= 1:
+            return tasks
+        groups: Dict[str, List[Dict[str, Any]]] = {}
+        for t in tasks:
+            act = (t.get("action") or "FOLLOW").upper()
+            act_key = "COMMENT" if "COMMENT" in act else act
+            if act_key not in groups:
+                groups[act_key] = []
+            groups[act_key].append(t)
+        interleaved = []
+        max_len = max(len(g) for g in groups.values())
+        for i in range(max_len):
+            for k in list(groups.keys()):
+                if i < len(groups[k]):
+                    interleaved.append(groups[k][i])
+        return interleaved
+
     def start(self, platforms: Optional[List[str]] = None):
         if self.is_running:
             return
@@ -107,10 +126,15 @@ class AutomationEngine:
         platform_cooldowns: Dict[str, float] = {}
 
         # 3. Boucle principale de traitement
+        platform_counts: Dict[str, int] = {}
+
+        # 3. Boucle principale de traitement
         while not self.stop_requested:
             tasks_executed_in_round = 0
+            # Trier les plateformes : prioritiser celles où le serveur PR.Social indique qu'il y a des tâches
+            ordered_platforms = sorted(active_platforms, key=lambda p: platform_counts.get(p, 1), reverse=True)
 
-            for platform in active_platforms:
+            for platform in ordered_platforms:
                 if self.stop_requested:
                     break
 
@@ -121,20 +145,34 @@ class AutomationEngine:
                     continue
 
                 self.log(f"Recherche de tâches disponibles pour [{platform.upper()}]...", "info")
-                status, tasks_data = self.api.get_available_tasks(platform=platform, sort="reward", limit=20)
+                status, tasks_data = self.api.get_available_tasks(platform=platform, sort="reward", limit=50)
                 
                 if status != 200:
                     self.log(f"Erreur API ({status}) sur [{platform.upper()}]: {tasks_data.get('error')}", "warning")
                     continue
 
+                # Mise à jour du radar serveur en temps réel
+                if isinstance(tasks_data.get("platformCounts"), list):
+                    for pc in tasks_data["platformCounts"]:
+                        if isinstance(pc, dict) and "platform" in pc:
+                            platform_counts[pc["platform"].lower()] = int(pc.get("count", 0))
+
                 tasks = tasks_data.get("tasks", [])
+                # Si aucune tâche avec sort="reward", tenter sort="new" pour attraper les tâches fraîches
                 if not tasks:
-                    self.log(f"Aucune tâche disponible pour [{platform.upper()}]. Cooldown de 45s.", "info")
-                    platform_cooldowns[platform] = time.time() + 45
+                    status_new, data_new = self.api.get_available_tasks(platform=platform, sort="new", limit=50)
+                    if status_new == 200:
+                        tasks = data_new.get("tasks", [])
+
+                if not tasks:
+                    self.log(f"Aucune tâche disponible pour [{platform.upper()}]. Rotation vers la suite...", "info")
+                    platform_cooldowns[platform] = time.time() + 15
                     continue
 
-                self.log(f"{len(tasks)} tâche(s) trouvée(s) pour [{platform.upper()}]. Exécution...", "info")
+                # Alterner intelligemment les actions (Follow, Like, Comment, etc.)
+                tasks = self.interleave_task_actions(tasks)
 
+                consecutive_busy = 0
                 for task in tasks:
                     if self.stop_requested:
                         break
@@ -151,23 +189,39 @@ class AutomationEngine:
                     acc_info = linked_accounts.get(platform)
                     acc_id = acc_info.get("id") if acc_info else None
 
-                    self.log(f"Démarrage tâche #{task_id} [{platform.upper()} - {action}] (Gain: ${reward:.3f})...", "info")
-
                     # Démarrer la tâche sur l'API PR.Social
                     start_st, start_res = self.api.start_task(task_id, social_account_id=acc_id)
                     if start_st != 200 or not start_res.get("ok"):
-                        err_msg = start_res.get("error", "Erreur inconnue")
-                        self.failed_tasks[task_id] = time.time()
+                        err_msg = str(start_res.get("error", "Erreur inconnue"))
+                        err_code = str(start_res.get("code", ""))
+
+                        is_busy = (err_code in ["SLOTS_TAKEN", "NOT_FOUND"] or
+                                   any(k in err_msg.lower() for k in ["все места", "places", "not found", "inactive", "уже выполн"]))
+
+                        if is_busy:
+                            # Ne pas polluer l'interface : mise en pause courte de 2 min
+                            self.failed_tasks[task_id] = time.time() - self.COOLDOWN_FAILED_SECONDS + 120
+                            consecutive_busy += 1
+                            if consecutive_busy >= 3:
+                                self.log(f"Lot [{platform.upper()}] temporairement saturé ({consecutive_busy} tâches complètes). Rotation vers la suite...", "info")
+                                break
+                        else:
+                            self.failed_tasks[task_id] = time.time()
+                            self.log(f"Impossible de démarrer #{task_id}: {err_msg}", "warning")
+
                         if start_st == 429:
-                            self.log(f"Limite horaire atteinte pour [{platform.upper()}]. Pause de 60s activée.", "warning")
-                            platform_cooldowns[platform] = time.time() + 60
+                            self.log(f"Limite horaire atteinte pour [{platform.upper()}]. Pause de 45s activée.", "warning")
+                            platform_cooldowns[platform] = time.time() + 45
                             break
-                        self.log(f"Impossible de démarrer la tâche #{task_id}: {err_msg}", "warning")
+
                         self.tasks_failed += 1
-                        time.sleep(2)
+                        time.sleep(1.0)
                         continue
 
+                    # Tâche réservée avec succès
+                    consecutive_busy = 0
                     tasks_executed_in_round += 1
+                    self.log(f"🚀 Tâche réservée #{task_id} [{platform.upper()} - {action}] (Gain: ${reward:.3f})...", "info")
 
                     # Récupérer l'URL cible
                     target_url = start_res.get("task", {}).get("target_url") or task.get("target_url")
@@ -249,8 +303,19 @@ class AutomationEngine:
                 time.sleep(2.0)
 
             if tasks_executed_in_round == 0:
-                self.log("Rotation terminée (aucun travail actif). Pause de 15s avant le prochain cycle...", "info")
-                for _ in range(15):
+                radar_total = sum(platform_counts.values()) if platform_counts else 0
+                active_has_tasks = sum(platform_counts.get(p, 0) for p in active_platforms)
+                if active_has_tasks > 0:
+                    self.log(f"Radar PR.Social : {active_has_tasks} tâche(s) détectée(s) sur vos réseaux. Reprise dans 3s...", "info")
+                    pause_sec = 3
+                elif radar_total > 0:
+                    self.log(f"Radar global : {radar_total} tâche(s) sur le serveur. Réévaluation rapide dans 5s...", "info")
+                    pause_sec = 5
+                else:
+                    self.log("Aucune nouvelle tâche disponible actuellement. Veille rapide de 6s...", "info")
+                    pause_sec = 6
+
+                for _ in range(pause_sec):
                     if self.stop_requested:
                         break
                     time.sleep(1)

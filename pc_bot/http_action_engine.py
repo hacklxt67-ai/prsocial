@@ -87,8 +87,8 @@ class PrSocialClient:
     def get_socials(self) -> Tuple[int, Dict[str, Any]]:
         return self.request("GET", "/profile/socials")
 
-    def get_available_tasks(self, platform: str, limit: int = 50) -> Tuple[int, Dict[str, Any]]:
-        return self.request("GET", "/tasks/available", params={"platform": platform, "sort": "reward", "limit": limit})
+    def get_available_tasks(self, platform: str, sort: str = "reward", limit: int = 50) -> Tuple[int, Dict[str, Any]]:
+        return self.request("GET", "/tasks/available", params={"platform": platform, "sort": sort, "limit": limit})
 
     def get_in_progress_tasks(self) -> Tuple[int, Dict[str, Any]]:
         return self.request("GET", "/tasks/my/list", params={"status": "in_progress"})
@@ -169,6 +169,25 @@ class UniversalSilentEngine:
             return True, "Commentaire automatisé"
         return True, "Faisable"
 
+    def interleave_task_actions(self, tasks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Alterne intelligemment les types d'actions (Follow, Like, Comment, etc.) pour varier le travail."""
+        if len(tasks) <= 1:
+            return tasks
+        groups: Dict[str, List[Dict[str, Any]]] = {}
+        for t in tasks:
+            act = (t.get("action") or "FOLLOW").upper()
+            act_key = "COMMENT" if "COMMENT" in act else act
+            if act_key not in groups:
+                groups[act_key] = []
+            groups[act_key].append(t)
+        interleaved = []
+        max_len = max(len(g) for g in groups.values())
+        for i in range(max_len):
+            for k in list(groups.keys()):
+                if i < len(groups[k]):
+                    interleaved.append(groups[k][i])
+        return interleaved
+
     def run_all(self, platforms: Optional[List[str]] = None):
         logger.info("=== DÉMARRAGE DU BOT AUTOMATIQUE PC (100% INVISIBLE / SILENCIEUX) ===")
 
@@ -206,21 +225,43 @@ class UniversalSilentEngine:
         session_earnings = 0.0
         success_count = 0
 
+        platform_counts: Dict[str, int] = {}
+
         while not self.stop_requested:
             tasks_found = 0
-            for plat in active_list:
+            # Trier les plateformes : prioritiser celles où le serveur PR.Social indique qu'il y a des tâches
+            ordered_platforms = sorted(active_list, key=lambda p: platform_counts.get(p, 1), reverse=True)
+
+            for plat in ordered_platforms:
                 if self.stop_requested:
                     break
 
                 acc_id = approved_accounts.get(plat, {}).get("id")
-                st, data = self.pr_api.get_available_tasks(plat, limit=15)
+                # Récupérer un lot plus grand (limit=50) pour ne pas manquer les tâches disponibles
+                st, data = self.pr_api.get_available_tasks(plat, sort="reward", limit=50)
                 if st != 200:
                     continue
 
+                # Mise à jour du radar serveur en temps réel
+                if isinstance(data.get("platformCounts"), list):
+                    for pc in data["platformCounts"]:
+                        if isinstance(pc, dict) and "platform" in pc:
+                            platform_counts[pc["platform"].lower()] = int(pc.get("count", 0))
+
                 tasks = data.get("tasks", [])
+                # Si aucune tâche avec sort="reward", tenter sort="new" pour attraper les tâches fraîchement publiées
+                if not tasks:
+                    st_new, data_new = self.pr_api.get_available_tasks(plat, sort="new", limit=50)
+                    if st_new == 200:
+                        tasks = data_new.get("tasks", [])
+
                 if not tasks:
                     continue
 
+                # Alterner intelligemment les actions (Follow, Like, Comment, etc.)
+                tasks = self.interleave_task_actions(tasks)
+
+                consecutive_busy = 0
                 for t in tasks:
                     if self.stop_requested:
                         break
@@ -240,19 +281,37 @@ class UniversalSilentEngine:
                     if not feasible:
                         continue
 
-                    tasks_found += 1
-                    logger.info(f"Démarrage tâche #{task_id} [{plat.upper()} - {action}] (Gain: ${reward:.3f})")
+                    # Réservation de la tâche auprès du serveur PR.Social
                     start_st, start_res = self.pr_api.start_task(task_id, acc_id)
 
                     if start_st != 200 or not start_res.get("ok"):
                         err_msg = str(start_res.get("error", ""))
-                        logger.warning(f"Impossible de démarrer #{task_id}: {err_msg}")
-                        self.failed_tasks[task_id] = time.time()
+                        err_code = str(start_res.get("code", ""))
+
+                        is_busy = (err_code in ["SLOTS_TAKEN", "NOT_FOUND"] or
+                                   any(k in err_msg.lower() for k in ["все места", "places", "not found", "inactive", "уже выполн"]))
+
+                        if is_busy:
+                            # Ne pas polluer l'écran de warnings : enregistrement discret pour 2 min
+                            self.failed_tasks[task_id] = time.time() - self.COOLDOWN_FAILED_SECONDS + 120
+                            consecutive_busy += 1
+                            if consecutive_busy >= 3:
+                                logger.info(f"Lot [{plat.upper()}] temporairement saturé ({consecutive_busy} tâches complètes). Rotation vers la suite...")
+                                break
+                        else:
+                            self.failed_tasks[task_id] = time.time()
+                            logger.warning(f"Impossible de démarrer #{task_id}: {err_msg}")
+
                         if "active task" in err_msg.lower() or "task_in_progress" in err_msg.lower():
                             logger.info("Déblocage automatique de la tâche bloquante...")
                             self.auto_unblock_active_tasks()
                             time.sleep(1)
                         continue
+
+                    # Réinitialiser le compteur de saturation dès qu'une tâche est acceptée
+                    consecutive_busy = 0
+                    tasks_found += 1
+                    logger.info(f"🚀 Tâche #{task_id} réservée [{plat.upper()} - {action}] (Gain: ${reward:.3f})")
 
                     target_url = start_res.get("task", {}).get("target_url") or t.get("target_url") or ""
                     if not target_url:
@@ -360,8 +419,19 @@ class UniversalSilentEngine:
                     time.sleep(delay)
 
             if tasks_found == 0:
-                logger.info("Aucune nouvelle tâche disponible. Pause de 15s...")
-                for _ in range(15):
+                radar_total = sum(platform_counts.values()) if platform_counts else 0
+                active_has_tasks = sum(platform_counts.get(p, 0) for p in active_list)
+                if active_has_tasks > 0:
+                    logger.info(f"Radar PR.Social : {active_has_tasks} tâche(s) détectée(s) sur vos réseaux. Reprise dans 3s...")
+                    pause_sec = 3
+                elif radar_total > 0:
+                    logger.info(f"Radar global : {radar_total} tâche(s) sur le serveur. Réévaluation rapide dans 5s...")
+                    pause_sec = 5
+                else:
+                    logger.info("Aucune nouvelle tâche disponible actuellement sur le serveur. Veille rapide de 6s...")
+                    pause_sec = 6
+
+                for _ in range(pause_sec):
                     if self.stop_requested:
                         break
                     time.sleep(1)
