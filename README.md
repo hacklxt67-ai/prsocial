@@ -66,7 +66,26 @@ Pour empêcher Android de mettre Termux en veille :
 
 ---
 
-## 💻 2. Guide Rapide PC (Windows)
+## ☁️ 2. Hébergement 24h/24 Gratuit sur GitHub Actions
+
+Vous pouvez faire tourner le bot **100% en arrière-plan sans laisser aucun appareil allumé** grâce à GitHub Actions.
+
+### 🔑 Configuration en 2 minutes :
+1. Sur la page de votre dépôt GitHub, cliquez sur **Settings** (en haut à droite).
+2. Dans le menu de gauche, allez dans **Secrets and variables** > **Actions**.
+3. Cliquez sur le bouton vert **New repository secret**.
+4. Définissez :
+   - **Name** : `PR_TOKEN`
+   - **Secret** : Collez votre Cookie ou Token de session PR.Social.
+5. *(Optionnel)* Créez un second secret `PR_CF_CLEARANCE` si votre compte utilise la protection Cloudflare.
+
+### 🚀 Fonctionnement :
+- **Automatique 24h/24** : GitHub Actions lance automatiquement le bot toutes les 25 minutes pour récupérer vos gains.
+- **Lancement Manuel 1-Clic** : Allez dans l'onglet **Actions** sur GitHub > cliquez sur **PR.Social 24/7 Automation Bot** > **Run workflow**.
+
+---
+
+## 💻 3. Guide Rapide PC (Windows)
 
 ### ⚡ Installation Rapide des Dépendances
 Double-cliquez sur :
