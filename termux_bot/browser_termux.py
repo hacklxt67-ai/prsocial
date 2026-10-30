@@ -4,7 +4,11 @@ import time
 import random
 import logging
 from typing import Optional, Tuple
-from PIL import Image
+try:
+    from PIL import Image
+except ImportError:
+    Image = None
+
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
@@ -53,24 +57,29 @@ def ensure_unique_screenshot(screenshot_path: str):
     """Garantit un hash unique (cryptographique et perceptuel) pour chaque capture afin d'éviter le rejet DUPLICATE_SCREENSHOT par PR.Social."""
     try:
         if os.path.exists(screenshot_path):
-            with Image.open(screenshot_path) as im:
-                im = im.convert("RGB")
-                pix = im.load()
-                w, h = im.size
-                if w > 10 and h > 10:
-                    # Variation subtile sur plusieurs pixels d'angles
-                    for i in range(random.randint(6, 12)):
-                        rx = random.randint(0, min(12, w - 1))
-                        ry = random.randint(0, min(12, h - 1))
-                        r, g, b = pix[rx, ry]
-                        pix[rx, ry] = ((r + random.randint(1, 15)) % 256, (g + random.randint(1, 9)) % 256, b)
-                    # Variation en bordure inférieure droite
-                    for i in range(random.randint(4, 8)):
-                        rx = w - 1 - random.randint(0, min(10, w - 1))
-                        ry = h - 1 - random.randint(0, min(10, h - 1))
-                        r, g, b = pix[rx, ry]
-                        pix[rx, ry] = ((r + random.randint(1, 13)) % 256, g, (b + random.randint(1, 17)) % 256)
-                im.save(screenshot_path, "PNG")
+            if Image is not None:
+                with Image.open(screenshot_path) as im:
+                    im = im.convert("RGB")
+                    pix = im.load()
+                    w, h = im.size
+                    if w > 10 and h > 10:
+                        # Variation subtile sur plusieurs pixels d'angles
+                        for i in range(random.randint(6, 12)):
+                            rx = random.randint(0, min(12, w - 1))
+                            ry = random.randint(0, min(12, h - 1))
+                            r, g, b = pix[rx, ry]
+                            pix[rx, ry] = ((r + random.randint(1, 15)) % 256, (g + random.randint(1, 9)) % 256, b)
+                        # Variation en bordure inférieure droite
+                        for i in range(random.randint(4, 8)):
+                            rx = w - 1 - random.randint(0, min(10, w - 1))
+                            ry = h - 1 - random.randint(0, min(10, h - 1))
+                            r, g, b = pix[rx, ry]
+                            pix[rx, ry] = ((r + random.randint(1, 13)) % 256, g, (b + random.randint(1, 17)) % 256)
+                    im.save(screenshot_path, "PNG")
+            else:
+                # Fallback sans PIL: variation binaire unique
+                with open(screenshot_path, "ab") as f:
+                    f.write(f"\x00PR_SALT_{random.randint(100000, 999999)}".encode("utf-8"))
     except Exception:
         pass
 
