@@ -34,6 +34,7 @@ env/
 venv/
 build/
 dist/
+dist_public/
 
 # ==============================================================================
 # Données temporaires d'exécution du bot
