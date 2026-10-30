@@ -29,13 +29,14 @@ api = PrSocialAPI(token=cfg.get("token"), cf_clearance=cfg.get("cf_clearance"))
 b_bot = BrowserBot(headless=True)
 mgr = RejectedTasksManager(api=api, browser_bot=b_bot)
 
+os.system('cls' if os.name == 'nt' else 'clear')
 print("=== SCAN ET RÉCUPÉRATION DIRECTE DES TÂCHES REJETÉES DISPONIBLES ===")
 st_me, me = api.get_me()
 u = me.get("user", {})
 print(f"Utilisateur : @{u.get('username')} | Solde de départ : ${float(u.get('balance', 0)):.4f}\n")
 
 print("1. Récupération de la liste complète des rejets...")
-all_tasks = mgr.fetch_all_rejected_tasks(max_pages=15)
+all_tasks = mgr.fetch_all_rejected_tasks(max_pages=100)
 print(f"   -> {len(all_tasks)} tâches trouvées au total.\n")
 
 print("2. Démarrage de la récupération...")
@@ -48,18 +49,7 @@ for idx, t in enumerate(all_tasks, 1):
     act = t["action"].upper()
     rew = t.get("reward", 0.0)
 
-    # Test rapide de démarrage
-    st_start, res_start = api.start_task(tid)
-    if st_start != 200 or not res_start.get("ok"):
-        err = res_start.get("code") or res_start.get("error") or "Erreur"
-        continue
-
-    # Si le démarrage réussit, la tâche est 100% active et réservée !
-    print(f"\n>>> [{idx}/{len(all_tasks)}] Tâche #{tid} [{plat} - {act}] (Gain: +${rew:.3f}) ACTIVE & RÉSERVÉE !")
-    # Annulation préalable pour laisser retry_single_task gérer la suite
-    api.cancel_task(tid)
-    time.sleep(1.0)
-
+    print(f"\n>>> [{idx}/{len(all_tasks)}] Tâche #{tid} [{plat} - {act}] (Gain potentiel: +${rew:.3f})...")
     ok, msg = mgr.retry_single_task(t, log_cb=lambda m, l: print(f"    [{l.upper()}] {m}"))
     if ok:
         success_count += 1

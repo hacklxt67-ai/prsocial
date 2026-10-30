@@ -5,9 +5,11 @@ import json
 import random
 from typing import Optional, List, Dict, Any
 
-# Encodage UTF-8 obligatoire pour la console Windows
 try:
-    sys.stdout.reconfigure(encoding='utf-8')
+    if sys.stdout:
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+    if sys.stderr:
+        sys.stderr.reconfigure(encoding='utf-8', errors='replace')
 except Exception:
     pass
 
@@ -28,7 +30,15 @@ from pc_bot.browser_bot import BrowserBot
 from pc_bot.automation_engine import AutomationEngine
 from pc_bot.rejected_tasks_manager import RejectedTasksManager, analyze_rejection_error
 
-CONFIG_FILE = r"D:\social_pc_bot\config.json"
+CONFIG_FILE = (
+    os.path.join(parent_dir, "config.json")
+    if os.path.exists(os.path.join(parent_dir, "config.json"))
+    else (
+        os.path.join(current_dir, "config.json")
+        if os.path.exists(os.path.join(current_dir, "config.json"))
+        else r"D:\social_pc_bot\config.json"
+    )
+)
 
 # ==============================================================================
 # COULEURS & STYLES ANSI
@@ -66,8 +76,9 @@ LOGO = f"""{C.CYAN}{C.BOLD}
   ██╔═══╝ ██╔══██╗╚════╝╚════██║██║   ██║██║     ██║██╔══██║██║     
   ██║     ██║  ██║      ███████║╚██████╔╝╚██████╗██║██║  ██║███████╗
   ╚═╝     ╚═╝  ╚═╝      ╚══════╝ ╚═════╝  ╚═════╝╚═╝╚═╝  ╚═╝╚══════╝{C.RESET}
-         {C.YELLOW}{C.BOLD}⚡ AUTOMATION BOT PC — ÉDITION PRO v1.2.0 ⚡{C.RESET}
-{C.GRAY}  ─────────────────────────────────────────────────────────────{C.RESET}"""
+       {C.MAGENTA}{C.BOLD}⚡ REVERSED ENGINEERING BOT PC — ÉDITION PRO v3.0 ⚡{C.RESET}
+       {C.YELLOW}{C.DIM}— L'argent c'est un chiffre —{C.RESET}
+  {C.GRAY}─────────────────────────────────────────────────────────────{C.RESET}"""
 
 class TerminalApp:
     def __init__(self):
@@ -149,9 +160,18 @@ class TerminalApp:
         print(f"  {C.GREEN}{C.BOLD}=== DÉMARRAGE DU BOT AUTOMATIQUE PR.SOCIAL ==={C.RESET}")
         print(f"  {C.GRAY}Appuyez sur {C.WHITE}{C.BOLD}Ctrl + C{C.RESET}{C.GRAY} à tout moment pour arrêter et revenir au menu.{C.RESET}\n")
 
-        # Callback pour afficher les logs en couleur
+        # Callback intelligent pour afficher les logs sans désordre
         def cli_log(msg, lvl="info"):
             timestamp = time.strftime("%H:%M:%S")
+            if "Radar PR.Social" in msg:
+                sys.stdout.write(f"\r  {C.GRAY}[{timestamp}]{C.RESET} {C.MAGENTA}⚡ {msg}{C.RESET}   ")
+                sys.stdout.flush()
+                return
+
+            # Effacer la ligne du radar si présente avant d'imprimer
+            sys.stdout.write("\r" + " " * 95 + "\r")
+            sys.stdout.flush()
+
             if lvl == "success":
                 prefix = f"{C.GREEN}[SUCCÈS]{C.RESET}"
             elif lvl == "error":
@@ -199,7 +219,7 @@ class TerminalApp:
             else:
                 print(f"  {C.CYAN}• {msg}{C.RESET}")
 
-        tasks = self.rejected_manager.fetch_all_rejected_tasks(max_pages=15, log_cb=cli_log)
+        tasks = self.rejected_manager.fetch_all_rejected_tasks(max_pages=100, log_cb=cli_log)
 
         if not tasks:
             print(f"\n  {C.GREEN}{C.BOLD}🎉 Félicitations ! Aucune tâche rejetée trouvée sur votre compte.{C.RESET}\n")
@@ -237,6 +257,8 @@ class TerminalApp:
             return
 
         if choice == 'a':
+            clear_screen()
+            print(LOGO)
             print(f"\n  {C.YELLOW}{C.BOLD}=== DÉMARRAGE DU RÉESSAI EN LOT (MODE STRICT) ==={C.RESET}")
             print(f"  {C.GRAY}Appuyez sur Ctrl+C pour interrompre.{C.RESET}\n")
             success_count = 0

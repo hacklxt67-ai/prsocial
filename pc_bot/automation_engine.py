@@ -1,4 +1,7 @@
+import os
 import time
+import json
+import random
 import threading
 from typing import List, Callable, Optional, Dict, Any
 from .pr_api import PrSocialAPI
@@ -145,11 +148,21 @@ class AutomationEngine:
                     continue
 
                 self.log(f"Recherche de tâches disponibles pour [{platform.upper()}]...", "info")
-                status, tasks_data = self.api.get_available_tasks(platform=platform, sort="reward", limit=50)
+                status, tasks_data = self.api.get_available_tasks(platform=platform, sort="reward", limit=500)
                 
                 if status != 200:
                     self.log(f"Erreur API ({status}) sur [{platform.upper()}]: {tasks_data.get('error')}", "warning")
                     continue
+
+                # Détection des paires en limite horaire (exhausted_pairs) renvoyées par le serveur PR.Social
+                exhausted = tasks_data.get("exhausted_pairs") or []
+                exhausted_actions = set()
+                if isinstance(exhausted, list):
+                    for ep in exhausted:
+                        if isinstance(ep, dict) and ep.get("platform", "").lower() == platform.lower():
+                            exhausted_actions.add(ep.get("action", "").lower())
+                            mins = ep.get("retry_after_min", 30)
+                            self.log(f"⚠️ Limite horaire serveur sur [{platform.upper()}/{ep.get('action')}] (~{mins} min restantes).", "warning")
 
                 # Mise à jour du radar serveur en temps réel
                 if isinstance(tasks_data.get("platformCounts"), list):
@@ -160,7 +173,7 @@ class AutomationEngine:
                 tasks = tasks_data.get("tasks", [])
                 # Si aucune tâche avec sort="reward", tenter sort="new" pour attraper les tâches fraîches
                 if not tasks:
-                    status_new, data_new = self.api.get_available_tasks(platform=platform, sort="new", limit=50)
+                    status_new, data_new = self.api.get_available_tasks(platform=platform, sort="new", limit=500)
                     if status_new == 200:
                         tasks = data_new.get("tasks", [])
 
@@ -168,6 +181,14 @@ class AutomationEngine:
                     self.log(f"Aucune tâche disponible pour [{platform.upper()}]. Rotation vers la suite...", "info")
                     platform_cooldowns[platform] = time.time() + 15
                     continue
+
+                # Filtrer les actions sous limite horaire
+                if exhausted_actions:
+                    tasks = [t for t in tasks if t.get("action", "").lower() not in exhausted_actions]
+                    if not tasks:
+                        self.log(f"Toutes les tâches disponibles sur [{platform.upper()}] sont en limite horaire. Rotation...", "info")
+                        platform_cooldowns[platform] = time.time() + 60
+                        continue
 
                 # Alterner intelligemment les actions (Follow, Like, Comment, etc.)
                 tasks = self.interleave_task_actions(tasks)
@@ -199,7 +220,6 @@ class AutomationEngine:
                                    any(k in err_msg.lower() for k in ["все места", "places", "not found", "inactive", "уже выполн"]))
 
                         if is_busy:
-                            # Ne pas polluer l'interface : mise en pause courte de 2 min
                             self.failed_tasks[task_id] = time.time() - self.COOLDOWN_FAILED_SECONDS + 120
                             consecutive_busy += 1
                             if consecutive_busy >= 3:
@@ -209,7 +229,7 @@ class AutomationEngine:
                             self.failed_tasks[task_id] = time.time()
                             self.log(f"Impossible de démarrer #{task_id}: {err_msg}", "warning")
 
-                        if start_st == 429:
+                        if start_st == 429 or err_code == "HOURLY_LIMIT":
                             self.log(f"Limite horaire atteinte pour [{platform.upper()}]. Pause de 45s activée.", "warning")
                             platform_cooldowns[platform] = time.time() + 45
                             break
@@ -252,27 +272,78 @@ class AutomationEngine:
                         self.tasks_failed += 1
                         continue
 
+                    # Préparation du commentaire si nécessaire
+                    comment_text = None
+                    if "comment" in action.lower():
+                        assigned = start_res.get("completion", {}).get("assigned_comment") or start_res.get("task", {}).get("assigned_comment")
+                        if not assigned:
+                            c_list = start_res.get("task", {}).get("comment_list")
+                            if isinstance(c_list, str):
+                                try:
+                                    c_list = json.loads(c_list)
+                                except Exception:
+                                    c_list = [line.strip() for line in c_list.split("\n") if line.strip()]
+                            if isinstance(c_list, list) and c_list:
+                                assigned = random.choice(c_list)
+                        if not assigned and ("emoji" in (start_res.get("task", {}).get("comment_type") or "").lower() or "emoji" in action.lower()):
+                            assigned = random.choice(["🔥", "👏", "🚀", "❤️", "👍", "✨", "💯", "🙌"])
+                        if not assigned:
+                            assigned = random.choice([
+                                "Great content! 👍",
+                                "Very interesting, thanks for sharing! ✨",
+                                "Top ! 🔥",
+                                "Nice post! 👏"
+                            ])
+                        comment_text = str(assigned).strip()
+
                     self.log(f"Navigation vers: {target_url}", "info")
                     self.log(f"Exécution automatique de l'action [{action.upper()}] en cours...", "info")
                     success, act_msg, screenshot_path = self.browser_bot.execute_task_action(
                         platform=platform,
                         action=action,
                         target_url=target_url,
-                        task_id=task_id
+                        task_id=task_id,
+                        comment_text=comment_text
                     )
 
-                    # Soumission de la preuve (Capture d'écran)
-                    self.log(f"Capture réussie ! Envoi de la preuve pour #{task_id}...", "info")
-                    sub_st, sub_res = self.api.submit_screenshot(task_id, screenshot_path)
-
-                    # Vérification automatique si disponible
-                    api_check_st, api_check_res = self.api.api_check_task(task_id)
-
                     is_confirmed = False
-                    if sub_st == 200 and sub_res.get("ok"):
-                        is_confirmed = True
-                    elif api_check_st == 200 and api_check_res.get("ok"):
-                        is_confirmed = True
+                    api_check_enabled = start_res.get("api_check_enabled", 0)
+
+                    # 1. Vérification API instantanée si disponible (sans téléversement lourd)
+                    if api_check_enabled == 1:
+                        self.log("Tentative de validation instantanée par API Check...", "info")
+                        api_check_st, api_check_res = self.api.api_check_task(task_id)
+                        if api_check_st == 200 and api_check_res.get("found") is True and api_check_res.get("approved") is True:
+                            is_confirmed = True
+                            self.log(f"✓ Validé instantanément par l'API PR.Social !", "success")
+
+                    # 2. Soumission de la preuve vérifiée si non validé par API
+                    if not is_confirmed:
+                        # GARDE-FOU ANTI-REJET STRICT : Ne JAMAIS envoyer de capture si l'action a échoué
+                        if success and screenshot_path and os.path.exists(screenshot_path):
+                            wait_sec = int(start_res.get("submit_after_sec") or 5)
+                            if wait_sec > 0:
+                                time.sleep(wait_sec)
+                            self.log(f"Preuve conforme vérifiée. Envoi pour #{task_id}...", "info")
+                            sub_st, sub_res = self.api.submit_screenshot(task_id, screenshot_path)
+                            if sub_st == 200 and sub_res.get("ok"):
+                                is_confirmed = True
+                                self.log(f"✓ Capture acceptée par PR.Social (Statut: {sub_res.get('completion', {}).get('status', 'pending_review')})", "success")
+                            else:
+                                err_sub = sub_res.get("error", f"Status {sub_st}")
+                                self.log(f"Soumission refusée pour #{task_id} ({err_sub}). Annulation de sécurité...", "warning")
+                                self.api.cancel_task(task_id)
+                                self.failed_tasks[task_id] = time.time()
+                                self.tasks_failed += 1
+                                continue
+                        else:
+                            # L'action a échoué dans Chrome (bouton non cliqué, page blanche, etc.)
+                            self.log(f"🛡️ SÉCURITÉ ANTI-REJET : Action non confirmée ({act_msg}). Capture écartée.", "warning")
+                            self.log(f"🛡️ Annulation sécurisée de #{task_id} pour empêcher tout avertissement ou ban PR.Social.", "info")
+                            self.api.cancel_task(task_id)
+                            self.failed_tasks[task_id] = time.time()
+                            self.tasks_failed += 1
+                            continue
 
                     if is_confirmed:
                         self.tasks_success += 1

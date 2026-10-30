@@ -37,6 +37,18 @@ PROFILE_DIR = os.path.join(BASE_DATA_DIR, "chromium_profile")
 os.makedirs(SCREENSHOT_DIR, exist_ok=True)
 os.makedirs(PROFILE_DIR, exist_ok=True)
 
+def cleanup_profile_locks(profile_dir: str):
+    """Supprime les verrous résiduels de Chromium pour éviter les blocages après arrêt forcé."""
+    if not os.path.exists(profile_dir):
+        return
+    for fname in ["SingletonLock", "SingletonSocket", "SingletonCookie", "DevToolsActivePort", "lockfile"]:
+        fpath = os.path.join(profile_dir, fname)
+        if os.path.exists(fpath):
+            try:
+                os.remove(fpath)
+            except Exception:
+                pass
+
 def ensure_unique_screenshot(screenshot_path: str):
     """Garantit un hash unique (cryptographique et perceptuel) pour chaque capture afin d'éviter le rejet DUPLICATE_SCREENSHOT par PR.Social."""
     try:
@@ -103,6 +115,7 @@ class BrowserTermux:
         options.add_argument("--disable-infobars")
         options.add_argument("--window-size=1280,720")
         options.add_argument("--lang=fr-FR,fr")
+        cleanup_profile_locks(PROFILE_DIR)
         options.add_argument(f"--user-data-dir={PROFILE_DIR}")
         options.add_argument(f"--user-agent={current_ua}")
         # Anti-détection Selenium
@@ -649,104 +662,6 @@ class BrowserTermux:
             if(aria.indexOf('suivre')!==-1||aria.indexOf('follow')!==-1||t==='suivre'||t==='follow'){ btns[i].click(); break; }
         }
         """)
-
-    def _handle_threads(self, driver, action: str, comment_text: Optional[str] = None):
-        """Threads : Follow profil, Like post, Repost, Commentaire."""
-        # 1. Modales cookies
-        driver.execute_script("""
-        try {
-            var cookieBtns = document.querySelectorAll('button');
-            for (var i = 0; i < cookieBtns.length; i++) {
-                var t = (cookieBtns[i].textContent || '').toLowerCase();
-                if (t.indexOf('accept') !== -1 || t.indexOf('accepter') !== -1) {
-                    cookieBtns[i].click(); break;
-                }
-            }
-        } catch(e) {}
-        """)
-        time.sleep(1)
-
-        # 2. Like
-        if "like" in action or "aime" in action:
-            driver.execute_script("""
-            var likeSvg = document.querySelector('svg[aria-label="Like" i], svg[aria-label="J\\'aime" i]');
-            if (likeSvg) {
-                var btn = likeSvg.closest('div[role="button"]') || likeSvg.parentElement;
-                if (btn) btn.click();
-            }
-            """)
-        # 3. Follow
-        elif "follow" in action or "suivre" in action:
-            driver.execute_script("""
-            var btns = document.querySelectorAll('div[role="button"], button');
-            for (var i = 0; i < btns.length; i++) {
-                var t = (btns[i].textContent || '').trim().toLowerCase();
-                if (t === 'follow' || t === 'suivre' || t === 's\\'abonner') {
-                    btns[i].click(); break;
-                }
-            }
-            """)
-        # 4. Commentaire
-        if "comment" in action:
-            driver.execute_script("""
-            var txt = arguments[0];
-            var box = document.querySelector('div[role="textbox"], div[contenteditable="true"]');
-            if (box) {
-                box.focus();
-                box.textContent = txt;
-                box.dispatchEvent(new Event('input', { bubbles: true }));
-            }
-            """, comment_text or "Great post! 🔥")
-
-    def _handle_reddit(self, driver, action: str, comment_text: Optional[str] = None):
-        """Reddit : Upvote post, Follow profil, Commentaire."""
-        # 1. Fermer bannières cookies
-        driver.execute_script("""
-        try {
-            var cookieBtns = document.querySelectorAll('button');
-            for (var i = 0; i < cookieBtns.length; i++) {
-                var t = (cookieBtns[i].textContent || '').toLowerCase();
-                if (t.indexOf('accept all') !== -1 || t.indexOf('tout accepter') !== -1) {
-                    cookieBtns[i].click(); break;
-                }
-            }
-        } catch(e) {}
-        """)
-        time.sleep(1)
-
-        # 2. Upvote
-        if "upvote" in action or "vote" in action or "like" in action:
-            driver.execute_script("""
-            var btn = document.querySelector('button[upvote-button], shreddit-post button[aria-label*="upvote" i], button[aria-label*="Upvote" i]');
-            if (btn) btn.click();
-            """)
-        # 3. Follow
-        elif "follow" in action or "suivre" in action:
-            driver.execute_script("""
-            var followSelectors = ['shreddit-profile-header button', 'button[aria-label*="Follow @" i]', 'button[aria-label*="Suivre @" i]'];
-            for (var s = 0; s < followSelectors.length; s++) {
-                var b = document.querySelector(followSelectors[s]);
-                if (b) {
-                    var txt = (b.textContent || '').toLowerCase();
-                    if (txt.indexOf('following') === -1 && txt.indexOf('abonné') === -1) {
-                        b.click(); break;
-                    }
-                }
-            }
-            """)
-        # 4. Commentaire
-        if "comment" in action:
-            driver.execute_script("""
-            var txt = arguments[0];
-            var box = document.querySelector('div[role="textbox"], textarea[name="comment"], shreddit-comment-composer div[contenteditable="true"]');
-            if (box) {
-                box.focus();
-                box.textContent = txt;
-                box.dispatchEvent(new Event('input', { bubbles: true }));
-                var subBtn = document.querySelector('shreddit-comment-composer button[type="submit"], button[type="submit"]');
-                if (subBtn) subBtn.click();
-            }
-            """, comment_text or "Nice post! 👍")
 
     def _handle_pinterest(self, driver, action: str, comment_text: Optional[str] = None):
         """Pinterest : Follow profil, Save/Like Pin, Repin, Commentaire. Anti-unfollow/unlike."""

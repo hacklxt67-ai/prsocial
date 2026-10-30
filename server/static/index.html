@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AUTOTASK PRO - Admin Panel</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+  <!-- Chart.js pour reproduire fidèlement les graphiques du template -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+  <!-- =========================================================================
+       1. ÉCRAN DE CONNEXION ADMIN
+       ========================================================================= -->
+  <div id="loginSection" class="login-container">
+    <div class="login-card">
+      <div class="brand-badge">🔐 ESPACE ADMINISTRATEUR</div>
+      <h1 class="login-title">AUTOTASK PRO</h1>
+      <p class="login-subtitle">Connectez-vous pour accéder au tableau de bord</p>
+
+      <form id="loginForm" onsubmit="handleLogin(event)">
+        <div class="form-group" style="text-align: left;">
+          <label for="adminUsername">Nom d'utilisateur</label>
+          <input type="text" id="adminUsername" class="form-control" value="admin" required placeholder="admin">
+        </div>
+        <div class="form-group" style="text-align: left;">
+          <label for="adminPassword">Mot de passe</label>
+          <input type="password" id="adminPassword" class="form-control" value="Admin1234!" required placeholder="••••••••">
+        </div>
+        <button type="submit" class="btn-primary-blue" style="width: 100%; justify-content: center; margin-top: 10px; padding: 12px;">
+          Se Connecter au Panel
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- =========================================================================
+       2. PANEL PRINCIPAL AUTOTASK PRO
+       ========================================================================= -->
+  <div id="dashboardSection" class="app-container" style="display: none;">
+    
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar" id="sidebarMenu">
+      <div class="sidebar-header">
+        <div class="brand-icon">▲</div>
+        <div class="brand-text">
+          <h2>AUTOTASK PRO</h2>
+          <span>Admin Panel</span>
+        </div>
+      </div>
+
+      <ul class="sidebar-nav">
+        <li>
+          <div class="nav-link active" onclick="switchNav('dashboard')">
+            <span class="nav-icon">🏠</span> Tableau de bord
+          </div>
+        </li>
+        <li>
+          <div class="nav-link" onclick="switchNav('clients')">
+            <span class="nav-icon">👥</span> Clients
+          </div>
+        </li>
+        <li>
+          <div class="nav-link" onclick="switchNav('subscriptions')">
+            <span class="nav-icon">📅</span> Abonnements
+          </div>
+        </li>
+        <li>
+          <div class="nav-link" onclick="switchNav('payments')">
+            <span class="nav-icon">💳</span> Paiements
+            <span id="navPendingBadge" class="nav-badge-pill" style="display: none;">0</span>
+          </div>
+        </li>
+        <li>
+          <div class="nav-link" onclick="switchNav('licenses')">
+            <span class="nav-icon">🔑</span> Licences
+          </div>
+        </li>
+        <li>
+          <div class="nav-link" onclick="switchNav('devices')">
+            <span class="nav-icon">💻</span> Appareils
+          </div>
+        </li>
+        <li>
+          <div class="nav-link" onclick="switchNav('reports')">
+            <span class="nav-icon">📊</span> Rapports
+          </div>
+        </li>
+        <li>
+          <div class="nav-link" onclick="switchNav('settings')">
+            <span class="nav-icon">⚙️</span> Paramètres
+          </div>
+        </li>
+      </ul>
+
+      <div class="sidebar-footer">
+        <div class="logout-link" onclick="logout()">
+          <span class="nav-icon">⏻</span> Déconnexion
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Wrapper -->
+    <div class="main-wrapper">
+      
+      <!-- Top Navbar Header -->
+      <header class="top-navbar">
+        <div class="nav-left">
+          <button class="menu-toggle-btn" onclick="toggleSidebar()">☰</button>
+        </div>
+        <div class="nav-right">
+          <div class="notification-bell" onclick="switchNav('payments')" title="Paiements en attente">
+            🔔
+            <span class="bell-badge" id="topBellCount">0</span>
+          </div>
+          <div class="admin-profile">
+            <div class="profile-avatar">👤</div>
+            <div class="profile-info">
+              <span class="profile-name" id="topAdminUsername">Admin</span>
+              <span class="profile-role">Administrateur</span>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <!-- Content Area -->
+      <main class="content-area">
+
+        <!-- ===================================================================
+             ONGLET 1 : TABLEAU DE BORD (CONFORME AU TEMPLATE)
+             =================================================================== -->
+        <section id="sectionDashboard" class="panel-section">
+          <div class="section-header">
+            <div class="section-title-wrap">
+              <span class="title-icon">🏠</span>
+              <div>
+                <h1 class="section-title">Tableau de bord</h1>
+                <p class="section-subtitle">Vue d'ensemble de votre activité</p>
+              </div>
+            </div>
+            <div class="date-badge">
+              <span>📅</span> <span id="currentDateDisplay">Aujourd'hui : 26 avril 2025</span>
+            </div>
+          </div>
+
+          <!-- 4 Stat Cards Row -->
+          <div class="metrics-grid">
+            
+            <!-- Card 1: Total clients -->
+            <div class="metric-card">
+              <div class="metric-top">
+                <div class="metric-icon-square blue">👥</div>
+                <div class="metric-label-group">
+                  <span class="metric-label">Total clients</span>
+                  <span class="metric-value" id="cardTotalClients">0</span>
+                </div>
+              </div>
+              <div class="metric-bottom">
+                <span class="trend-badge up">↑ +12%</span>
+                <span class="subtext-note" id="subtextNewClients">Nouveaux ce mois : 28</span>
+              </div>
+            </div>
+
+            <!-- Card 2: Licences actives -->
+            <div class="metric-card">
+              <div class="metric-top">
+                <div class="metric-icon-square green">💳</div>
+                <div class="metric-label-group">
+                  <span class="metric-label">Licences actives</span>
+                  <span class="metric-value" id="cardActiveLicenses">0</span>
+                </div>
+              </div>
+              <div class="metric-bottom">
+                <span class="trend-badge up">↑ +8%</span>
+                <span class="subtext-note" id="subtextExpiring">Expirant cette semaine : 14</span>
+              </div>
+            </div>
+
+            <!-- Card 3: Paiements en attente -->
+            <div class="metric-card">
+              <div class="metric-top">
+                <div class="metric-icon-square orange">⏰</div>
+                <div class="metric-label-group">
+                  <span class="metric-label">Paiements en attente</span>
+                  <span class="metric-value" id="cardPendingPayments">0</span>
+                </div>
+              </div>
+              <div class="metric-bottom">
+                <span class="trend-badge" style="color: var(--warning);" id="trendPending">↑ En attente</span>
+                <span class="subtext-note" id="subtextMethods">MVola : 0 | USDT : 0</span>
+              </div>
+            </div>
+
+            <!-- Card 4: Revenu total -->
+            <div class="metric-card">
+              <div class="metric-top">
+                <div class="metric-icon-square purple">💰</div>
+                <div class="metric-label-group">
+                  <span class="metric-label">Revenu total</span>
+                  <span class="metric-value" id="cardTotalRevenue">0 $</span>
+                </div>
+              </div>
+              <div class="metric-bottom">
+                <span class="trend-badge up">↑ +15%</span>
+                <span class="subtext-note" id="subtextRevenueMonth">Ce mois : 0 $</span>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Widgets Row : 2 Graphiques + 1 Tableau Derniers Paiements -->
+          <div class="widgets-grid">
+            
+            <!-- Widget 1: Évolution des ventes (7 derniers jours) -->
+            <div class="widget-card">
+              <div class="widget-header">
+                <h3 class="widget-title">Évolution des ventes (7 derniers jours)</h3>
+                <span style="font-size: 12px; font-weight: 600; color: var(--text-muted);">Ventes ▾</span>
+              </div>
+              <div class="chart-container-rel">
+                <canvas id="salesLineChart"></canvas>
+              </div>
+            </div>
+
+            <!-- Widget 2: Répartition des paiements -->
+            <div class="widget-card">
+              <div class="widget-header">
+                <h3 class="widget-title">Répartition des paiements</h3>
+              </div>
+              <div class="chart-container-rel" style="display: flex; align-items: center;">
+                <div style="position: relative; width: 140px; height: 140px;">
+                  <canvas id="paymentDonutChart"></canvas>
+                  <div class="chart-center-text">
+                    <span class="center-label">Total</span>
+                    <span class="center-val" id="donutTotalAmount">0 $</span>
+                  </div>
+                </div>
+                <div class="chart-legend-box">
+                  <div class="legend-item">
+                    <span class="legend-dot usdt"></span>
+                    <span>USDT</span>
+                    <span id="donutPercentUsdt" style="margin-left: auto; color: var(--text-dark);">60%</span>
+                  </div>
+                  <div class="legend-item">
+                    <span class="legend-dot mvola"></span>
+                    <span>MVola</span>
+                    <span id="donutPercentMvola" style="margin-left: auto; color: var(--text-dark);">40%</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Widget 3: Derniers paiements -->
+            <div class="widget-card">
+              <div class="widget-header">
+                <h3 class="widget-title">Derniers paiements</h3>
+                <a href="javascript:void(0)" onclick="switchNav('payments')" style="font-size: 12px; font-weight: 600; color: var(--primary); text-decoration: none;">Voir tout</a>
+              </div>
+              <div class="table-responsive">
+                <table class="modern-table">
+                  <thead>
+                    <tr>
+                      <th>Utilisateur</th>
+                      <th>Montant</th>
+                      <th>Méthode</th>
+                      <th>Statut</th>
+                      <th>Date</th>
+                    </tr>
+                  </thead>
+                  <tbody id="widgetPaymentsTbody">
+                    <tr><td colspan="5" style="text-align: center; color: var(--text-light); padding: 20px;">Chargement...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+          </div>
+        </section>
+
+        <!-- ===================================================================
+             ONGLET 2 : GESTION DES CLIENTS
+             =================================================================== -->
+        <section id="sectionClients" class="panel-section" style="display: none;">
+          <div class="section-header">
+            <div class="section-title-wrap">
+              <span class="title-icon">👥</span>
+              <div>
+                <h1 class="section-title">Gestion des clients</h1>
+                <p class="section-subtitle">Liste et gestion de vos clients</p>
+              </div>
+            </div>
+            <button class="btn-primary-blue" onclick="openAddClientModal()">
+              <span>+</span> Ajouter un client
+            </button>
+          </div>
+
+          <div class="card-panel">
+            <div class="panel-header-toolbar">
+              <div class="search-input-wrap">
+                <span class="search-icon-pos">🔍</span>
+                <input type="text" id="clientSearchInput" placeholder="Rechercher un client (nom, identifiant, email...)" onkeyup="filterClientsTable()">
+              </div>
+              <div class="filter-btn-group">
+                <button class="btn-white-filter" onclick="filterClientsTable()">
+                  <span>⚙️</span> Filtrer
+                </button>
+              </div>
+            </div>
+
+            <div class="table-responsive">
+              <table class="modern-table">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Identifiant</th>
+                    <th>Email / Téléphone</th>
+                    <th>Statut</th>
+                    <th>Licences</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="clientsTableBody">
+                  <tr><td colspan="6" style="text-align: center; color: var(--text-light); padding: 30px;">Chargement des clients...</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="table-pagination-bar">
+              <span id="clientPaginationInfo">Affichage de 1 à 5 sur 124 clients</span>
+              <div class="pagination-controls">
+                <button class="page-num">‹</button>
+                <button class="page-num active">1</button>
+                <button class="page-num">2</button>
+                <button class="page-num">3</button>
+                <button class="page-num">4</button>
+                <button class="page-num">5</button>
+                <button class="page-num">›</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ===================================================================
+             ONGLET 3 : GESTION DES ABONNEMENTS
+             =================================================================== -->
+        <section id="sectionSubscriptions" class="panel-section" style="display: none;">
+          <div class="section-header">
+            <div class="section-title-wrap">
+              <span class="title-icon">📅</span>
+              <div>
+                <h1 class="section-title">Gestion des abonnements</h1>
+                <p class="section-subtitle">Suivi des licences et renouvellements</p>
+              </div>
+            </div>
+            <button class="btn-primary-blue" onclick="openGenerateModal()">
+              <span>+</span> Créer un abonnement
+            </button>
+          </div>
+
+          <div class="card-panel">
+            <div class="table-responsive">
+              <table class="modern-table">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Client</th>
+                    <th>Licence</th>
+                    <th>Durée</th>
+                    <th>Statut</th>
+                    <th>Expiration</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="subscriptionsTableBody">
+                  <tr><td colspan="7" style="text-align: center; color: var(--text-light); padding: 30px;">Chargement des abonnements...</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="table-pagination-bar">
+              <span id="subPaginationInfo">Affichage de 1 à 5 sur 47 abonnements</span>
+              <div class="pagination-controls">
+                <button class="page-num">‹</button>
+                <button class="page-num active">1</button>
+                <button class="page-num">2</button>
+                <button class="page-num">3</button>
+                <button class="page-num">›</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ===================================================================
+             ONGLET 4 : GESTION DES PAIEMENTS
+             =================================================================== -->
+        <section id="sectionPayments" class="panel-section" style="display: none;">
+          <div class="section-header">
+            <div class="section-title-wrap">
+              <span class="title-icon">💳</span>
+              <div>
+                <h1 class="section-title">Gestion des paiements</h1>
+                <p class="section-subtitle">Suivi et validation des transactions</p>
+              </div>
+            </div>
+            <div class="filter-btn-group">
+              <button class="filter-tab-btn active" onclick="setPaymentFilter('ALL', this)">Tous</button>
+              <button class="filter-tab-btn" onclick="setPaymentFilter('MVOLA', this)">MVola</button>
+              <button class="filter-tab-btn" onclick="setPaymentFilter('USDT', this)">USDT</button>
+            </div>
+          </div>
+
+          <div class="card-panel">
+            <div class="panel-header-toolbar">
+              <div class="search-input-wrap">
+                <span class="search-icon-pos">🔍</span>
+                <input type="text" id="paymentSearchInput" placeholder="Rechercher par identifiant, transaction..." onkeyup="filterPaymentsTable()">
+              </div>
+              <div style="display: flex; gap: 8px;">
+                <div class="date-badge" style="font-size: 12px; padding: 6px 12px;">
+                  📅 26/04/2025 - 26/04/2025
+                </div>
+                <button class="btn-white-filter" onclick="filterPaymentsTable()">
+                  <span>⚙️</span> Filtrer
+                </button>
+              </div>
+            </div>
+
+            <div class="table-responsive">
+              <table class="modern-table">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Utilisateur / Contact</th>
+                    <th>Montant</th>
+                    <th>Méthode</th>
+                    <th>Référence Transaction</th>
+                    <th>Statut</th>
+                    <th>Date</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="paymentsTableBody">
+                  <tr><td colspan="8" style="text-align: center; color: var(--text-light); padding: 30px;">Chargement des transactions...</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="table-pagination-bar">
+              <span id="paymentPaginationInfo">Affichage des paiements</span>
+              <div class="pagination-controls">
+                <button class="page-num">‹</button>
+                <button class="page-num active">1</button>
+                <button class="page-num">2</button>
+                <button class="page-num">›</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ===================================================================
+             ONGLET 5 : GESTION DES LICENCES
+             =================================================================== -->
+        <section id="sectionLicenses" class="panel-section" style="display: none;">
+          <div class="section-header">
+            <div class="section-title-wrap">
+              <span class="title-icon">🔑</span>
+              <div>
+                <h1 class="section-title">Gestion des licences</h1>
+                <p class="section-subtitle">Création et gestion des clés d'accès</p>
+              </div>
+            </div>
+            <button class="btn-primary-blue" onclick="openGenerateModal()">
+              <span>+</span> Générer une Licence
+            </button>
+          </div>
+
+          <div class="card-panel">
+            <div class="panel-header-toolbar">
+              <div class="search-input-wrap">
+                <span class="search-icon-pos">🔍</span>
+                <input type="text" id="licenseSearchInput" placeholder="Rechercher une licence ou un client..." onkeyup="filterLicensesTable()">
+              </div>
+              <div class="filter-btn-group">
+                <select id="licenseStatusFilter" class="form-control" style="width: 170px;" onchange="filterLicensesTable()">
+                  <option value="">Tous les statuts</option>
+                  <option value="ACTIVE">Actif</option>
+                  <option value="EXPIRED">Expiré</option>
+                  <option value="UNUSED">En attente (Non activé)</option>
+                  <option value="REVOKED">Révoqué</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="table-responsive">
+              <table class="modern-table">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Client</th>
+                    <th>Clé de licence</th>
+                    <th>Appareil</th>
+                    <th>Statut</th>
+                    <th>Expiration</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="licensesTableBody">
+                  <tr><td colspan="7" style="text-align: center; color: var(--text-light); padding: 30px;">Chargement des clés de licence...</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="table-pagination-bar">
+              <span id="licensePaginationInfo">Affichage des licences</span>
+              <div class="pagination-controls">
+                <button class="page-num">‹</button>
+                <button class="page-num active">1</button>
+                <button class="page-num">2</button>
+                <button class="page-num">›</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ===================================================================
+             ONGLET 6 : APPAREILS (SMARTPHONES TERMUX)
+             =================================================================== -->
+        <section id="sectionDevices" class="panel-section" style="display: none;">
+          <div class="section-header">
+            <div class="section-title-wrap">
+              <span class="title-icon">💻</span>
+              <div>
+                <h1 class="section-title">Gestion des appareils</h1>
+                <p class="section-subtitle">Smartphones Android & Terminaux Termux autorisés</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="card-panel">
+            <div class="table-responsive">
+              <table class="modern-table">
+                <thead>
+                  <tr>
+                    <th>Device ID (Identifiant Matériel Unique)</th>
+                    <th>Modèle Smartphone / Système</th>
+                    <th>Contact Utilisateur</th>
+                    <th>Dernière Synchronisation</th>
+                    <th>Total Licences Liées</th>
+                  </tr>
+                </thead>
+                <tbody id="devicesTableBody">
+                  <tr><td colspan="5" style="text-align: center; color: var(--text-light); padding: 30px;">Chargement des appareils...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- ===================================================================
+             ONGLET 7 : RAPPORTS (GRAPHIQUES & STATISTIQUES FINANCIÈRES)
+             =================================================================== -->
+        <section id="sectionReports" class="panel-section" style="display: none;">
+          <div class="section-header">
+            <div class="section-title-wrap">
+              <span class="title-icon">📊</span>
+              <div>
+                <h1 class="section-title">Rapports & Ventes</h1>
+                <p class="section-subtitle">Analyse détaillée des performances commerciales</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="card-panel">
+            <h3 style="font-size: 16px; font-weight: 700; margin-bottom: 16px;">📈 Synthèse des Gains</h3>
+            <div style="height: 300px; position: relative;">
+              <canvas id="reportsDetailedChart"></canvas>
+            </div>
+          </div>
+        </section>
+
+        <!-- ===================================================================
+             ONGLET 8 : PARAMÈTRES (MVOLA & USDT)
+             =================================================================== -->
+        <section id="sectionSettings" class="panel-section" style="display: none;">
+          <div class="section-header">
+            <div class="section-title-wrap">
+              <span class="title-icon">⚙️</span>
+              <div>
+                <h1 class="section-title">Paramètres Commerciaux</h1>
+                <p class="section-subtitle">Gestion des comptes de paiement et du support</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="card-panel" style="max-width: 720px;">
+            <form onsubmit="handleSaveSettings(event)">
+              <div style="background: #fff7ed; border: 1px solid #fed7aa; padding: 18px; border-radius: var(--radius-md); margin-bottom: 20px;">
+                <h4 style="color: #c2410c; margin-bottom: 12px; font-size: 14px;">🇲🇬 Coordonnées MVola (Madagascar)</h4>
+                <div class="form-group">
+                  <label>Numéro MVola officiel</label>
+                  <input type="text" id="setting_mvola_number" class="form-control" placeholder="034 00 000 00">
+                </div>
+                <div class="form-group">
+                  <label>Nom du titulaire du compte</label>
+                  <input type="text" id="setting_mvola_name" class="form-control" placeholder="Ex: RAKOTO Jean">
+                </div>
+                <div class="form-group">
+                  <label>Montant en MGA pour 7 jours</label>
+                  <input type="text" id="setting_mvola_rate_mga" class="form-control" placeholder="9500">
+                </div>
+              </div>
+
+              <div style="background: #ecfdf5; border: 1px solid #a7f3d0; padding: 18px; border-radius: var(--radius-md); margin-bottom: 20px;">
+                <h4 style="color: #047857; margin-bottom: 12px; font-size: 14px;">🪙 Coordonnées USDT (Crypto)</h4>
+                <div class="form-group">
+                  <label>Adresse Wallet USDT (TRC-20)</label>
+                  <input type="text" id="setting_usdt_address" class="form-control" placeholder="Txxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">
+                </div>
+                <div class="form-group">
+                  <label>Réseau Blockchain</label>
+                  <input type="text" id="setting_usdt_network" class="form-control" value="TRC-20 (Tron)">
+                </div>
+                <div class="form-group">
+                  <label>Prix en USD</label>
+                  <input type="text" id="setting_price_usd" class="form-control" value="2.00">
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label>Contact Support Telegram</label>
+                <input type="text" id="setting_support_telegram" class="form-control" placeholder="@VotreSupport">
+              </div>
+
+              <button type="submit" class="btn-primary-blue" style="width: 100%; justify-content: center; padding: 12px;">
+                Enregistrer les Paramètres
+              </button>
+            </form>
+          </div>
+        </section>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- =========================================================================
+       MODALS (GÉNÉRER LICENCE & AJOUT CLIENT)
+       ========================================================================= -->
+  <div id="generateModal" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">➕ Générer une Licence</h3>
+        <button class="modal-close" onclick="closeModal('generateModal')">✕</button>
+      </div>
+      <form onsubmit="handleGenerateLicense(event)">
+        <div class="form-group">
+          <label>Nombre de clés à créer</label>
+          <input type="number" id="genCount" class="form-control" value="1" min="1" max="50">
+        </div>
+        <div class="form-group">
+          <label>Durée d'accès (en jours)</label>
+          <input type="number" id="genDays" class="form-control" value="7" min="1">
+        </div>
+        <div class="form-group">
+          <label>Client / Identifiant (Optionnel)</label>
+          <input type="text" id="genContact" class="form-control" placeholder="Ex: user123 ou 034...">
+        </div>
+        <div class="form-group">
+          <label>Note Interne (Optionnel)</label>
+          <input type="text" id="genNotes" class="form-control" placeholder="Ex: Achat MVola ou Partenaire">
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn-white-filter" onclick="closeModal('generateModal')">Annuler</button>
+          <button type="submit" class="btn-primary-blue">Générer Clé</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="toastContainer" class="toast-container"></div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

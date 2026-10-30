@@ -40,12 +40,13 @@ Termux dispose désormais de deux lanceurs rapides créés dans votre dossier ut
 ```bash
 ./lancer_bot.sh
 ```
-Ce menu vous donne accès à 5 options claires :
-- `[1]` **Start Tout** : Exécution automatique des tâches multi-plateformes avec déblocage auto des tâches orphelines.
-- `[2]` **Récupérer & Réessayer les Tâches Rejetées** : Analyse en profondeur de toutes vos tâches rejetées, diagnostic intelligent et relance sécurisée en Mode Strict.
+Ce menu vous donne accès à 6 options claires :
+- `[1]` **Start Tout** : Exécution automatique des tâches multi-plateformes avec déblocage auto des tâches orphelines *(Licence requise)*.
+- `[2]` **Récupérer & Réessayer les Tâches Rejetées** : Diagnostic et réexécution sécurisée en Mode Strict *(Licence requise)*.
 - `[3]` **Comptes Liés** : Liste vos profils sociaux enregistrés et validés sur PR.Social.
-- `[4]` **Changer de Cookie / Déconnexion** : Réinitialise la session pour se connecter à un autre compte.
-- `[5]` **Quitter Bot**
+- `[4]` **Changer de Cookie / Déconnexion** : Réinitialise la session pour changer de compte.
+- `[5]` **Gestion Licence & Paiements** : Activation de clé (PR-XXXX-XXXX-XXXX), instructions de paiement (MVola & USDT) et envoi de preuve en 1 clic.
+- `[6]` **Quitter Bot**
 
 #### ⚡ Option B : Récupération Directe 1-Clic des Rejets
 Si vous voulez uniquement récupérer vos tâches rejetées sans passer par le bot de tâches courantes :

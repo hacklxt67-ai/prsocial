@@ -245,6 +245,22 @@ class StrictRetryEngine:
             return False, str(e), screenshot_path
 
 
+# Barème de rémunération standard PR.Social par type d'action
+DEFAULT_ACTION_REWARDS = {
+    "share": 0.005,
+    "repost": 0.005,
+    "retweet": 0.005,
+    "comment_custom": 0.005,
+    "comment": 0.004,
+    "follow": 0.004,
+    "subscribe": 0.004,
+    "sub": 0.004,
+    "join": 0.004,
+    "like": 0.003,
+    "upvote": 0.003,
+    "vote": 0.003,
+}
+
 # ==============================================================================
 # 3. GESTIONNAIRE COMPLET DES TÂCHES REJETÉES
 # ==============================================================================
@@ -255,9 +271,10 @@ class RejectedTasksManager:
         self.strict_engine = StrictRetryEngine(api, browser_bot)
         self.cached_rejected_tasks: List[Dict[str, Any]] = []
 
-    def fetch_all_rejected_tasks(self, max_pages: int = 15, log_cb: Optional[Callable[[str, str], None]] = None) -> List[Dict[str, Any]]:
+    def fetch_all_rejected_tasks(self, max_pages: int = 100, log_cb: Optional[Callable[[str, str], None]] = None) -> List[Dict[str, Any]]:
         """
-        Récupère toutes les tâches rejetées depuis PR.Social et enrichit chacune avec une analyse d'erreur détaillée.
+        Récupère TOUTES les tâches rejetées depuis PR.Social (jusqu'à max_pages, défaut 100)
+        et enrichit chacune avec une analyse d'erreur détaillée et son estimation de gain.
         """
         def _log(msg, lvl="info"):
             if log_cb:
@@ -265,14 +282,14 @@ class RejectedTasksManager:
             else:
                 logger.info(msg)
 
-        _log("Interrogation de l'API PR.Social pour récupérer les tâches rejetées...", "info")
+        _log("Interrogation de l'API PR.Social pour récupérer l'intégralité des tâches rejetées...", "info")
         results = []
         seen_ids = set()
 
         for page in range(1, max_pages + 1):
             st, data = self.api.get_rejected_tasks(page=page, limit=50)
             if st != 200:
-                _log(f"Erreur HTTP {st} lors de la lecture de la page {page} : {data.get('error')}", "warning")
+                _log(f"Arrêt de pagination à la page {page} : {data.get('error', f'HTTP {st}')}", "warning")
                 break
 
             items = data.get("items", [])
@@ -285,14 +302,26 @@ class RejectedTasksManager:
                     continue
                 seen_ids.add(task_id)
 
-                plat = it.get("platform", "unknown")
-                action = it.get("action", "FOLLOW")
-                reward = float(it.get("worker_reward") or it.get("cost_per_task") or it.get("paid") or 0.0)
+                plat = (it.get("platform") or "unknown").lower()
+                action = (it.get("action") or "FOLLOW").upper()
+
+                # Calcul intelligent de la rémunération (la liste 'my/list' ne contient pas de champ worker_reward direct)
+                raw_rew = it.get("worker_reward") or it.get("cost_per_task") or it.get("paid")
+                reward = float(raw_rew) if raw_rew is not None else 0.0
+
+                if reward <= 0.0:
+                    act_key = action.lower()
+                    for k, val in DEFAULT_ACTION_REWARDS.items():
+                        if k in act_key:
+                            reward = val
+                            break
+                    if reward <= 0.0:
+                        reward = 0.003
 
                 # Récupération de la raison exacte (ai_reason)
-                ai_reason = it.get("ai_reason") or it.get("reject_reason") or it.get("reason")
-                if not ai_reason:
-                    # Tenter d'obtenir le détail complet de la tâche
+                ai_reason = it.get("reject_reason") or it.get("ai_reason") or it.get("reason")
+                if not ai_reason and len(results) < 20:
+                    # Ne faire des requêtes détails que si nécessaire pour les premiers éléments
                     det_st, det_data = self.api.get_task_details(task_id)
                     if det_st == 200:
                         completion = det_data.get("completion") or {}
@@ -301,6 +330,9 @@ class RejectedTasksManager:
                             it["target_url"] = det_data.get("task", {}).get("target_url")
                         if not it.get("target_username"):
                             it["target_username"] = det_data.get("task", {}).get("target_username")
+                        task_worker_rew = det_data.get("task", {}).get("worker_reward")
+                        if task_worker_rew:
+                            reward = float(task_worker_rew)
 
                 # Analyse rigoureuse de l'erreur
                 analysis = analyze_rejection_error(ai_reason, plat, action)
@@ -319,6 +351,9 @@ class RejectedTasksManager:
                     "status_retry": "En attente"
                 }
                 results.append(task_obj)
+
+            if page % 5 == 0:
+                _log(f"Lecture page {page} : {len(results)} tâches rejetées indexées...", "info")
 
         _log(f"✓ {len(results)} tâche(s) rejetée(s) récupérée(s) et analysée(s) avec succès.", "success")
         self.cached_rejected_tasks = results

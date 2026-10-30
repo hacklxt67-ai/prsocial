@@ -38,6 +38,11 @@ try:
 except ImportError:
     from termux_bot.rejected_tasks_manager import TermuxRejectedTasksManager
 
+try:
+    from license_client import TermuxLicenseClient
+except ImportError:
+    from termux_bot.license_client import TermuxLicenseClient
+
 # Couleurs ANSI
 RESET = "\033[0m"
 BOLD = "\033[1m"
@@ -143,6 +148,9 @@ class TermuxBotApp:
         self.approved_accounts = {}
         self.failed_tasks = set()
         self.rejected_manager = TermuxRejectedTasksManager(self.api, self.browser)
+        self.license_client = TermuxLicenseClient()
+        self.is_licensed = False
+        self.license_info = {}
 
     def print_logo(self):
         print(f"""{CYAN}{BOLD}
@@ -234,7 +242,7 @@ class TermuxBotApp:
             sys.exit(0)
 
     # ==========================================================================
-    # MENU ÉTAT 2 : CONNECTÉ (TABLEAU DE BORD ÉPURÉ + 4 CHOIX CLAIRS)
+    # MENU ÉTAT 2 : CONNECTÉ (TABLEAU DE BORD + CONTRÔLE DE LICENCE)
     # ==========================================================================
     def show_authenticated_menu(self):
         clear_screen()
@@ -244,24 +252,51 @@ class TermuxBotApp:
         # Date et heure actuelles
         now_str = datetime.now().strftime("%d/%m/%Y - %H:%M:%S")
 
-        # Tableau de bord : Utilisateur, Solde, Date et Heure
+        # Contrôle de la licence Termux
+        is_val, msg, info = self.license_client.check_license()
+        self.is_licensed = is_val
+        self.license_info = info
+
+        if is_val:
+            exp_date = info.get("expires_at", "")
+            d_left = info.get("days_left", 0)
+            h_left = info.get("hours_left", 0)
+            lic_str = f"{GREEN}{BOLD}ACTIVE{RESET} ({d_left}j {h_left}h restants)"
+        elif info.get("status") == "EXPIRED":
+            lic_str = f"{RED}{BOLD}EXPIRÉE{RESET} (Renouvellement 2 USD)"
+        elif info.get("status") == "DEVICE_MISMATCH":
+            lic_str = f"{RED}{BOLD}VERROUILLÉE SUR AUTRE SMARTPHONE{RESET}"
+        else:
+            lic_str = f"{YELLOW}{BOLD}AUCUNE LICENCE ACTIVE{RESET}"
+
+        # Tableau de bord : Utilisateur, Solde, Licence, Date et Heure
         bal_str = f"${self.current_balance:.4f}"
         print(f"\n{BLUE}╭─────────────────────────────────────────────────────────────╮{RESET}")
         print(f"{BLUE}│{RESET}  👤 {WHITE}Utilisateur connecté :{RESET} {GREEN}{BOLD}@{self.current_user:<31}{RESET} {BLUE}│{RESET}")
         print(f"{BLUE}│{RESET}  💰 {WHITE}Solde actuel         :{RESET} {YELLOW}{BOLD}{bal_str:<32}{RESET} {BLUE}│{RESET}")
+        print(f"{BLUE}│{RESET}  🛡️  {WHITE}Licence Bot (7j)     :{RESET} {lic_str:<42} {BLUE}│{RESET}")
         print(f"{BLUE}│{RESET}  🕒 {WHITE}Date et Heure        :{RESET} {CYAN}{now_str:<32}{RESET} {BLUE}│{RESET}")
         print(f"{BLUE}╰─────────────────────────────────────────────────────────────╯{RESET}")
 
-        # Menu à 5 choix clairs
+        # Menu à 6 choix clairs
         print(f"\n{CYAN}┌─────────────────────────────────────────────────────────────┐{RESET}")
         print(f"{CYAN}│{RESET}  {GREEN}{BOLD}[1]{RESET} 🚀 {WHITE}{BOLD}Start Tout (Auto-Bot + Déblocage Auto Tâches){RESET}       {CYAN}│{RESET}")
         print(f"{CYAN}│{RESET}  {MAGENTA}{BOLD}[2]{RESET} 🔄 {WHITE}{BOLD}Récupérer & Réessayer les Tâches Rejetées{RESET}         {CYAN}│{RESET}")
         print(f"{CYAN}│{RESET}  {CYAN}{BOLD}[3]{RESET} 🔗 {WHITE}Comptes Liés{RESET}                                          {CYAN}│{RESET}")
         print(f"{CYAN}│{RESET}  {YELLOW}{BOLD}[4]{RESET} 🔑 {WHITE}Changer de Cookie / Déconnexion{RESET}                       {CYAN}│{RESET}")
-        print(f"{CYAN}│{RESET}  {RED}{BOLD}[5]{RESET} 🚪 {WHITE}Quitter Bot{RESET}                                           {CYAN}│{RESET}")
+        print(f"{CYAN}│{RESET}  {BLUE}{BOLD}[5]{RESET} 🛡️ {WHITE}{BOLD}Gestion Licence & Paiements (MVola & USDT){RESET}      {CYAN}│{RESET}")
+        print(f"{CYAN}│{RESET}  {RED}{BOLD}[6]{RESET} 🚪 {WHITE}Quitter Bot{RESET}                                           {CYAN}│{RESET}")
         print(f"{CYAN}└─────────────────────────────────────────────────────────────┘{RESET}")
 
-        choice = input(f"\n{BOLD}Votre choix [1-5] : {RESET}").strip()
+        choice = input(f"\n{BOLD}Votre choix [1-6] : {RESET}").strip()
+
+        # Protection stricte par licence pour les fonctions [1] et [2]
+        if choice in ["1", "2"] and not self.is_licensed:
+            print(f"\n{RED}{BOLD}⛔ ACCÈS BLOQUÉ : LICENCE HEBDOMADAIRE REQUISE (2 USD / 7 JOURS){RESET}")
+            print(f"{YELLOW}Cette fonctionnalité est réservée aux utilisateurs disposant d'une licence active.{RESET}")
+            print(f"{CYAN}Allez dans le menu [5] pour activer une clé ou payer via MVola / USDT.{RESET}")
+            time.sleep(3.0)
+            return
 
         if choice == "1":
             self.start_all_tasks()
@@ -281,9 +316,108 @@ class TermuxBotApp:
             print(f"{GREEN}✓ Déconnecté. La session précédente a été réinitialisée.{RESET}")
             time.sleep(1.5)
         elif choice == "5":
+            self.show_license_menu()
+        elif choice == "6":
             print(f"\n{CYAN}Arrêt du bot. À bientôt ! 👋{RESET}\n")
             self.browser.stop_driver()
             sys.exit(0)
+
+    # ==========================================================================
+    # GESTION COMMERCIALE & PAIEMENTS (MVOLA & USDT)
+    # ==========================================================================
+    def show_license_menu(self):
+        clear_screen()
+        self.print_logo()
+        print(f"\n{BLUE}{BOLD}🛡️ GESTION DE LA LICENCE & PAIEMENTS (2 USD / 7 JOURS){RESET}")
+        print(f"{DIM}Identifiant Smartphone (HWID) : {self.license_client.device_id}{RESET}\n")
+
+        # Statut actuel
+        is_val, msg, info = self.license_client.check_license()
+        if is_val:
+            print(f"  {GREEN}✓ Statut : ACTIVE{RESET}")
+            print(f"  📅 Expire le : {info.get('expires_at')}")
+            print(f"  ⏳ Temps restant : {info.get('days_left')} jours et {info.get('hours_left')} heures")
+            print(f"  🔑 Clé active : {info.get('license_key')}\n")
+        else:
+            print(f"  {RED}✖ Statut : INACTIVE / EXPIRÉE{RESET}")
+            print(f"  ℹ️  Détail : {msg}\n")
+
+        print(f"{CYAN}┌─────────────────────────────────────────────────────────────┐{RESET}")
+        print(f"{CYAN}│{RESET}  {GREEN}[1]{RESET} 🔑 Activer / Prolonger avec une Clé (PR-XXXX-XXXX-XXXX)   {CYAN}│{RESET}")
+        print(f"{CYAN}│{RESET}  {YELLOW}[2]{RESET} 💳 Afficher les Coordonnées de Paiement (MVola & USDT)     {CYAN}│{RESET}")
+        print(f"{CYAN}│{RESET}  {MAGENTA}[3]{RESET} 📤 Envoyer une Preuve de Paiement (Validation en 2 min)    {CYAN}│{RESET}")
+        print(f"{CYAN}│{RESET}  {RED}[4]{RESET} ↩️  Retour au Menu Principal                              {CYAN}│{RESET}")
+        print(f"{CYAN}└─────────────────────────────────────────────────────────────┘{RESET}")
+
+        opt = input(f"\n{BOLD}Votre choix [1-4] : {RESET}").strip()
+
+        if opt == "1":
+            print(f"\n{CYAN}Entrez votre clé de licence reçue :{RESET}")
+            key = input("👉 ").strip()
+            if not key:
+                return
+            contact = input(f"{DIM}Votre Contact Telegram ou Téléphone (Optionnel) : {RESET}").strip()
+            print(f"{YELLOW}Activation auprès du serveur en cours...{RESET}")
+            ok, act_msg, act_info = self.license_client.activate_license(key, contact)
+            if ok:
+                print(f"\n{GREEN}{BOLD}🎉 Félicitations ! {act_msg}{RESET}")
+                if act_info.get("expires_at"):
+                    print(f"{GREEN}Nouvelle date d'expiration : {act_info['expires_at']}{RESET}")
+            else:
+                print(f"\n{RED}✖ Échec d'activation : {act_msg}{RESET}")
+            time.sleep(2.5)
+
+        elif opt == "2":
+            clear_screen()
+            self.print_logo()
+            print(f"\n{YELLOW}{BOLD}💳 INSTRUCTIONS DE PAIEMENT POUR LA LICENCE (2 USD / 7 JOURS){RESET}\n")
+            info_pay = self.license_client.get_payment_instructions()
+            if not info_pay:
+                print(f"{RED}Impossible de joindre le serveur. Contactez le support.{RESET}")
+            else:
+                mv = info_pay.get("mvola", {})
+                us = info_pay.get("usdt", {})
+                print(f"{YELLOW}{BOLD}1. PAIEMENT MVOLA (MADAGASCAR) :{RESET}")
+                print(f"   • Numéro Destinataire : {GREEN}{BOLD}{mv.get('number')}{RESET}")
+                print(f"   • Nom du Titulaire   : {WHITE}{BOLD}{mv.get('name')}{RESET}")
+                print(f"   • Montant à envoyer  : {YELLOW}{BOLD}{mv.get('amount_to_pay')}{RESET}")
+                print(f"   {DIM}(Gardez bien la référence de transaction SMS reçue){RESET}\n")
+
+                print(f"{GREEN}{BOLD}2. PAIEMENT USDT CRYPTO (TRC-20) :{RESET}")
+                print(f"   • Réseau              : {WHITE}{us.get('network')}{RESET}")
+                print(f"   • Adresse Wallet     : {CYAN}{BOLD}{us.get('address')}{RESET}")
+                print(f"   • Montant exact       : {YELLOW}{BOLD}{us.get('amount_to_pay')}{RESET}\n")
+
+                print(f"💬 Support Telegram : {info_pay.get('support')}")
+            input(f"\n{DIM}Appuyez sur Entrée pour continuer...{RESET}")
+
+        elif opt == "3":
+            print(f"\n{CYAN}Choisissez le moyen de paiement utilisé :{RESET}")
+            print(" [1] MVola")
+            print(" [2] USDT")
+            p_choice = input("👉 ").strip()
+            method = "MVOLA" if p_choice == "1" else "USDT"
+
+            print(f"\n{WHITE}Entrez la référence de transaction :{RESET}")
+            print(f"{DIM}(Ex: Réf SMS MV2410... ou Hash de transaction USDT){RESET}")
+            ref = input("👉 ").strip()
+
+            print(f"\n{WHITE}Entrez votre numéro de téléphone ou wallet expéditeur :{RESET}")
+            contact = input("👉 ").strip()
+
+            if not ref or not contact:
+                print(f"{RED}Informations incomplètes. Annulation.{RESET}")
+                time.sleep(2)
+                return
+
+            print(f"{YELLOW}Transmission de la preuve à l'administrateur...{RESET}")
+            ok_sub, msg_sub = self.license_client.submit_payment_proof(method, ref, contact)
+            if ok_sub:
+                print(f"\n{GREEN}{BOLD}✓ Preuve envoyée avec succès !{RESET}")
+                print(f"{GREEN}L'administrateur valide votre accès dans les prochaines minutes.{RESET}")
+            else:
+                print(f"\n{RED}✖ {msg_sub}{RESET}")
+            time.sleep(3.0)
 
     # ==========================================================================
     # OPTION 1 : START TOUT (AVEC DÉTECTION ET DÉBLOCAGE ORPHELIN)
@@ -551,13 +685,129 @@ class TermuxBotApp:
 
         input(f"\n{DIM}Appuyez sur Entrée pour revenir au menu...{RESET}")
 
+    # ==========================================================================
+    # MENU D'ABONNEMENT PRÉALABLE (AVANT TOUT ACCÈS AU BOT ET AUX COOKIES)
+    # ==========================================================================
+    def show_subscription_gate_menu(self):
+        """
+        Affiche le menu d'abonnement élégant avant tout accès au bot.
+        Présente le tarif (2 USD / 7 jours), les moyens de paiement (MVola & USDT),
+        l'identifiant unique HWID, et propose :
+        [1] 💬 Contacter l'Administrateur
+        [2] 🚪 Exit
+        Une fois le contact pris, l'option 1 devient :
+        [1] 🔑 Entrer la Clé de Licence reçue (PR-XXXX-XXXX-XXXX)
+        """
+        step = "CONTACT"
+
+        while not self.is_licensed:
+            clear_screen()
+            self.print_logo()
+
+            # Récupérer les coordonnées officielles (depuis l'API ou fallback)
+            pay_info = self.license_client.get_payment_instructions()
+            mv = pay_info.get("mvola", {})
+            us = pay_info.get("usdt", {})
+            support = pay_info.get("support", "@PRSocialSupport")
+            hwid = self.license_client.device_id
+
+            # En-tête PRO et élégant
+            print(f"\n{CYAN}{BOLD}╭─────────────────────────────────────────────────────────────╮{RESET}")
+            print(f"{CYAN}│{RESET}  💎 {WHITE}{BOLD}ABONNEMENT BOT TERMUX REQUIS (ACCÈS COMPLET 7 JOURS){RESET}   {CYAN}│{RESET}")
+            print(f"{CYAN}│{RESET}                                                             {CYAN}│{RESET}")
+            print(f"{CYAN}│{RESET}  💰 {WHITE}Tarif officiel       :{RESET} {GREEN}{BOLD}2 USD / 7 JOURS{RESET} {DIM}(Renouvelable){RESET}  {CYAN}│{RESET}")
+            print(f"{CYAN}│{RESET}  📱 {WHITE}Identifiant Smartphone:{RESET} {MAGENTA}{BOLD}{hwid:<30}{RESET} {CYAN}│{RESET}")
+            print(f"{CYAN}╰─────────────────────────────────────────────────────────────╯{RESET}")
+
+            # Bloc Moyens de paiement avec couleurs professionnelles
+            print(f"\n{YELLOW}{BOLD}🇲🇬 MOYEN DE PAIEMENT 1 : MVOLA (MADAGASCAR){RESET}")
+            print(f"   {WHITE}• Numéro Destinataire :{RESET} {GREEN}{BOLD}{mv.get('number', '034 00 000 00')}{RESET}")
+            print(f"   {WHITE}• Nom du Titulaire    :{RESET} {WHITE}{BOLD}{mv.get('name', 'PR.Social Support')}{RESET}")
+            print(f"   {WHITE}• Montant à envoyer   :{RESET} {YELLOW}{BOLD}{mv.get('amount_to_pay', '9 500 MGA')}{RESET}")
+
+            print(f"\n{GREEN}{BOLD}🪙 MOYEN DE PAIEMENT 2 : USDT CRYPTO (TRC-20){RESET}")
+            print(f"   {WHITE}• Réseau Blockchain   :{RESET} {WHITE}{BOLD}{us.get('network', 'TRC-20 (Tron)')}{RESET}")
+            print(f"   {WHITE}• Adresse Wallet USDT :{RESET} {CYAN}{BOLD}{us.get('address', 'Txxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx')}{RESET}")
+            print(f"   {WHITE}• Montant exact       :{RESET} {GREEN}{BOLD}{us.get('amount_to_pay', '2.00 USDT')}{RESET}")
+
+            print(f"\n{DIM}─────────────────────────────────────────────────────────────{RESET}")
+
+            if step == "CONTACT":
+                print(f"{CYAN}┌─────────────────────────────────────────────────────────────┐{RESET}")
+                print(f"{CYAN}│{RESET}  {GREEN}{BOLD}[1]{RESET} 💬 {WHITE}{BOLD}Contacter l'Administrateur pour Acheter{RESET}              {CYAN}│{RESET}")
+                print(f"{CYAN}│{RESET}  {RED}{BOLD}[2]{RESET} 🚪 {WHITE}Quitter le Bot (Exit){RESET}                                  {CYAN}│{RESET}")
+                print(f"{CYAN}└─────────────────────────────────────────────────────────────┘{RESET}")
+
+                choice = input(f"\n{BOLD}Votre choix [1-2] : {RESET}").strip()
+
+                if choice == "1":
+                    clear_screen()
+                    self.print_logo()
+                    print(f"\n{CYAN}{BOLD}💬 CONTACTEZ L'ADMINISTRATEUR POUR VALIDER VOTRE ABONNEMENT :{RESET}\n")
+                    print(f"  {WHITE}1. Envoyez votre paiement de {YELLOW}{BOLD}2 USD{RESET} ({YELLOW}{mv.get('amount_to_pay', '9 500 MGA')}{RESET} ou {GREEN}{us.get('amount_to_pay', '2.00 USDT')}{RESET}).")
+                    print(f"  {WHITE}2. Contactez l'administrateur et transmettez-lui :{RESET}")
+                    print(f"     • Votre preuve de paiement (Capture ou référence SMS / TxID)")
+                    print(f"     • Votre Identifiant Smartphone (HWID) : {MAGENTA}{BOLD}{hwid}{RESET}")
+                    print(f"\n  {GREEN}👉 Contact Support Officiel :{RESET} {BOLD}{support}{RESET}\n")
+                    print(f"{YELLOW}Dès réception, l'administrateur vous remettra votre Clé de Licence.{RESET}")
+                    print(f"{DIM}─────────────────────────────────────────────────────────────{RESET}")
+                    input(f"\n{CYAN}Appuyez sur Entrée pour entrer votre clé reçue...{RESET}")
+                    step = "ENTER_KEY"
+
+                elif choice == "2":
+                    print(f"\n{CYAN}Au revoir ! 👋{RESET}\n")
+                    sys.exit(0)
+
+            elif step == "ENTER_KEY":
+                print(f"{CYAN}┌─────────────────────────────────────────────────────────────┐{RESET}")
+                print(f"{CYAN}│{RESET}  {GREEN}{BOLD}[1]{RESET} 🔑 {WHITE}{BOLD}Entrer la Clé de Licence reçue (PR-XXXX-XXXX-XXXX){RESET}   {CYAN}│{RESET}")
+                print(f"{CYAN}│{RESET}  {RED}{BOLD}[2]{RESET} 🚪 {WHITE}Quitter le Bot (Exit){RESET}                                  {CYAN}│{RESET}")
+                print(f"{CYAN}└─────────────────────────────────────────────────────────────┘{RESET}")
+
+                choice = input(f"\n{BOLD}Votre choix [1-2] : {RESET}").strip()
+
+                if choice == "1":
+                    print(f"\n{CYAN}🔑 Collez la Clé de Licence remise par l'administrateur :{RESET}")
+                    key = input("👉 ").strip()
+                    if not key:
+                        continue
+
+                    print(f"\n{YELLOW}⏳ Vérification de votre abonnement auprès du serveur...{RESET}")
+                    ok, act_msg, act_info = self.license_client.activate_license(key)
+                    if ok:
+                        self.is_licensed = True
+                        self.license_info = act_info
+                        exp_str = act_info.get("expires_at", "7 jours")
+                        print(f"\n{GREEN}{BOLD}🎉 FÉLICITATIONS ! ABONNEMENT CONFIRMÉ ET VALIDÉ !{RESET}")
+                        print(f"{GREEN}✓ Accès accordé pour 7 jours jusqu'au : {BOLD}{exp_str}{RESET}")
+                        print(f"{CYAN}Chargement de votre session PR.Social dans 2 secondes...{RESET}")
+                        time.sleep(2.0)
+                        return
+                    else:
+                        print(f"\n{RED}{BOLD}✖ ERREUR D'ACTIVATION :{RESET} {RED}{act_msg}{RESET}")
+                        print(f"{YELLOW}Vérifiez la clé saisie ou contactez l'administrateur.{RESET}")
+                        time.sleep(3.0)
+
+                elif choice == "2":
+                    print(f"\n{CYAN}Au revoir ! 👋{RESET}\n")
+                    sys.exit(0)
+
     def run(self):
         clear_screen()
         self.print_logo()
 
-        # Vérification au démarrage : si une session est déjà enregistrée
+        # ÉTAPE 1 : CONTRÔLE D'ABONNEMENT STRICT AVANT TOUT ACCÈS AU BOT
+        is_val, msg, info = self.license_client.check_license()
+        self.is_licensed = is_val
+        self.license_info = info
+
+        if not self.is_licensed:
+            # Affiche le menu d'abonnement élégant en priorité
+            self.show_subscription_gate_menu()
+
+        # ÉTAPE 2 : UNE FOIS L'ABONNEMENT CONFIRMÉ -> GESTION DU COOKIE PR.SOCIAL
         if self.token:
-            print(f"\n{CYAN}🔄 Session enregistrée trouvée. Connexion automatique en cours...{RESET}")
+            print(f"\n{CYAN}🔄 Session PR.Social trouvée. Connexion automatique en cours...{RESET}")
             if self.verify_login():
                 print(f"{GREEN}{BOLD}✓ Connexion automatique réussie !{RESET} {GREEN}Bienvenue @{self.current_user} (Solde: ${self.current_balance:.4f}){RESET}")
                 time.sleep(1.2)
@@ -568,11 +818,18 @@ class TermuxBotApp:
                 self.cf = ""
 
         while True:
-            # Si pas de session valide -> Menu ÉTAT 1 (Demande Login Cookie)
+            # Sécurité anti-expiration continue
+            is_val, _, info = self.license_client.check_license()
+            if not is_val:
+                self.is_licensed = False
+                self.show_subscription_gate_menu()
+                continue
+
+            # Si pas de session valide -> Menu Demande Login Cookie PR.Social
             if not self.token or not self.verify_login():
                 self.show_unauthenticated_menu()
             else:
-                # Session valide -> Menu ÉTAT 2 (Connecté)
+                # Session valide -> Menu connecté
                 self.show_authenticated_menu()
 
 def main():

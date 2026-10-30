@@ -34,11 +34,13 @@ try:
     from browser_termux import BrowserTermux
     from rejected_tasks_manager import TermuxRejectedTasksManager
     from termux_action_engine import load_saved_session, save_session, parse_cookie_input
+    from license_client import TermuxLicenseClient
 except ImportError:
     from termux_bot.pr_api import PrSocialAPI
     from termux_bot.browser_termux import BrowserTermux
     from termux_bot.rejected_tasks_manager import TermuxRejectedTasksManager
     from termux_bot.termux_action_engine import load_saved_session, save_session, parse_cookie_input
+    from termux_bot.license_client import TermuxLicenseClient
 
 # Couleurs ANSI
 RESET = "\033[0m"
@@ -104,6 +106,16 @@ def main():
                 if plat not in approved_accounts:
                     approved_accounts[plat] = a
 
+    # Vérification stricte de la licence
+    license_client = TermuxLicenseClient()
+    is_licensed, lic_msg, lic_info = license_client.check_license()
+    if not is_licensed:
+        print(f"\n{RED}{BOLD}⛔ ACCÈS BLOQUÉ : LICENCE ACTIVE REQUISE (2 USD / 7 JOURS){RESET}")
+        print(f"{YELLOW}Statut : {lic_msg}{RESET}")
+        print(f"{CYAN}Veuillez activer votre licence via ./lancer_bot.sh (Option [5]) avant de relancer les rejets.{RESET}\n")
+        return
+
+    print(f"🛡️  Licence : {GREEN}ACTIVE ({lic_info.get('days_left', 0)}j {lic_info.get('hours_left', 0)}h restants){RESET}")
     print(f"{CYAN}🔍 Récupération des tâches rejetées depuis PR.Social...{RESET}")
     browser = BrowserTermux(headless=True, user_agent=api.user_agent)
     manager = TermuxRejectedTasksManager(api, browser)

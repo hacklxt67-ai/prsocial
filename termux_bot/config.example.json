@@ -2,5 +2,6 @@
   "token": "",
   "cf_clearance": "",
   "delay_min": 5,
-  "delay_max": 10
+  "delay_max": 10,
+  "license_server_url": "http://127.0.0.1:8000"
 }

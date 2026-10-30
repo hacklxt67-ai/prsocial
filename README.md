@@ -110,3 +110,25 @@ Ce script vérifie Python, installe les bibliothèques (`selenium`, `customtkint
 - **Déblocage Automatique des Tâches Orphelines** : Annulation proactive des tâches bloquantes pour ne jamais geler le bot.
 - **Interleaving Intelligent** : Alternance dynamique des actions (Follow, Like, Comment) et radar de présence de tâches sur le serveur.
 - **Multi-Réseaux Pris en Charge** : Threads, Reddit, Pinterest, SoundCloud, Bluesky, TikTok, Instagram, YouTube, Facebook, LinkedIn, Twitter, Telegram, Spotify, Snapchat, Discord, GitHub.
+
+---
+
+## 🌐 4. Serveur de Licences & Administration Web (SaaS)
+
+Pour commercialiser l'accès au bot (2 USD / 7 jours via MVola & USDT) :
+
+### 🚀 Lancement Rapide du Serveur
+Double-cliquez sur :
+```text
+LANCER_SERVEUR_LICENCE.bat
+```
+- **Dashboard Web Administrateur** : `http://127.0.0.1:8000`
+- **Documentation API Interactive (Swagger)** : `http://127.0.0.1:8000/docs`
+- **Identifiants Admin par défaut** : `admin` / `Admin1234!`
+
+### ✨ Fonctionnalités Administrateur
+- **Génération de Clés 1-Clic** : Créez des clés de licence hebdomadaires (format `PR-XXXX-XXXX-XXXX`).
+- **Verrouillage Matériel (Device ID)** : Chaque licence est automatiquement liée au smartphone de l'acheteur.
+- **Validation des Paiements MVola & USDT** : Validez les références de transaction en un clic pour générer ou prolonger l'accès du client.
+- **Prolongation Intelligente (+7 jours)** : Ajout automatique de 7 jours à la date d'expiration pour les renouvellements anticipés.
+

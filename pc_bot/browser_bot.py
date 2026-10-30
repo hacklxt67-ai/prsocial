@@ -208,9 +208,9 @@ class BrowserBot:
             _log(f"Erreur lors du lancement de Chrome : {str(e)}", "error")
             return None
 
-    def execute_task_action(self, platform: str, action: str, target_url: str, task_id: int, comment_text: Optional[str] = None) -> Tuple[bool, str, str]:
+    def execute_task_action(self, platform: str, action: str, target_url: str, task_id: int, comment_text: Optional[str] = None, wait_seconds: Optional[int] = None, progress_cb = None) -> Tuple[bool, str, str]:
         """
-        Ouvre l'URL, simule l'action (Suivre / Like / Commentaire), attend la mise à jour visuelle,
+        Ouvre l'URL, simule l'action (Suivre / Like / Commentaire / Surf), attend la mise à jour visuelle,
         et enregistre une capture d'écran pour la preuve.
         Retourne (succès, message, chemin_screenshot).
         """
@@ -261,6 +261,8 @@ class BrowserBot:
                 action_done = self._handle_soundcloud(driver, action_lower, comment_text)
             elif "bluesky" in platform_lower or "bsky" in platform_lower or "bsky.app" in target_url:
                 action_done = self._handle_bluesky(driver, action_lower, comment_text)
+            elif any(k in platform_lower for k in ["surf", "web", "website", "traffic"]) or any(k in action_lower for k in ["surf", "visit", "view"]):
+                action_done = self._handle_surf_website(driver, required_seconds=wait_seconds or 20, progress_cb=progress_cb)
             else:
                 action_done = True # Navigation simple
 
@@ -276,6 +278,77 @@ class BrowserBot:
             except Exception:
                 pass
             return False, f"Erreur navigateur: {str(e)}", screenshot_path
+
+    def _handle_surf_website(self, driver: webdriver.Chrome, required_seconds: int = 20, progress_cb = None) -> bool:
+        """
+        Simule une visite humaine réaliste sur un site web externe (Surf Website) :
+        1. Neutralise la détection de masquage de page (Page Visibility API / document.hidden).
+        2. Ferme automatiquement les modales / bannières de cookies.
+        3. Fait défiler la page (scroll) de façon progressive et naturelle.
+        4. Maintient la présence active avec affichage du chrono en direct.
+        """
+        try:
+            # 1. Empêcher la mise en pause du timer (visibilité forcée)
+            driver.execute_script("""
+                try {
+                    Object.defineProperty(document, 'hidden', { value: false, writable: false });
+                    Object.defineProperty(document, 'visibilityState', { value: 'visible', writable: false });
+                    window.dispatchEvent(new Event('focus'));
+                } catch(e) {}
+            """)
+            
+            # 2. Fermeture automatique des bannières cookies
+            try:
+                driver.execute_script("""
+                    var cookieKeywords = ['accept', 'accepter', 'agree', 'allow all', 'autoriser', 'consent', 'ok', 'got it'];
+                    var btns = document.querySelectorAll('button, a, div[role="button"]');
+                    for (var b of btns) {
+                        var t = (b.textContent || '').trim().toLowerCase();
+                        if (cookieKeywords.some(function(k) { return t === k || (t.length < 25 && t.indexOf(k) !== -1); })) {
+                            b.click();
+                            break;
+                        }
+                    }
+                """)
+            except Exception:
+                pass
+
+            # 3. Défilement progressif humain avec chrono en direct
+            start_t = time.time()
+            scroll_pos = 0
+            last_scroll = 0
+            while True:
+                elapsed = int(time.time() - start_t)
+                if elapsed >= required_seconds:
+                    break
+
+                if progress_cb:
+                    state = "Défilement actif" if (elapsed // 3) % 2 == 0 else "Lecture active"
+                    progress_cb(elapsed, required_seconds, state)
+
+                # Scroll toutes les 2.5 secondes
+                if time.time() - last_scroll >= 2.5:
+                    scroll_pos += random.randint(200, 450)
+                    try:
+                        driver.execute_script(f"window.scrollTo({{ top: {scroll_pos}, behavior: 'smooth' }});")
+                    except Exception:
+                        pass
+                    last_scroll = time.time()
+                    if scroll_pos > 2200:
+                        scroll_pos = random.randint(150, 400)
+                        try:
+                            driver.execute_script(f"window.scrollTo({{ top: {scroll_pos}, behavior: 'smooth' }});")
+                        except Exception:
+                            pass
+
+                time.sleep(0.5)
+
+            if progress_cb:
+                progress_cb(required_seconds, required_seconds, "Visite complétée")
+
+            return True
+        except Exception:
+            return True
 
     def _handle_tiktok(self, driver: webdriver.Chrome, action: str, comment_text: Optional[str] = None) -> bool:
         # 1. Fermer les modales et popups intrusives

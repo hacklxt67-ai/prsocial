@@ -44,3 +44,5 @@ chrome_profile/
 chromium_profile/
 scratch/
 *.log
+*.db
+.env
