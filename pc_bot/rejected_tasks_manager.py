@@ -11,8 +11,16 @@ try:
 except Exception:
     pass
 
-from .pr_api import PrSocialAPI
-from .browser_bot import BrowserBot, ensure_unique_screenshot
+try:
+    from .pr_api import PrSocialAPI
+    from .browser_bot import BrowserBot, ensure_unique_screenshot
+except (ImportError, ValueError):
+    try:
+        from pc_bot.pr_api import PrSocialAPI
+        from pc_bot.browser_bot import BrowserBot, ensure_unique_screenshot
+    except (ImportError, ValueError):
+        from pr_api import PrSocialAPI
+        from browser_bot import BrowserBot, ensure_unique_screenshot
 
 logger = logging.getLogger("RejectedTasksManager")
 

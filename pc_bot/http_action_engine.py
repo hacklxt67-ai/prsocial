@@ -1154,6 +1154,8 @@ def main():
     candidates = [
         os.path.join(os.path.dirname(curr_dir), "config.json"),
         os.path.join(curr_dir, "config.json"),
+        os.path.join(os.getcwd(), "config.json"),
+        os.path.join(os.path.expanduser("~"), "social_bot_data", "config.json"),
         r"D:\social_pc_bot\config.json"
     ]
     config_file = candidates[0]
@@ -1363,7 +1365,7 @@ def main():
                 cfg["token"] = token
                 try:
                     for cf_path in set([config_file, candidates[0]]):
-                        os.makedirs(os.path.dirname(cf_path), exist_ok=True)
+                        if os.path.dirname(cf_path): os.makedirs(os.path.dirname(cf_path), exist_ok=True)
                         with open(cf_path, "w", encoding="utf-8") as f:
                             json.dump(cfg, f, indent=2)
                 except Exception:
