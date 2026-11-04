@@ -15,9 +15,19 @@ import hashlib
 import sqlite3
 from datetime import datetime, timedelta
 
+# Forcer UTF-8 sous Windows CMD
+try:
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    if hasattr(sys.stderr, "reconfigure"):
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
+
 # Couleurs ANSI
 RESET = "\033[0m"
 BOLD = "\033[1m"
+DIM = "\033[2m"
 GREEN = "\033[92m"
 YELLOW = "\033[93m"
 CYAN = "\033[96m"
