@@ -17,6 +17,8 @@ def build_single_file_obfuscated(output_path: str):
         ("pr_api", os.path.join(termux_dir, "pr_api.py")),
         ("license_client", os.path.join(termux_dir, "license_client.py")),
         ("browser_termux", os.path.join(termux_dir, "browser_termux.py")),
+        ("profile_sentinel", os.path.join(termux_dir, "profile_sentinel.py")),
+        ("profile_auto_completer", os.path.join(termux_dir, "profile_auto_completer.py")),
         ("rejected_tasks_manager", os.path.join(termux_dir, "rejected_tasks_manager.py")),
     ]
 

@@ -121,16 +121,28 @@ class TerminalApp:
         print(LOGO)
         
         ok, uname, bal = self.get_user_status()
+        warn_badge = ""
         if ok:
             status_badge = f"{C.GREEN}{C.BOLD}● CONNECTÉ : @{uname}{C.RESET}"
             balance_badge = f"{C.YELLOW}{C.BOLD}💰 Solde : ${bal:.4f}{C.RESET}"
+            w_st, w_data = self.api.get_warnings()
+            w_cnt = int(w_data.get("count", 0)) if w_st == 200 else 0
+            if w_cnt >= 4:
+                warn_badge = f"{C.RED}{C.BOLD}🚨 4/4 AVERTISSEMENTS (PAUSE RETRAITS){C.RESET}"
+            elif w_cnt > 0:
+                warn_badge = f"{C.RED if w_cnt >= 3 else C.YELLOW}{C.BOLD}🛡️ AVERTISSEMENTS : {w_cnt}/4 (BOUCLIER ACTIF){C.RESET}"
+            else:
+                warn_badge = f"{C.GREEN}🛡️ Compte Sain (0/4){C.RESET}"
         else:
             status_badge = f"{C.RED}{C.BOLD}● NON CONNECTÉ (Token invalide ou manquant){C.RESET}"
             balance_badge = f"{C.GRAY}Solde : $0.000{C.RESET}"
 
         mode_badge = f"{C.MAGENTA}Mode : {'Invisible (Headless)' if self.headless else 'Visible (Écran)'}{C.RESET}"
         
-        print(f"  {status_badge}  |  {balance_badge}  |  {mode_badge}")
+        line_info = f"  {status_badge}  |  {balance_badge}  |  {mode_badge}"
+        if warn_badge:
+            line_info += f"  |  {warn_badge}"
+        print(line_info)
         print(f"{C.GRAY}  ─────────────────────────────────────────────────────────────{C.RESET}\n")
 
     def print_menu(self):

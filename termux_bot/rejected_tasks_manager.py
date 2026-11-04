@@ -254,12 +254,8 @@ class TermuxRejectedTasksManager:
 
         is_validated = False
 
-        # 3. Vérification API Check si active
-        if api_check == 1:
-            c_st, c_res = self.api.api_check_task(task_id)
-            if c_st == 200 and c_res.get("found") is True and c_res.get("approved") is True:
-                is_validated = True
-                print(f"  {GREEN}✓ Validé instantanément par API Check !{RESET}")
+        # 3. Bypass complet de l'API Check (sécurité anti-dissociation)
+        # Soumission directe et propre de la capture d'écran
 
         # 4. Soumission de la preuve certifiée
         if not is_validated:

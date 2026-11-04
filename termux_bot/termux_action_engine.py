@@ -285,10 +285,11 @@ class TermuxBotApp:
         print(f"{CYAN}│{RESET}  {CYAN}{BOLD}[3]{RESET} 🔗 {WHITE}Comptes Liés{RESET}                                          {CYAN}│{RESET}")
         print(f"{CYAN}│{RESET}  {YELLOW}{BOLD}[4]{RESET} 🔑 {WHITE}Changer de Cookie / Déconnexion{RESET}                       {CYAN}│{RESET}")
         print(f"{CYAN}│{RESET}  {BLUE}{BOLD}[5]{RESET} 🛡️ {WHITE}{BOLD}Gestion Licence & Paiements (MVola & USDT){RESET}      {CYAN}│{RESET}")
-        print(f"{CYAN}│{RESET}  {RED}{BOLD}[6]{RESET} 🚪 {WHITE}Quitter Bot{RESET}                                           {CYAN}│{RESET}")
+        print(f"{CYAN}│{RESET}  {MAGENTA}{BOLD}[6]{RESET} 🛠️ {WHITE}{BOLD}Auto-Complétion & Réparation Profils (Anti-Ban){RESET}{CYAN}│{RESET}")
+        print(f"{CYAN}│{RESET}  {RED}{BOLD}[7]{RESET} 🚪 {WHITE}Quitter Bot{RESET}                                           {CYAN}│{RESET}")
         print(f"{CYAN}└─────────────────────────────────────────────────────────────┘{RESET}")
 
-        choice = input(f"\n{BOLD}Votre choix [1-6] : {RESET}").strip()
+        choice = input(f"\n{BOLD}Votre choix [1-7] : {RESET}").strip()
 
         # Protection stricte par licence pour les fonctions [1] et [2]
         if choice in ["1", "2"] and not self.is_licensed:
@@ -318,9 +319,53 @@ class TermuxBotApp:
         elif choice == "5":
             self.show_license_menu()
         elif choice == "6":
+            self.auto_complete_profiles()
+        elif choice == "7":
             print(f"\n{CYAN}Arrêt du bot. À bientôt ! 👋{RESET}\n")
             self.browser.stop_driver()
             sys.exit(0)
+
+    def auto_complete_profiles(self):
+        clear_screen()
+        self.print_logo()
+        print(f"\n{MAGENTA}{BOLD}🛠️ AUTO-COMPLÉTION & CONFORMITÉ DES PROFILS (ANTI-BAN){RESET}\n")
+        print(f"{CYAN}Analyse en temps réel de vos comptes PR.Social...{RESET}\n")
+
+        try:
+            from profile_sentinel import ProfileComplianceSentinel
+            from profile_auto_completer import ProfileAutoCompleter
+
+            completer = ProfileAutoCompleter()
+            st_s, s_data = self.api.get_socials()
+            accounts = s_data.get("accounts", []) if st_s == 200 else []
+
+            if not accounts:
+                print(f"{YELLOW}Aucun compte lié trouvé sur PR.Social.{RESET}")
+            else:
+                for acc in accounts:
+                    plat = acc.get("platform", "").lower()
+                    user = acc.get("username", "")
+                    url = acc.get("profile_url", "")
+                    status = acc.get("status", "")
+
+                    report = ProfileComplianceSentinel.audit_account(plat, user, url)
+                    badge = f"{GREEN}✓ CONFORME{RESET}" if report["is_safe"] else f"{RED}⚠ CRITÈRES MANQUANTS{RESET}"
+                    print(f"  [{CYAN}{plat.upper()}{RESET}] @{user} ({status}) -> {badge}")
+
+                    plan = completer.auto_fix_plan(acc, report)
+                    if plan:
+                        print(f"    {YELLOW}Actions d'auto-complétion générées :{RESET}")
+                        for action in plan:
+                            print(f"      ↳ {WHITE}{action}{RESET}")
+                    else:
+                        print(f"      {GREEN}↳ Profil 100% prêt, aucun critère manquant.{RESET}")
+                    print()
+
+                print(f"{GREEN}{BOLD}✓ Avatars et packs de publications prêts dans 'generated_profiles/' !{RESET}")
+        except Exception as e:
+            print(f"{RED}Erreur lors de l'auto-complétion : {e}{RESET}")
+
+        input(f"\nAppuyez sur {BOLD}Entrée{RESET} pour revenir au menu...")
 
     # ==========================================================================
     # GESTION COMMERCIALE & PAIEMENTS (MVOLA & USDT)
@@ -427,14 +472,55 @@ class TermuxBotApp:
         self.print_logo()
         print(f"\n{GREEN}{BOLD}🚀 DÉMARRAGE DU BOT AUTOMATIQUE (CTRL+C POUR REVENIR AU MENU){RESET}\n")
         
+        # 0. Bouclier de Sécurité : Vérification stricte des avertissements
+        w_st, w_data = self.api.get_warnings()
+        w_count = int(w_data.get("count") or 0) if (w_st == 200 and isinstance(w_data, dict)) else 0
+        active_warnings = w_data.get("warnings", []) if isinstance(w_data, dict) else []
+        quarantined_platforms = set()
+
+        if w_count >= 4:
+            print(f"\n{RED}{BOLD}🚨 ARRÊT D'URGENCE : Compte à {w_count}/4 avertissements ! Retraits protégés.{RESET}\n")
+            input("Appuyez sur Entrée pour revenir au menu...")
+            return
+        elif w_count > 0:
+            print(f"\n{YELLOW}{BOLD}🛡️ BOUCLIER ANTI-AVERTISSEMENT ACTIF : {w_count}/4 avertissement(s).{RESET}")
+            for w in active_warnings:
+                wp = str(w.get("platform", "")).lower()
+                if wp:
+                    quarantined_platforms.add(wp)
+            for rp in ["tiktok", "instagram", "linkedin"]:
+                quarantined_platforms.add(rp)
+            q_list = ", ".join([p.upper() for p in sorted(quarantined_platforms)])
+            print(f"  {CYAN}↳ Quarantaine préventive : {q_list}{RESET}")
+            print(f"  {DIM}(Ces réseaux sont écartés : 0 tâche = 0 risque du 4ème avertissement fatal){RESET}\n")
+
         # 1. Détection & déblocage automatique immédiat
         print(f"{YELLOW}🔍 Détection automatique des tâches orphelines...{RESET}")
         unblocked = self.auto_unblock_tasks()
         if unblocked == 0:
             print(f"{GREEN}✓ Aucune tâche orpheline bloquante. Prêt pour l'automatisation.{RESET}")
 
+        # 1.5. Sentinelle de Qualité : Détection et Auto-Quarantaine avant PR.Social
+        try:
+            from profile_sentinel import ProfileComplianceSentinel
+            sentinel_bad, sentinel_rep = ProfileComplianceSentinel.audit_all(list(self.approved_accounts.values()))
+            for bp in sentinel_bad:
+                quarantined_platforms.add(bp)
+                for iss in sentinel_rep.get(bp, {}).get("issues", []):
+                    print(f"  {YELLOW}🛡️ SENTINELLE PRÉVENTIVE [{bp.upper()}] : {iss}{RESET}")
+            if sentinel_bad:
+                s_list = ", ".join([p.upper() for p in sorted(sentinel_bad)])
+                print(f"  {CYAN}↳ Auto-Quarantaine Sentinelle : {s_list} écartés d'office.{RESET}\n")
+        except Exception:
+            pass
+
         target_platforms = ["threads", "reddit", "pinterest", "soundcloud", "bluesky", "tiktok", "instagram", "youtube", "facebook", "linkedin", "telegram", "twitter", "snapchat", "github", "discord", "spotify"]
-        active_list = [p for p in target_platforms if p in self.approved_accounts] if self.approved_accounts else target_platforms
+        # Tolérance zéro : Uniquement les plateformes ayant un compte explicitement approuvé
+        active_list = [p for p in target_platforms if p in self.approved_accounts and p not in quarantined_platforms]
+        if not active_list:
+            print(f"{YELLOW}Aucun réseau lié approuvé trouvé. Veuillez associer un compte sur PR.Social.{RESET}")
+            input("Appuyez sur Entrée pour revenir au menu...")
+            return
 
         print(f"{WHITE}Réseaux surveillés : {', '.join([f'{CYAN}{p.upper()}{RESET}' for p in active_list])}\n")
 
@@ -554,37 +640,33 @@ class TermuxBotApp:
                         )
 
                         is_valid = False
-                        if api_check == 1:
-                            c_st, c_res = self.api.api_check_task(task_id)
-                            if c_st == 200 and c_res.get("found") is True and c_res.get("approved") is True:
-                                is_valid = True
-                                print(f"  {GREEN}✓ Validé instantanément par API Check !{RESET}")
 
-                        # GARDE-FOU ANTI-BAN STRICT : Ne JAMAIS soumettre si l'action ou la capture est invalide
-                        if not is_valid:
-                            if ok_act and os.path.exists(shot_path):
-                                print(f"  ⏳ Sécurité ({wait_sec}s) puis soumission de la preuve vérifiée...")
-                                time.sleep(wait_sec + 1)
-                                s_st, s_res = self.api.submit_screenshot(task_id, shot_path)
-                                if s_st == 200 and s_res.get("ok"):
-                                    is_valid = True
-                                    print(f"  {GREEN}✓ Preuve enregistrée avec succès !{RESET}")
+                        # SÉCURITÉ ABSOLUE : Bypass complet de l'API Check (qui déclenche les rejets/sanctions)
+                        # Passage direct en soumission de preuve visuelle sécurisée avec hash unique
+                        if ok_act and os.path.exists(shot_path):
+                            print(f"  ⏳ Délai de sécurité humaine ({wait_sec}s) puis soumission de la preuve vérifiée...")
+                            time.sleep(wait_sec + 1)
+                            s_st, s_res = self.api.submit_screenshot(task_id, shot_path)
+                            if s_st == 200 and s_res.get("ok"):
+                                is_valid = True
+                                print(f"  {GREEN}✓ Preuve enregistrée avec succès !{RESET}")
                             else:
                                 print(f"  🛡️ {RED}{BOLD}SÉCURITÉ ANTI-BAN STRICTE: Capture non conforme écartée.{RESET}")
                                 print(f"  ⚠️ {YELLOW}Raison : {msg_act}{RESET}")
                                 print(f"  🛡️ {CYAN}Annulation propre de la tâche #{task_id} pour empêcher tout ban PR.Social.{RESET}")
                                 self.api.cancel_task(task_id)
                                 self.failed_tasks.add(task_id)
+                        else:
+                            print(f"  🛡️ {RED}{BOLD}SÉCURITÉ ANTI-BAN STRICTE: Action non validée ({msg_act}).{RESET}")
+                            print(f"  🛡️ {CYAN}Annulation propre immédiate de #{task_id} pour préserver la réputation.{RESET}")
+                            self.api.cancel_task(task_id)
+                            self.failed_tasks.add(task_id)
 
                         if is_valid:
                             _, fresh = self.api.get_me()
                             if fresh.get("user"):
                                 self.current_balance = float(fresh["user"].get("balance", 0.0))
                             print(f"  {GREEN}{BOLD}🎉 Tâche #{task_id} validée ! Nouveau solde : ${self.current_balance:.4f}{RESET}")
-                        elif ok_act:
-                            print(f"  {YELLOW}⚠️ Non validée. Déblocage automatique de sécurité...{RESET}")
-                            self.api.cancel_task(task_id)
-                            self.failed_tasks.add(task_id)
 
                         tasks_completed_count += 1
                         if tasks_completed_count % 4 == 0:

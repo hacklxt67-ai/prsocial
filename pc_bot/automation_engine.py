@@ -95,6 +95,25 @@ class AutomationEngine:
         if self.cb_balance:
             self.cb_balance(balance)
 
+        # 1.5. Bouclier de Sécurité : Vérification des avertissements & Quarantaine
+        w_st, w_data = self.api.get_warnings()
+        warn_count = int(w_data.get("count", 0)) if w_st == 200 else 0
+        quarantined_platforms = set()
+        if warn_count >= 4:
+            self.log(f"🚨 ARRÊT D'URGENCE : Compte à {warn_count}/4 avertissements ! Retraits protégés contre tout blocage.", "error")
+            self.stop()
+            return
+        elif warn_count > 0:
+            self.log(f"🛡️ BOUCLIER ANTI-AVERTISSEMENT : {warn_count}/4 avertissement(s) actif(s).", "warning")
+            for w in w_data.get("warnings", []):
+                wp = str(w.get("platform", "")).lower()
+                if wp:
+                    quarantined_platforms.add(wp)
+            # Quarantaine préventive des comptes non conformes
+            for rp in ["tiktok", "instagram", "linkedin"]:
+                quarantined_platforms.add(rp)
+            self.log(f"🛡️ ÉCHAPPATOIRE DIRECTE API : Quarantaine de [{', '.join([p.upper() for p in sorted(quarantined_platforms)])}] (0 risque de 4ème warning).", "warning")
+
         # 2. Vérification des comptes sociaux
         status, socials = self.api.get_socials()
         linked_accounts = {}
@@ -114,18 +133,18 @@ class AutomationEngine:
         else:
             self.log("Note: Impossible de vérifier les comptes liés (erreur réseau/temporaire). Poursuite avec les plateformes demandées.", "warning")
 
-        # Si des comptes ont été identifiés, on filtre. Sinon on autorise les plateformes sélectionnées
+        # Si des comptes ont été identifiés, on filtre en écartant strictement la quarantaine
         if linked_accounts:
-            active_platforms = [p for p in self.selected_platforms if p in linked_accounts]
+            active_platforms = [p for p in self.selected_platforms if p in linked_accounts and p not in quarantined_platforms]
         else:
-            active_platforms = list(self.selected_platforms)
+            active_platforms = [p for p in self.selected_platforms if p not in quarantined_platforms]
 
         if not active_platforms:
-            self.log("Aucune plateforme approuvée sélectionnée. Liez vos comptes sur PR.Social.", "error")
+            self.log("Aucune plateforme sécurisée disponible hors quarantaine. Liez vos comptes conformes sur PR.Social.", "error")
             self.stop()
             return
 
-        self.log(f"Plateformes prêtes pour les tâches: {', '.join([p.upper() for p in active_platforms])}", "info")
+        self.log(f"Plateformes prêtes pour les tâches (Sécurisées) : {', '.join([p.upper() for p in active_platforms])}", "info")
         platform_cooldowns: Dict[str, float] = {}
 
         # 3. Boucle principale de traitement

@@ -471,13 +471,8 @@ class RejectedTasksManager:
 
         is_validated = False
 
-        # 3. Vérification API si supportée
-        if api_check_enabled == 1:
-            _log("Tentative de validation instantanée par l'API...", "info")
-            api_st, api_res = self.api.api_check_task(task_id)
-            if api_st == 200 and api_res.get("found") is True and api_res.get("approved") is True:
-                is_validated = True
-                _log(f"✓ Validé immédiatement par l'API PR.Social !", "success")
+        # 3. Bypass complet de l'API Check (sécurité anti-dissociation)
+        # Soumission directe et propre de la capture d'écran
 
         # 4. Soumission de la preuve certifiée
         if not is_validated and os.path.exists(screenshot_path):
