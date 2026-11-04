@@ -1181,6 +1181,20 @@ def main():
     yt_cookies = cfg.get("youtube_cookies", "")
     tt_cookies = cfg.get("tiktok_cookies", "")
 
+    # Contrôle d'accès strict par Licence : 1 Utilisateur = 1 Appareil = 1 Clé
+    try:
+        from license_manager import UniversalLicenseManager
+    except ImportError:
+        try:
+            from pc_bot.license_manager import UniversalLicenseManager
+        except ImportError:
+            from termux_bot.license_manager import UniversalLicenseManager
+
+    lic_mgr = UniversalLicenseManager(candidates)
+    if not lic_mgr.enforce_license_login():
+        print(f"\n  {ANSI.RED}Accès refusé. Clé de licence requise pour cet appareil.{ANSI.RESET}")
+        return
+
     client = PrSocialClient(token, cf)
 
     while True:
