@@ -325,11 +325,8 @@ function initOrUpdateSalesChart() {
   const maxVal = Math.max(...dataPoints, 0);
 
   if (salesChartInstance) {
-    salesChartInstance.data.labels = labels;
-    salesChartInstance.data.datasets[0].data = dataPoints;
-    salesChartInstance.options.scales.y.suggestedMax = maxVal > 0 ? maxVal * 1.25 : 10;
-    salesChartInstance.update();
-    return;
+    try { salesChartInstance.destroy(); } catch (e) {}
+    salesChartInstance = null;
   }
 
   salesChartInstance = new Chart(ctx, {
@@ -421,11 +418,8 @@ function initOrUpdateDonutChart() {
   const chartColors = total > 0 ? ['#10b981', '#f97316'] : ['#e2e8f0'];
 
   if (donutChartInstance) {
-    donutChartInstance.data.labels = chartLabels;
-    donutChartInstance.data.datasets[0].data = chartData;
-    donutChartInstance.data.datasets[0].backgroundColor = chartColors;
-    donutChartInstance.update();
-    return;
+    try { donutChartInstance.destroy(); } catch (e) {}
+    donutChartInstance = null;
   }
 
   donutChartInstance = new Chart(ctx, {

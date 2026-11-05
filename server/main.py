@@ -31,6 +31,14 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+@app.middleware("http")
+async def add_no_cache_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
+
 
 SERVER_DIR = os.path.dirname(os.path.abspath(__file__))
 STATIC_DIR = os.path.join(SERVER_DIR, "static")
@@ -333,5 +341,12 @@ def serve_admin_dashboard():
     html_path = os.path.join(STATIC_DIR, "index.html")
     if os.path.exists(html_path):
         with open(html_path, "r", encoding="utf-8") as f:
-            return HTMLResponse(content=f.read())
+            c = f.read()
+            c = c.replace("/static/app.js", f"/static/app.js?v={int(datetime.now().timestamp())}")
+            c = c.replace("/static/style.css", f"/static/style.css?v={int(datetime.now().timestamp())}")
+            return HTMLResponse(content=c, headers={
+                "Cache-Control": "no-cache, no-store, must-revalidate, max-age=0",
+                "Pragma": "no-cache",
+                "Expires": "0"
+            })
     return HTMLResponse(content="<h1>Administration PR.Social</h1><p>Fichiers statiques en cours d'initialisation...</p>")
