@@ -1,9 +1,9 @@
 @echo off
 chcp 65001 >nul
-title PR.Social - Serveur de Licences & Administration Web
+title PR.Social - Serveur de Licences et Administration Web
 
 echo ============================================================
-echo   🚀 Démarrage du Serveur API & Administration PR.Social
+echo   [*] Demarrage du Serveur API et Administration PR.Social
 echo ============================================================
 echo.
 
