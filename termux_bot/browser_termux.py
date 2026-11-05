@@ -9,9 +9,14 @@ try:
 except ImportError:
     Image = None
 
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.chrome.service import Service
+try:
+    from selenium import webdriver
+    from selenium.webdriver.chrome.options import Options
+    from selenium.webdriver.chrome.service import Service
+except ImportError:
+    webdriver = None
+    Options = None
+    Service = None
 
 try:
     from user_agents import get_random_user_agent
