@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AUTOTASK PRO - Admin Panel</title>
+  <title>PR.SOCIAL - Panel d'Administration</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -19,7 +19,7 @@
   <div id="loginSection" class="login-container">
     <div class="login-card">
       <div class="brand-badge">🔐 ESPACE ADMINISTRATEUR</div>
-      <h1 class="login-title">AUTOTASK PRO</h1>
+      <h1 class="login-title">PR.SOCIAL</h1>
       <p class="login-subtitle">Connectez-vous pour accéder au tableau de bord</p>
 
       <form id="loginForm" onsubmit="handleLogin(event)">
@@ -39,7 +39,7 @@
   </div>
 
   <!-- =========================================================================
-       2. PANEL PRINCIPAL AUTOTASK PRO
+       2. PANEL PRINCIPAL PR.SOCIAL
        ========================================================================= -->
   <div id="dashboardSection" class="app-container" style="display: none;">
     
@@ -48,7 +48,7 @@
       <div class="sidebar-header">
         <div class="brand-icon">▲</div>
         <div class="brand-text">
-          <h2>AUTOTASK PRO</h2>
+          <h2>PR.SOCIAL</h2>
           <span>Admin Panel</span>
         </div>
       </div>
@@ -160,8 +160,8 @@
                 </div>
               </div>
               <div class="metric-bottom">
-                <span class="trend-badge up">↑ +12%</span>
-                <span class="subtext-note" id="subtextNewClients">Nouveaux ce mois : 28</span>
+                <span class="trend-badge neutral" id="badgeClientsTrend">• En direct</span>
+                <span class="subtext-note" id="subtextNewClients">Nouveaux ce mois : 0</span>
               </div>
             </div>
 
@@ -175,8 +175,8 @@
                 </div>
               </div>
               <div class="metric-bottom">
-                <span class="trend-badge up">↑ +8%</span>
-                <span class="subtext-note" id="subtextExpiring">Expirant cette semaine : 14</span>
+                <span class="trend-badge neutral" id="badgeLicensesTrend">• En direct</span>
+                <span class="subtext-note" id="subtextExpiring">Expirant sous 7j : 0</span>
               </div>
             </div>
 
@@ -205,7 +205,7 @@
                 </div>
               </div>
               <div class="metric-bottom">
-                <span class="trend-badge up">↑ +15%</span>
+                <span class="trend-badge neutral" id="badgeRevenueTrend">• En direct</span>
                 <span class="subtext-note" id="subtextRevenueMonth">Ce mois : 0 $</span>
               </div>
             </div>
@@ -243,12 +243,12 @@
                   <div class="legend-item">
                     <span class="legend-dot usdt"></span>
                     <span>USDT</span>
-                    <span id="donutPercentUsdt" style="margin-left: auto; color: var(--text-dark);">60%</span>
+                    <span id="donutPercentUsdt" style="margin-left: auto; color: var(--text-dark);">0%</span>
                   </div>
                   <div class="legend-item">
                     <span class="legend-dot mvola"></span>
                     <span>MVola</span>
-                    <span id="donutPercentMvola" style="margin-left: auto; color: var(--text-dark);">40%</span>
+                    <span id="donutPercentMvola" style="margin-left: auto; color: var(--text-dark);">0%</span>
                   </div>
                 </div>
               </div>

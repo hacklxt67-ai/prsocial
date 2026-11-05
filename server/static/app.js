@@ -1,11 +1,12 @@
 // ============================================================================
-// AUTOTASK PRO - ADMIN PANEL JAVASCRIPT
+// PR.SOCIAL - ADMIN PANEL JAVASCRIPT
 // ============================================================================
 
 let currentNav = 'dashboard';
 let cachedLicenses = [];
 let cachedPayments = [];
 let cachedClients = [];
+let cachedStats = null;
 let currentPaymentFilter = 'ALL';
 
 let salesChartInstance = null;
@@ -75,7 +76,7 @@ async function handleLogin(e) {
     }
     localStorage.setItem('pr_admin_token', data.token);
     localStorage.setItem('pr_admin_user', data.username);
-    showToast('Connexion réussie ! Bienvenue sur AUTOTASK PRO.', 'success');
+    showToast('Connexion réussie ! Bienvenue sur PR.SOCIAL.', 'success');
     showDashboard();
   } catch (err) {
     showToast('Impossible de contacter le serveur API.', 'error');
@@ -176,6 +177,7 @@ async function loadAllData() {
 
     // Mettre à jour les badges et le dashboard
     if (dataStats.ok) {
+      cachedStats = dataStats.stats;
       updateStatsCards(dataStats.stats);
     }
     renderDashboardOverview();
@@ -187,31 +189,82 @@ async function loadAllData() {
 
 function updateStatsCards(stats) {
   // Badges compteurs
-  const pendingCount = stats.pending_payments;
+  const pendingCount = stats.pending_payments || 0;
   const navBadge = document.getElementById('navPendingBadge');
   const bellCount = document.getElementById('topBellCount');
   
   if (pendingCount > 0) {
-    navBadge.textContent = pendingCount;
-    navBadge.style.display = 'inline-block';
-    bellCount.textContent = pendingCount;
+    if (navBadge) { navBadge.textContent = pendingCount; navBadge.style.display = 'inline-block'; }
+    if (bellCount) bellCount.textContent = pendingCount;
   } else {
-    navBadge.style.display = 'none';
-    bellCount.textContent = '0';
+    if (navBadge) navBadge.style.display = 'none';
+    if (bellCount) bellCount.textContent = '0';
   }
 
-  // 4 Stat Cards
-  document.getElementById('cardTotalClients').textContent = stats.total_clients || cachedClients.length || '0';
-  document.getElementById('cardActiveLicenses').textContent = stats.active_licenses || '0';
-  document.getElementById('cardPendingPayments').textContent = stats.pending_payments || '0';
-  document.getElementById('cardTotalRevenue').textContent = `${Math.round(stats.total_revenue_usd)} $`;
+  // 1. Total clients
+  const totalCli = stats.total_clients !== undefined ? stats.total_clients : cachedClients.length;
+  document.getElementById('cardTotalClients').textContent = totalCli;
+  const subCli = document.getElementById('subtextNewClients');
+  if (subCli) subCli.textContent = `Nouveaux ce mois : ${stats.new_clients_this_month || 0}`;
+  const badgeCli = document.getElementById('badgeClientsTrend');
+  if (badgeCli) {
+    if (stats.new_clients_this_month > 0) {
+      badgeCli.className = 'trend-badge up';
+      badgeCli.textContent = `↑ +${stats.new_clients_this_month}`;
+    } else {
+      badgeCli.className = 'trend-badge neutral';
+      badgeCli.textContent = '• Stable';
+    }
+  }
 
-  // Sous-textes
-  document.getElementById('subtextRevenueMonth').textContent = `Ce mois : ${Math.round(stats.total_revenue_usd)} $`;
-  
-  const mvolaCount = cachedPayments.filter(p => p.method === 'MVOLA' && p.status === 'PENDING').length;
-  const usdtCount = cachedPayments.filter(p => p.method === 'USDT' && p.status === 'PENDING').length;
-  document.getElementById('subtextMethods').textContent = `MVola : ${mvolaCount} | USDT : ${usdtCount}`;
+  // 2. Licences actives
+  document.getElementById('cardActiveLicenses').textContent = stats.active_licenses || 0;
+  const subExp = document.getElementById('subtextExpiring');
+  if (subExp) subExp.textContent = `Expirant sous 7j : ${stats.expiring_this_week || 0}`;
+  const badgeLic = document.getElementById('badgeLicensesTrend');
+  if (badgeLic) {
+    if (stats.expiring_this_week > 0) {
+      badgeLic.className = 'trend-badge warning';
+      badgeLic.textContent = `⚠️ ${stats.expiring_this_week}`;
+    } else {
+      badgeLic.className = 'trend-badge up';
+      badgeLic.textContent = '✓ À jour';
+    }
+  }
+
+  // 3. Paiements en attente
+  document.getElementById('cardPendingPayments').textContent = pendingCount;
+  const mvolaCount = stats.pending_mvola !== undefined ? stats.pending_mvola : cachedPayments.filter(p => p.method === 'MVOLA' && p.status === 'PENDING').length;
+  const usdtCount = stats.pending_usdt !== undefined ? stats.pending_usdt : cachedPayments.filter(p => p.method === 'USDT' && p.status === 'PENDING').length;
+  const subMeth = document.getElementById('subtextMethods');
+  if (subMeth) subMeth.textContent = `MVola : ${mvolaCount} | USDT : ${usdtCount}`;
+  const trendPend = document.getElementById('trendPending');
+  if (trendPend) {
+    if (pendingCount > 0) {
+      trendPend.style.color = 'var(--warning)';
+      trendPend.textContent = `🔔 ${pendingCount} à valider`;
+    } else {
+      trendPend.style.color = 'var(--success)';
+      trendPend.textContent = '✓ Aucun retard';
+    }
+  }
+
+  // 4. Revenu total
+  const revTotal = stats.total_revenue_usd !== undefined ? stats.total_revenue_usd : 0;
+  const revMonth = stats.revenue_this_month !== undefined ? stats.revenue_this_month : revTotal;
+  document.getElementById('cardTotalRevenue').textContent = `${Math.round(revTotal)} $`;
+  const subRev = document.getElementById('subtextRevenueMonth');
+  if (subRev) subRev.textContent = `Ce mois : ${Math.round(revMonth)} $`;
+  const badgeRev = document.getElementById('badgeRevenueTrend');
+  if (badgeRev) {
+    if (revMonth > 0) {
+      badgeRev.className = 'trend-badge up';
+      badgeRev.textContent = `↑ +${Math.round(revMonth)} $`;
+    } else {
+      badgeRev.className = 'trend-badge neutral';
+      badgeRev.textContent = '0 $';
+    }
+  }
 }
 
 // ============================================================================
@@ -253,28 +306,28 @@ function initOrUpdateSalesChart() {
   const ctx = document.getElementById('salesLineChart');
   if (!ctx) return;
 
-  // Calcul des ventes sur les 7 derniers jours
-  const labels = [];
-  const dataPoints = [];
-  const today = new Date();
+  let labels = [];
+  let dataPoints = [];
 
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date(today);
-    d.setDate(d.getDate() - i);
-    const dayStr = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
-    labels.push(dayStr);
-    
-    // Ventes fictives ou réelles basées sur la date
-    const count = cachedPayments.filter(p => {
-      if (!p.created_at) return false;
-      return p.created_at.includes(dayStr.split('/').reverse().join('-'));
-    }).length;
-    dataPoints.push(count > 0 ? count * 2 : Math.floor(Math.random() * 12 + 10));
+  if (cachedStats && cachedStats.sales_7_days && cachedStats.sales_7_days.length > 0) {
+    labels = cachedStats.sales_7_days.map(d => d.date);
+    dataPoints = cachedStats.sales_7_days.map(d => d.amount);
+  } else {
+    const today = new Date();
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(today);
+      d.setDate(d.getDate() - i);
+      labels.push(`${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`);
+      dataPoints.push(0);
+    }
   }
+
+  const maxVal = Math.max(...dataPoints, 0);
 
   if (salesChartInstance) {
     salesChartInstance.data.labels = labels;
     salesChartInstance.data.datasets[0].data = dataPoints;
+    salesChartInstance.options.scales.y.suggestedMax = maxVal > 0 ? maxVal * 1.25 : 10;
     salesChartInstance.update();
     return;
   }
@@ -307,7 +360,12 @@ function initOrUpdateSalesChart() {
           titleFont: { size: 12 },
           bodyFont: { size: 12 },
           padding: 10,
-          cornerRadius: 6
+          cornerRadius: 6,
+          callbacks: {
+            label: function(context) {
+              return ` Ventes : ${context.parsed.y} $`;
+            }
+          }
         }
       },
       scales: {
@@ -317,8 +375,13 @@ function initOrUpdateSalesChart() {
         },
         y: {
           grid: { color: '#f1f5f9' },
-          ticks: { color: '#94a3b8', font: { size: 11 } },
-          min: 0
+          ticks: {
+            color: '#94a3b8',
+            font: { size: 11 },
+            callback: function(value) { return value + ' $'; }
+          },
+          min: 0,
+          suggestedMax: maxVal > 0 ? maxVal * 1.25 : 10
         }
       }
     }
@@ -329,19 +392,38 @@ function initOrUpdateDonutChart() {
   const ctx = document.getElementById('paymentDonutChart');
   if (!ctx) return;
 
-  const totalUsdt = cachedPayments.filter(p => p.method === 'USDT' && p.status === 'APPROVED').reduce((acc, p) => acc + p.amount_usd, 0) || 154;
-  const totalMvola = cachedPayments.filter(p => p.method === 'MVOLA' && p.status === 'APPROVED').reduce((acc, p) => acc + p.amount_usd, 0) || 94;
-  const total = totalUsdt + totalMvola;
+  let totalUsdt = 0;
+  let totalMvola = 0;
+  let total = 0;
+  let pctUsdt = 0;
+  let pctMvola = 0;
 
-  const pctUsdt = Math.round((totalUsdt / total) * 100);
-  const pctMvola = 100 - pctUsdt;
+  if (cachedStats && cachedStats.distribution) {
+    totalUsdt = cachedStats.distribution.total_usdt || 0;
+    totalMvola = cachedStats.distribution.total_mvola || 0;
+    total = cachedStats.distribution.total || 0;
+    pctUsdt = cachedStats.distribution.pct_usdt || 0;
+    pctMvola = cachedStats.distribution.pct_mvola || 0;
+  } else {
+    totalUsdt = cachedPayments.filter(p => p.method === 'USDT' && p.status === 'APPROVED').reduce((acc, p) => acc + (p.amount_usd || 0), 0);
+    totalMvola = cachedPayments.filter(p => p.method === 'MVOLA' && p.status === 'APPROVED').reduce((acc, p) => acc + (p.amount_usd || 0), 0);
+    total = totalUsdt + totalMvola;
+    pctUsdt = total > 0 ? Math.round((totalUsdt / total) * 100) : 0;
+    pctMvola = total > 0 ? (100 - pctUsdt) : 0;
+  }
 
-  document.getElementById('donutTotalAmount').textContent = `${total} $`;
+  document.getElementById('donutTotalAmount').textContent = `${Math.round(total)} $`;
   document.getElementById('donutPercentUsdt').textContent = `${pctUsdt}%`;
   document.getElementById('donutPercentMvola').textContent = `${pctMvola}%`;
 
+  const chartData = total > 0 ? [totalUsdt, totalMvola] : [1];
+  const chartLabels = total > 0 ? ['USDT', 'MVola'] : ['En attente de ventes'];
+  const chartColors = total > 0 ? ['#10b981', '#f97316'] : ['#e2e8f0'];
+
   if (donutChartInstance) {
-    donutChartInstance.data.datasets[0].data = [totalUsdt, totalMvola];
+    donutChartInstance.data.labels = chartLabels;
+    donutChartInstance.data.datasets[0].data = chartData;
+    donutChartInstance.data.datasets[0].backgroundColor = chartColors;
     donutChartInstance.update();
     return;
   }
@@ -349,10 +431,10 @@ function initOrUpdateDonutChart() {
   donutChartInstance = new Chart(ctx, {
     type: 'doughnut',
     data: {
-      labels: ['USDT', 'MVola'],
+      labels: chartLabels,
       datasets: [{
-        data: [totalUsdt, totalMvola],
-        backgroundColor: ['#10b981', '#f97316'],
+        data: chartData,
+        backgroundColor: chartColors,
         borderWidth: 0,
         hoverOffset: 4
       }]
@@ -365,7 +447,13 @@ function initOrUpdateDonutChart() {
         legend: { display: false },
         tooltip: {
           backgroundColor: '#0f172a',
-          cornerRadius: 6
+          cornerRadius: 6,
+          callbacks: {
+            label: function(context) {
+              if (total === 0) return ' Aucune vente encaissée';
+              return ` ${context.label} : ${context.parsed} $`;
+            }
+          }
         }
       }
     }
@@ -611,24 +699,54 @@ function renderReportsChart() {
     reportsChartInstance.destroy();
   }
 
+  const now = new Date();
+  const currentYearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  
+  const mvolaWeeks = [0, 0, 0, 0];
+  const usdtWeeks = [0, 0, 0, 0];
+
+  cachedPayments.forEach(p => {
+    if (p.status === 'APPROVED' && p.created_at && p.created_at.startsWith(currentYearMonth)) {
+      try {
+        const day = parseInt(p.created_at.substring(8, 10), 10);
+        const wIndex = Math.min(Math.floor((day - 1) / 7), 3);
+        const amt = p.amount_usd || 0;
+        if (p.method === 'MVOLA') mvolaWeeks[wIndex] += amt;
+        else if (p.method === 'USDT') usdtWeeks[wIndex] += amt;
+      } catch (e) {}
+    }
+  });
+
   reportsChartInstance = new Chart(ctx, {
     type: 'bar',
     data: {
-      labels: ['Semaine 1', 'Semaine 2', 'Semaine 3', 'Semaine 4'],
+      labels: ['Semaine 1 (1-7)', 'Semaine 2 (8-14)', 'Semaine 3 (15-21)', 'Semaine 4 (22+)'],
       datasets: [
-        { label: 'MVola ($)', data: [42, 68, 54, 88], backgroundColor: '#f97316' },
-        { label: 'USDT ($)', data: [64, 82, 110, 142], backgroundColor: '#10b981' }
+        { label: 'MVola ($)', data: mvolaWeeks, backgroundColor: '#f97316' },
+        { label: 'USDT ($)', data: usdtWeeks, backgroundColor: '#10b981' }
       ]
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
-        legend: { position: 'top' }
+        legend: { position: 'top' },
+        tooltip: {
+          callbacks: {
+            label: function(context) {
+              return ` ${context.dataset.label} : ${context.parsed.y} $`;
+            }
+          }
+        }
       },
       scales: {
         x: { grid: { display: false } },
-        y: { beginAtZero: true }
+        y: {
+          beginAtZero: true,
+          ticks: {
+            callback: function(value) { return value + ' $'; }
+          }
+        }
       }
     }
   });

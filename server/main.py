@@ -7,6 +7,8 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
+from datetime import datetime, timedelta
+
 from database import init_db
 from security import create_admin_token, verify_admin_token
 from models import LicenseManager, PaymentManager, ClientManager, SettingsManager, AdminManager
@@ -184,13 +186,56 @@ def get_admin_stats(admin: str = Depends(require_admin)):
     payments = PaymentManager.list_all()
     clients = ClientManager.list_all()
 
-    active_licenses = sum(1 for l in licenses if l["status"] == "ACTIVE")
-    unused_licenses = sum(1 for l in licenses if l["status"] == "UNUSED")
-    expired_licenses = sum(1 for l in licenses if l["status"] == "EXPIRED")
-    pending_payments = sum(1 for p in payments if p["status"] == "PENDING")
-    approved_payments = sum(1 for p in payments if p["status"] == "APPROVED")
-    
-    total_revenue_usd = sum(p["amount_usd"] for p in payments if p["status"] == "APPROVED")
+    now = datetime.now()
+    now_month_str = now.strftime("%Y-%m")
+
+    active_licenses = sum(1 for l in licenses if l.get("status") == "ACTIVE")
+    unused_licenses = sum(1 for l in licenses if l.get("status") == "UNUSED")
+    expired_licenses = sum(1 for l in licenses if l.get("status") == "EXPIRED")
+    revoked_licenses = sum(1 for l in licenses if l.get("status") == "REVOKED")
+
+    pending_payments = sum(1 for p in payments if p.get("status") == "PENDING")
+    approved_payments = sum(1 for p in payments if p.get("status") == "APPROVED")
+    rejected_payments = sum(1 for p in payments if p.get("status") == "REJECTED")
+
+    pending_mvola = sum(1 for p in payments if p.get("status") == "PENDING" and p.get("method") == "MVOLA")
+    pending_usdt = sum(1 for p in payments if p.get("status") == "PENDING" and p.get("method") == "USDT")
+
+    new_clients_this_month = sum(1 for c in clients if (c.get("first_seen") or "").startswith(now_month_str))
+
+    expiring_this_week = 0
+    for l in licenses:
+        if l.get("status") == "ACTIVE" and l.get("expires_at"):
+            try:
+                exp_dt = datetime.strptime(l["expires_at"], "%Y-%m-%d %H:%M:%S")
+                if 0 <= (exp_dt - now).total_seconds() <= 7 * 86400:
+                    expiring_this_week += 1
+            except Exception:
+                pass
+
+    total_revenue_usd = sum(p.get("amount_usd", 0) for p in payments if p.get("status") == "APPROVED")
+    revenue_this_month = sum(p.get("amount_usd", 0) for p in payments if p.get("status") == "APPROVED" and (p.get("created_at") or "").startswith(now_month_str))
+
+    sales_7_days = []
+    for i in range(6, -1, -1):
+        d = now - timedelta(days=i)
+        d_iso = d.strftime("%Y-%m-%d")
+        d_label = d.strftime("%d/%m")
+        day_payments = [p for p in payments if p.get("status") == "APPROVED" and (p.get("created_at") or "").startswith(d_iso)]
+        total_day = sum(p.get("amount_usd", 0) for p in day_payments)
+        sales_7_days.append({
+            "date": d_label,
+            "iso": d_iso,
+            "amount": round(total_day, 2),
+            "count": len(day_payments)
+        })
+
+    approved_list = [p for p in payments if p.get("status") == "APPROVED"]
+    total_usdt = sum(p.get("amount_usd", 0) for p in approved_list if p.get("method") == "USDT")
+    total_mvola = sum(p.get("amount_usd", 0) for p in approved_list if p.get("method") == "MVOLA")
+    total_approved = total_usdt + total_mvola
+    pct_usdt = round((total_usdt / total_approved) * 100) if total_approved > 0 else 0
+    pct_mvola = round((total_mvola / total_approved) * 100) if total_approved > 0 else 0
 
     return {
         "ok": True,
@@ -198,11 +243,26 @@ def get_admin_stats(admin: str = Depends(require_admin)):
             "active_licenses": active_licenses,
             "unused_licenses": unused_licenses,
             "expired_licenses": expired_licenses,
+            "revoked_licenses": revoked_licenses,
             "total_licenses": len(licenses),
             "pending_payments": pending_payments,
             "approved_payments": approved_payments,
+            "rejected_payments": rejected_payments,
+            "pending_mvola": pending_mvola,
+            "pending_usdt": pending_usdt,
             "total_clients": len(clients),
-            "total_revenue_usd": round(total_revenue_usd, 2)
+            "new_clients_this_month": new_clients_this_month,
+            "expiring_this_week": expiring_this_week,
+            "total_revenue_usd": round(total_revenue_usd, 2),
+            "revenue_this_month": round(revenue_this_month, 2),
+            "sales_7_days": sales_7_days,
+            "distribution": {
+                "total_usdt": round(total_usdt, 2),
+                "total_mvola": round(total_mvola, 2),
+                "total": round(total_approved, 2),
+                "pct_usdt": pct_usdt,
+                "pct_mvola": pct_mvola
+            }
         }
     }
 

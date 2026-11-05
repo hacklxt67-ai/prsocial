@@ -494,6 +494,9 @@ body {
   gap: 2px;
 }
 .trend-badge.up { color: var(--success); }
+.trend-badge.neutral { color: var(--text-muted); }
+.trend-badge.warning { color: var(--warning); }
+.trend-badge.danger { color: var(--danger); }
 
 .subtext-note {
   color: var(--text-muted);
