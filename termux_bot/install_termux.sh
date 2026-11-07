@@ -62,20 +62,37 @@ BOT_DIR="$CURRENT_DIR"
 if [ ! -d "\$BOT_DIR" ]; then
     if [ -d "\$HOME/prsocial/termux_bot" ]; then
         BOT_DIR="\$HOME/prsocial/termux_bot"
-    elif [ -d "\$HOME/pr_social/termux_bot" ]; then
-        BOT_DIR="\$HOME/pr_social/termux_bot"
+    elif [ -d "\$HOME/prsocial" ]; then
+        BOT_DIR="\$HOME/prsocial"
     fi
 fi
 
-echo "============================================================"
-echo "⚡ Démarrage du PR.Social Bot sous Termux (Android Debian)"
-echo "============================================================"
-proot-distro login debian --bind "\$BOT_DIR":/root/termux_bot -- bash -c "
-    cd /root/termux_bot
-    python3 termux_action_engine.py
-"
+cd "\$BOT_DIR"
+if [ -f "pc_bot/http_action_engine.py" ]; then
+    python pc_bot/http_action_engine.py
+elif [ -f "termux_action_engine.py" ]; then
+    python termux_action_engine.py
+else
+    python3 -m pc_bot.http_action_engine
+fi
 EOF
 chmod +x "$LAUNCHER"
+
+UPDATER="$HOME/update_bot.sh"
+cat << EOF > "$UPDATER"
+#!/data/data/com.termux/files/usr/bin/bash
+if [ -d "\$HOME/prsocial" ]; then
+    cd "\$HOME/prsocial"
+elif [ -d "\$HOME/pr_social" ]; then
+    cd "\$HOME/pr_social"
+fi
+echo "⚡ Mise à jour du bot PR.Social depuis GitHub..."
+git fetch origin main
+git reset --hard origin/main
+echo "✓ Mise à jour terminée ! Démarrage du bot..."
+python pc_bot/http_action_engine.py
+EOF
+chmod +x "$UPDATER"
 
 LAUNCHER_REJETS="$HOME/recuperer_rejets.sh"
 cat << EOF > "$LAUNCHER_REJETS"

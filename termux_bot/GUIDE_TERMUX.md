@@ -1,77 +1,54 @@
 # 📱 Guide d'Utilisation - PR.Social Bot sur Android (Termux)
 
-Ce guide vous explique pas-à-pas comment faire tourner le bot **PR.Social 24h/24 directement sur votre smartphone Android**, sans laisser votre PC allumé.
+Ce guide vous donne les commandes prêtes à l'emploi pour installer, mettre à jour et faire tourner le bot **PR.Social 24h/24 directement sur votre smartphone Android**.
 
 ---
 
-## ⚡ 1. Prérequis sur votre Téléphone Android
+## ⚡ 1. NOUVEAU DÉBUTANT (Installation Complète en 1 Clic)
 
-1. Téléchargez et installez l'application **Termux** (depuis [F-Droid](https://f-droid.org/fr/packages/com.termux/) de préférence pour avoir la version à jour).
-2. Ouvrez l'application **Termux**.
+Si vous installez Termux pour la première fois, ouvrez l'application **Termux**, copiez et collez cette commande unique :
+
+```bash
+pkg update -y && pkg install -y git python && git clone https://github.com/hacklxt67-ai/prsocial.git && cd prsocial && pip install requests pillow && python pc_bot/http_action_engine.py
+```
+
+> **Ce que fait cette commande :**
+> 1. Installe `git` et `python`.
+> 2. Télécharge le projet complet depuis GitHub.
+> 3. Installe les dépendances requises (`requests`, `pillow`).
+> 4. Démarre directement le bot avec l'interface interactive.
 
 ---
 
-## 🚀 2. Installation Automatique en 1 Étape
+## 🚀 2. UTILISATEUR DÉJÀ INSTALLÉ (Mise à Jour Rapide & Lancement)
 
-Dans Termux, copiez et collez la commande suivante pour tout installer automatiquement (Proot Linux Debian, Chromium Headless ARM64, Python, Selenium) :
+Si vous avez déjà le bot installé sur votre téléphone et souhaitez appliquer toutes les dernières mises à jour (support Instagram, correctif anti-quarantaine, nouvelles tâches) :
 
 ```bash
-pkg update -y && pkg install -y git proot-distro python
+cd ~/prsocial && git fetch origin main && git reset --hard origin/main && python pc_bot/http_action_engine.py
 ```
 
-Ensuite, lancez le script d'installation inclus :
-```bash
-bash install_termux.sh
-```
-
-Le script va automatiquement :
-- Configurer l'environnement Linux Debian ARM64.
-- Installer Chromium et Chromedriver headless adaptés à Android.
-- Installer les modules Python (`selenium`, `requests`, `Pillow`).
-- Créer un raccourci direct sur votre écran Termux nommé **`./lancer_bot.sh`**.
+> **Astuce :** Vous pouvez aussi relancer simplement le bot à tout moment avec :
+> ```bash
+> cd ~/prsocial && python pc_bot/http_action_engine.py
+> ```
 
 ---
 
-### 🎮 3. Lancement du Bot & Récupération des Rejets
+## 🎮 3. Options Disponibles dans le Bot
 
-Termux dispose désormais de deux lanceurs rapides créés dans votre dossier utilisateur :
-
-#### 🚀 Option A : Menu Principal Interactif
-```bash
-./lancer_bot.sh
-```
-Ce menu vous donne accès à 6 options claires :
-- `[1]` **Start Tout** : Exécution automatique des tâches multi-plateformes avec déblocage auto des tâches orphelines *(Licence requise)*.
-- `[2]` **Récupérer & Réessayer les Tâches Rejetées** : Diagnostic et réexécution sécurisée en Mode Strict *(Licence requise)*.
-- `[3]` **Comptes Liés** : Liste vos profils sociaux enregistrés et validés sur PR.Social.
-- `[4]` **Changer de Cookie / Déconnexion** : Réinitialise la session pour changer de compte.
-- `[5]` **Gestion Licence & Paiements** : Activation de clé (PR-XXXX-XXXX-XXXX), instructions de paiement (MVola & USDT) et envoi de preuve en 1 clic.
-- `[6]` **Quitter Bot**
-
-#### ⚡ Option B : Récupération Directe 1-Clic des Rejets
-Si vous voulez uniquement récupérer vos tâches rejetées sans passer par le bot de tâches courantes :
-```bash
-./recuperer_rejets.sh
-```
-
-### 🔑 A. Première Utilisation (Login Cookie)
-1. Au tout premier lancement (ou après déconnexion), le bot affiche :
-   `[1] Login Cookie (Coller le Cookie / Token)`
-2. Choisissez `1` et collez votre Cookie / Token PR.Social récupéré depuis votre navigateur (`token=eyJ...` ou jeton direct).
-3. Le bot vérifie instantanément votre session auprès de PR.Social et **la sauvegarde définitivement**.
-
-### ⚡ B. Connexion Automatique aux Lancements Suivants
-- Dès le lancement suivant, vous n'avez **plus rien à saisir** !
-- Le bot détecte votre session enregistrée, se connecte automatiquement et affiche :  
-  `✓ Connexion automatique réussie ! Bienvenue @VotreCompte (Solde: $X.XXXX)`
-- Vous accédez directement au tableau de bord.
-- Si vous souhaitez changer de compte, il vous suffit de choisir l'option **`[4] Changer de Cookie / Déconnexion`**.
+Au lancement, vous accédez au tableau de bord :
+- `[1]` **Start Tout** : Démarre automatiquement le traitement des tâches rémunérées (Instagram, YouTube, Twitter, TikTok, etc.) avec déblocage auto des tâches orphelines.
+- `[2]` **Surf Automatique** : Effectue les visites de sites rémunérées.
+- `[3]` **Comptes Liés** : Affiche vos comptes sociaux approuvés par PR.Social.
+- `[4]` **Changer de Token / Cookie** : Pour connecter un nouveau compte PR.Social.
+- `[5]` **Quitter**
 
 ---
 
 ## 🛡️ 4. Faire Tourner le Bot en Arrière-Plan H24 (Écran Éteint)
 
-Pour que Termux ne soit pas fermé par la gestion de batterie d'Android quand vous éteignez l'écran :
+Pour éviter qu'Android n'arrête Termux lorsque vous verrouillez votre écran :
 1. Dans Termux, descendez le volet des notifications Android.
-2. Cliquez sur la notification Termux et sélectionnez **`Acquire Wakelock`** (ou tapez la commande `termux-wake-lock`).
-3. Dans les paramètres de votre téléphone Android : *Paramètres > Applications > Termux > Batterie > Définir sur "Non restreinte"*.
+2. Cliquez sur la notification Termux et sélectionnez **`Acquire Wakelock`** (ou tapez `termux-wake-lock`).
+3. Dans les paramètres de votre téléphone : *Paramètres > Applications > Termux > Batterie > Non restreinte*.
