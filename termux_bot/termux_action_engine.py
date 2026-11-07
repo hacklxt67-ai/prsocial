@@ -819,30 +819,36 @@ class TermuxBotApp:
             print(f"{CYAN}│{RESET}  📱 {WHITE}Identifiant Smartphone:{RESET} {MAGENTA}{BOLD}{hwid:<30}{RESET} {CYAN}│{RESET}")
             print(f"{CYAN}╰─────────────────────────────────────────────────────────────╯{RESET}")
 
-            # Bloc Moyens de paiement avec couleurs professionnelles
-            print(f"\n{YELLOW}{BOLD}🇲🇬 MOYEN DE PAIEMENT 1 : MVOLA (MADAGASCAR){RESET}")
-            print(f"   {WHITE}• Numéro Destinataire :{RESET} {GREEN}{BOLD}{mv.get('number', '034 00 000 00')}{RESET}")
-            print(f"   {WHITE}• Nom du Titulaire    :{RESET} {WHITE}{BOLD}{mv.get('name', 'PR.Social Support')}{RESET}")
-            print(f"   {WHITE}• Montant à envoyer   :{RESET} {YELLOW}{BOLD}{mv.get('amount_to_pay', '9 500 MGA')}{RESET}")
+            # Bloc Moyens de paiement avec coordonnées officielles
+            box_t = f"{CYAN}┌─────────────────────────────────────────────────────────────┐{RESET}"
+            box_b = f"{CYAN}└─────────────────────────────────────────────────────────────┘{RESET}"
 
-            print(f"\n{GREEN}{BOLD}🪙 MOYEN DE PAIEMENT 2 : USDT CRYPTO (TRC-20){RESET}")
-            print(f"   {WHITE}• Réseau Blockchain   :{RESET} {WHITE}{BOLD}{us.get('network', 'TRC-20 (Tron)')}{RESET}")
-            print(f"   {WHITE}• Adresse Wallet USDT :{RESET} {CYAN}{BOLD}{us.get('address', 'Txxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx')}{RESET}")
-            print(f"   {WHITE}• Montant exact       :{RESET} {GREEN}{BOLD}{us.get('amount_to_pay', '2.00 USDT')}{RESET}")
+            print()
+            print(box_t)
+            print(f"{CYAN}│{RESET}  {WHITE}Abonnement{RESET} : {GREEN}{BOLD}8000 ar = 2$ par semaine{RESET}                        {CYAN}│{RESET}")
+            print(f"{CYAN}│{RESET}                                                             {CYAN}│{RESET}")
+            print(f"{CYAN}│{RESET}  {YELLOW}{BOLD}Paiements acceptés :{RESET}                                      {CYAN}│{RESET}")
+            print(f"{CYAN}│{RESET}  • {WHITE}Binance ID{RESET} : {CYAN}{BOLD}826509536{RESET}                                    {CYAN}│{RESET}")
+            print(f"{CYAN}│{RESET}  • {WHITE}MVola{RESET}      : {GREEN}{BOLD}0347281599{RESET} {WHITE}(Baggio Michel){RESET}                   {CYAN}│{RESET}")
+            print(box_b)
 
-            print(f"\n{DIM}─────────────────────────────────────────────────────────────{RESET}")
+            print()
+            print(box_t)
+            print(f"{CYAN}│{RESET}  {WHITE}HWID{RESET}    : {YELLOW}{BOLD}{hwid:<45}{RESET} {CYAN}│{RESET}")
+            print(f"{CYAN}│{RESET}  {WHITE}STATUT{RESET}  : {RED}{BOLD}🔴 Non activé{RESET}                                    {CYAN}│{RESET}")
+            print(box_b)
 
-            if step == "CONTACT":
-                print(f"{CYAN}┌─────────────────────────────────────────────────────────────┐{RESET}")
-                print(f"{CYAN}│{RESET}  {GREEN}{BOLD}[1]{RESET} 💬 {WHITE}{BOLD}Contacter l'Administrateur pour Acheter{RESET}              {CYAN}│{RESET}")
-                print(f"{CYAN}│{RESET}  {RED}{BOLD}[2]{RESET} 🚪 {WHITE}Quitter le Bot (Exit){RESET}                                  {CYAN}│{RESET}")
-                print(f"{CYAN}└─────────────────────────────────────────────────────────────┘{RESET}")
+            print()
+            print(f" {GREEN}{BOLD}[1] 🔑 Entrer la clé de licence{RESET}")
+            print(f" {RED}{BOLD}[2] ❌ Quitter l'application{RESET}")
+            print()
 
-                choice = input(f"\n{BOLD}Votre choix [1-2] : {RESET}").strip()
+            choice = input(f" {CYAN}▶{RESET} {WHITE}{BOLD}Sélectionner une option [1-2] :{RESET} ").strip()
 
-                if choice == "1":
-                    clear_screen()
-                    self.print_logo()
+            if choice == "1":
+                key = input(f"\n{WHITE}{BOLD}🔑 Entrer la clé de licence :{RESET} ").strip().upper()
+                if not key:
+                    continue
                     print(f"\n{CYAN}{BOLD}💬 CONTACTEZ L'ADMINISTRATEUR POUR VALIDER VOTRE ABONNEMENT :{RESET}\n")
                     print(f"  {WHITE}1. Envoyez votre paiement de {YELLOW}{BOLD}2 USD{RESET} ({YELLOW}{mv.get('amount_to_pay', '9 500 MGA')}{RESET} ou {GREEN}{us.get('amount_to_pay', '2.00 USDT')}{RESET}).")
                     print(f"  {WHITE}2. Contactez l'administrateur et transmettez-lui :{RESET}")

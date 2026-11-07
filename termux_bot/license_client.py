@@ -170,17 +170,17 @@ class TermuxLicenseClient:
             "price_usd": 2.0,
             "duration_days": 7,
             "mvola": {
-                "number": "034 00 000 00",
-                "name": "PR.Social Support",
-                "rate_mga": "9500",
-                "amount_to_pay": "9 500 MGA"
+                "number": "0347281599",
+                "name": "Baggio Michel",
+                "rate_mga": "8000",
+                "amount_to_pay": "8 000 MGA"
             },
             "usdt": {
-                "address": "Txxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-                "network": "TRC-20 (Tron)",
+                "address": "826509536",
+                "network": "Binance Pay / ID",
                 "amount_to_pay": "2.00 USDT"
             },
-            "support": "@votre_contact_telegram"
+            "support": "@BaggioMichel"
         }
 
     def submit_payment_proof(self, method: str, ref: str, sender_contact: str, local_amount: str = "") -> Tuple[bool, str]:

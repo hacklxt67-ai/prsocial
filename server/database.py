@@ -92,16 +92,17 @@ def init_db():
     default_settings = {
         "price_usd": "2.00",
         "duration_days": "7",
-        "mvola_number": "034 00 000 00",
-        "mvola_name": "PR.Social Bot Support",
-        "mvola_rate_mga": "9500",
-        "usdt_address": "Txxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-        "usdt_network": "TRC-20 (Tron)",
-        "support_telegram": "@votre_contact_telegram"
+        "mvola_number": "0347281599",
+        "mvola_name": "Baggio Michel",
+        "mvola_rate_mga": "8000",
+        "binance_id": "826509536",
+        "usdt_address": "826509536",
+        "usdt_network": "Binance Pay / ID",
+        "support_telegram": "@BaggioMichel"
     }
 
     for k, v in default_settings.items():
-        cursor.execute("INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?);", (k, v))
+        cursor.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?);", (k, v))
 
     conn.commit()
     conn.close()

@@ -23,6 +23,8 @@ import socket
 import hashlib
 import hmac
 import time
+import re
+import unicodedata
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, Tuple
 
@@ -46,6 +48,35 @@ REVOKED_KEYS_FILE = os.path.join(DATA_DIR, ".revoked_keys.json")
 MASTER_SECRET_SIGNING_KEY = b"PR_SOCIAL_ADMIN_MASTER_SECRET_KEY_2026_BAGIO67"
 
 DEFAULT_SERVER_URL = "http://127.0.0.1:8000"
+
+def _strip_ansi(text: str) -> str:
+    return re.sub(r'\x1b\[[0-9;]*m', '', text)
+
+def _display_width(text: str) -> int:
+    w = 0
+    for ch in text:
+        ea = unicodedata.east_asian_width(ch)
+        if ea in ('W', 'F') or ord(ch) > 0x1F000:
+            w += 2
+        else:
+            w += 1
+    return w
+
+def _pad_box_row(content: str, width: int = 70) -> str:
+    rl = _display_width(_strip_ansi(content))
+    p = max(0, width - rl)
+    return f" │  {content}{' ' * p}│"
+
+LOGO_BOT_HEADER = f"""{CYAN}{BOLD}
+  ██████╗ ██████╗       ███████╗ ██████╗  ██████╗██╗ █████╗ ██╗     
+  ██╔══██╗██╔══██╗      ██╔════╝██╔═══██╗██╔════╝██║██╔══██╗██║     
+  ██████╔╝██████╔╝█████╗███████╗██║   ██║██║     ██║███████║██║     
+  ██╔═══╝ ██╔══██╗╚════╝╚════██║██║   ██║██║     ██║██╔══██║██║     
+  ██║     ██║  ██║      ███████║╚██████╔╝╚██████╗██║██║  ██║███████╗
+  ╚═╝     ╚═╝  ╚═╝      ╚══════╝ ╚═════╝  ╚═════╝╚═╝╚═╝  ╚═╝╚══════╝{RESET}
+       {MAGENTA}{BOLD}⚡ REVERSED ENGINEERING BOT PRO · v3.0 ⚡{RESET}
+       {YELLOW}{DIM}— L'argent c'est un chiffre —{RESET}
+  {WHITE}{DIM}────────────────────────────────────────────────────────────────────────{RESET}"""
 
 def get_universal_device_id() -> str:
     """
@@ -428,57 +459,70 @@ class UniversalLicenseManager:
                 time.sleep(0.8)
                 return True
 
-        # Écran d'Activation Obligatoire
+        # Écran d'Activation Obligatoire (Design Officiel)
         while True:
-            if sys.stdout and hasattr(sys.stdout, 'isatty') and sys.stdout.isatty(): os.system('cls' if os.name == 'nt' else 'clear')
-            else: sys.stdout.write('\033[2J\033[H')
-            print(f"""
-  {CYAN}{BOLD}╔══════════════════════════════════════════════════════════════════════╗{RESET}
-  {CYAN}{BOLD}║{RESET}             {MAGENTA}{BOLD}🛡️ PR.SOCIAL BOT PRO · CONTRÔLE D'ACCÈS LICENCE{RESET}           {CYAN}{BOLD}║{RESET}
-  {CYAN}{BOLD}╠══════════════════════════════════════════════════════════════════════╣{RESET}
-  {CYAN}{BOLD}║{RESET}  {WHITE}{BOLD}RÈGLE STRICTE : 1 Utilisateur = 1 Appareil (HWID) = 1 Clé Unique{RESET}     {CYAN}{BOLD}║{RESET}
-  {CYAN}{BOLD}║{RESET}                                                                      {CYAN}{BOLD}║{RESET}
-  {CYAN}{BOLD}║{RESET}  📱 {YELLOW}{BOLD}VOTRE IDENTIFIANT APPAREIL (HWID) :{RESET}                               {CYAN}{BOLD}║{RESET}
-  {CYAN}{BOLD}║{RESET}     👉 {GREEN}{BOLD}{self.device_id:<40}{RESET}               {CYAN}{BOLD}║{RESET}
-  {CYAN}{BOLD}║{RESET}                                                                      {CYAN}{BOLD}║{RESET}
-  {CYAN}{BOLD}║{RESET}  ℹ️ {WHITE}Ce bot est privé et protégé.{RESET}                                      {CYAN}{BOLD}║{RESET}
-  {CYAN}{BOLD}║{RESET}     {WHITE}Seul l'Administrateur peut vous fournir une clé de licence.{RESET}       {CYAN}{BOLD}║{RESET}
-  {CYAN}{BOLD}║{RESET}     {DIM}Transmettez votre Identifiant Appareil ci-dessus à l'administrateur.{RESET}{CYAN}{BOLD}║{RESET}
-  {CYAN}{BOLD}╚══════════════════════════════════════════════════════════════════════╝{RESET}
-""")
+            if sys.stdout and hasattr(sys.stdout, 'isatty') and sys.stdout.isatty():
+                os.system('cls' if os.name == 'nt' else 'clear')
+            else:
+                sys.stdout.write('\033[2J\033[H')
+
+            # 1. Logo en haut
+            print(LOGO_BOT_HEADER)
+
+            # 2. Cadres officiels
+            box_top = f" {CYAN}┌{'─' * 72}┐{RESET}"
+            box_bot = f" {CYAN}└{'─' * 72}┘{RESET}"
+
+            print()
+            print(box_top)
+            print(_pad_box_row(f"{WHITE}Abonnement : {GREEN}{BOLD}8000 ar = 2$ par semaine{RESET}"))
+            print(_pad_box_row(""))
+            print(_pad_box_row(f"{YELLOW}{BOLD}Paiements acceptés :{RESET}"))
+            print(_pad_box_row(f"• {WHITE}Binance ID : {CYAN}{BOLD}826509536{RESET}"))
+            print(_pad_box_row(f"• {WHITE}MVola      : {GREEN}{BOLD}0347281599{RESET} {WHITE}(Baggio Michel){RESET}"))
+            print(box_bot)
+
+            print()
+            print(box_top)
+            print(_pad_box_row(f"{WHITE}HWID    : {YELLOW}{BOLD}{self.device_id}{RESET}"))
+            print(_pad_box_row(f"{WHITE}STATUT  : {RED}{BOLD}🔴 Non activé{RESET}"))
+            print(box_bot)
+
+            print()
+            print(f" {GREEN}{BOLD}[1] 🔑 Entrer la clé de licence{RESET}")
+            print(f" {RED}{BOLD}[2] ❌ Quitter l'application{RESET}")
+            print()
 
             if saved_key:
-                print(f"  {RED}⚠️ Clé actuelle invalide ou expirée : {saved_key}{RESET}\n")
+                print(f" {RED}⚠️ Clé actuelle invalide ou expirée : {saved_key}{RESET}\n")
 
-            print(f"  {GREEN}{BOLD}[ 1 ] 🔑 Entrer / Activer ma Clé de Licence{RESET}")
-            print(f"  {RED}{BOLD}[ 2 ] ❌ Quitter{RESET}\n")
             sys.stdout.flush()
 
             try:
-                choice = input(f"  {CYAN}⚡ {WHITE}{BOLD}Votre choix [1-2] :{RESET} ").strip()
+                choice = input(f" {CYAN}▶{RESET} {WHITE}{BOLD}Sélectionner une option [1-2] :{RESET} ").strip()
             except (KeyboardInterrupt, EOFError):
                 return False
 
             if choice == "1":
                 print()
-                user_key = input(f"  {WHITE}{BOLD}Collez votre Clé de Licence (fournie par l'Admin) :{RESET} ").strip().upper()
+                user_key = input(f" {WHITE}{BOLD}🔑 Entrer la clé de licence :{RESET} ").strip().upper()
                 if not user_key:
-                    print(f"  {RED}Clé vide.{RESET}")
+                    print(f" {RED}Clé vide.{RESET}")
                     time.sleep(1.5)
                     continue
 
-                print(f"\n  {CYAN}Vérification de la licence pour l'appareil {self.device_id}...{RESET}")
+                print(f"\n {CYAN}⏳ Vérification de la licence pour l'appareil {self.device_id}...{RESET}")
                 ok, msg, info = self.activate_key(user_key)
                 if ok:
-                    print(f"\n  {GREEN}{BOLD}✓ SUCCÈS ! LICENCE ACTIVÉE AVEC SUCCÈS !{RESET}")
+                    print(f"\n {GREEN}{BOLD}✓ SUCCÈS ! LICENCE ACTIVÉE AVEC SUCCÈS !{RESET}")
                     exp = info.get("expires_at") or "Actif"
-                    print(f"  {WHITE}Appareil lié : {GREEN}{self.device_id}{RESET}")
-                    print(f"  {WHITE}Date de fin  : {YELLOW}{exp}{RESET}\n")
+                    print(f" {WHITE}Appareil : {GREEN}{self.device_id}{RESET}")
+                    print(f" {WHITE}Expire le: {YELLOW}{exp}{RESET}\n")
                     time.sleep(2)
                     return True
                 else:
-                    print(f"\n  {RED}{BOLD}❌ ACTIVATION REFUSÉE :{RESET} {RED}{msg}{RESET}")
-                    input(f"\n  Appuyez sur {BOLD}Entrée{RESET} pour réessayer...")
+                    print(f"\n {RED}{BOLD}❌ ACTIVATION REFUSÉE :{RESET} {RED}{msg}{RESET}")
+                    input(f"\n Appuyez sur {BOLD}Entrée{RESET} pour réessayer...")
 
             elif choice in ["2", "q", "exit"]:
                 return False
