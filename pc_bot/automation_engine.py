@@ -109,10 +109,10 @@ class AutomationEngine:
                 wp = str(w.get("platform", "")).lower()
                 if wp:
                     quarantined_platforms.add(wp)
-            # Quarantaine préventive des comptes non conformes
-            for rp in ["tiktok", "instagram", "linkedin"]:
-                quarantined_platforms.add(rp)
-            self.log(f"🛡️ ÉCHAPPATOIRE DIRECTE API : Quarantaine de [{', '.join([p.upper() for p in sorted(quarantined_platforms)])}] (0 risque de 4ème warning).", "warning")
+            if warn_count >= 3:
+                for rp in ["tiktok", "linkedin"]:
+                    quarantined_platforms.add(rp)
+                self.log(f"🛡️ SEUIL CRITIQUE (3/4) : Quarantaine préventive de [{', '.join([p.upper() for p in sorted(quarantined_platforms)])}].", "warning")
 
         # 2. Vérification des comptes sociaux
         status, socials = self.api.get_socials()

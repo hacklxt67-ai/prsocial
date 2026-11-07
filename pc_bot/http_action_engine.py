@@ -557,13 +557,11 @@ class UniversalSilentEngine:
                     quarantined_platforms.add(w_plat)
                 UI.step(f"   ↳ Avertissement #{w.get('id')} [{w_plat.upper()}] : {w_reason} ({w_date})", "warning")
 
-        # Quarantaine préventive immédiate pour échapper directement à l'API :
-        # Tout réseau ayant déjà reçu un avertissement ou non conforme aux règles NEED est neutralisé
-        if warn_count >= 1:
-            for risky_p in ["tiktok", "instagram", "linkedin"]:
-                quarantined_platforms.add(risky_p)
-            UI.step(f"🛡️ ÉCHAPPATOIRE DIRECTE API : Quarantaine absolue de : {', '.join([p.upper() for p in sorted(quarantined_platforms)])}", "success")
-            UI.step("   (Ces plateformes sont totalement écartées : 0 tâche exécutée = 0 scan TikHub = 0 risque de 4ème warning)", "info")
+            # Quarantaine de sécurité renforcée UNIQUEMENT au seuil critique (3 avertissements sur 4)
+            if warn_count >= 3:
+                for risky_p in ["tiktok", "linkedin"]:
+                    quarantined_platforms.add(risky_p)
+                UI.step(f"🛡️ SEUIL CRITIQUE (3/4) : Protection renforcée sur : {', '.join([p.upper() for p in sorted(quarantined_platforms)])}", "error")
 
         # 3. Nettoyage initial des tâches orphelines
         self.auto_unblock_active_tasks()
@@ -583,25 +581,31 @@ class UniversalSilentEngine:
 
         UI.accounts_grid(approved_accounts)
 
-        # 4.5. Sentinelle de Qualité : Audit préventif des profils (détection avant PR.Social)
+        # 4.5. Sentinelle de Qualité : Vérification consultative (sans bloquer les comptes approuvés PR.Social)
         try:
-            from pc_bot.profile_sentinel import ProfileComplianceSentinel
-            sentinel_bad, sentinel_rep = ProfileComplianceSentinel.audit_all(list(approved_accounts.values()))
-            for bp in sentinel_bad:
-                quarantined_platforms.add(bp)
-                for iss in sentinel_rep.get(bp, {}).get("issues", []):
-                    UI.step(f"🛡️ SENTINELLE PRÉVENTIVE [{bp.upper()}] : {iss}", "warning")
-            if sentinel_bad:
-                s_list = ", ".join([p.upper() for p in sorted(sentinel_bad)])
-                UI.step(f"🛡️ AUTO-QUARANTAINE SENTINELLE : {s_list} écartés d'office (anti-avertissement).", "success")
+            import re
+            for p, acc in approved_accounts.items():
+                u = acc.get("username", "")
+                if re.search(r'\d{5,}', u):
+                    UI.step(f"⚠️ AVERTISSEMENT PROFIL [{p.upper()}] : Le pseudo @{u} a plus de 4 chiffres consécutifs.", "warning")
         except Exception:
             pass
 
-        target_platforms = platforms or ["youtube", "twitter", "threads", "snapchat", "github", "reddit", "discord", "facebook", "soundcloud", "bluesky", "spotify", "telegram"]
+        ALL_SUPPORTED_PLATFORMS = [
+            "instagram", "tiktok", "youtube", "twitter", "threads",
+            "facebook", "snapchat", "github", "reddit", "discord",
+            "soundcloud", "bluesky", "spotify", "telegram", "pinterest", "linkedin"
+        ]
+        # Si aucune sélection manuelle, on prend toutes les plateformes approuvées par PR.Social
+        target_platforms = platforms or list(approved_accounts.keys()) or ALL_SUPPORTED_PLATFORMS
+
         # Tolérance zéro : Uniquement les plateformes ayant un compte explicitement approuvé ET hors quarantaine
         active_list = [p for p in target_platforms if p in approved_accounts and p not in quarantined_platforms]
         if not active_list:
-            UI.step("Aucune plateforme sécurisée disponible hors quarantaine.", "warning")
+            if not approved_accounts:
+                UI.step("Aucun compte lié approuvé trouvé sur PR.Social. Liez vos réseaux dans PR.Social.", "warning")
+            else:
+                UI.step(f"Tous vos comptes approuvés ({', '.join([p.upper() for p in approved_accounts.keys()])}) sont sous quarantaine d'avertissement.", "warning")
             return
 
         UI.step(f"Surveillance active sur {len(active_list)} plateformes sécurisées (Autoroute Anti-Ban) : {', '.join([p.upper() for p in active_list])}", "info")

@@ -75,7 +75,8 @@ class ProfileComplianceSentinel:
                 issues.append("Compte détecté comme PRIVÉ. PR.Social exige un compte ouvert à tous.")
                 is_safe = False
 
-            if any(k in body_text for k in ["page not found", "cette page n'est pas disponible", "user not found"]):
+            # Détection de profil non existant (uniquement sur plateformes sans login-wall obligatoire)
+            if plat not in ["instagram", "tiktok"] and any(k in body_text for k in ["page not found", "user not found"]):
                 issues.append("Profil introuvable publiquement (404/Non existant).")
                 is_safe = False
 
@@ -86,12 +87,11 @@ class ProfileComplianceSentinel:
                     try:
                         n_posts = int(m_posts.group(1).replace(',', ''))
                         if n_posts < 5:
-                            issues.append(f"Instagram exige 5 posts minimum (détecté : {n_posts}/5).")
-                            is_safe = False
+                            recommendations.append(f"Conseil : Instagram recommande 5 posts minimum (détecté : {n_posts}/5).")
                     except Exception:
                         pass
                 else:
-                    recommendations.append("Ajouter au moins 5 publications avec photo de profil pour éviter un audit TikHub.")
+                    recommendations.append("Vérifiez que votre compte a au moins 5 publications avec photo de profil.")
 
             elif plat == "tiktok":
                 if any(k in body_text for k in ["pas encore de contenu", "no videos yet", "couldn't find this account"]):

@@ -488,11 +488,11 @@ class TermuxBotApp:
                 wp = str(w.get("platform", "")).lower()
                 if wp:
                     quarantined_platforms.add(wp)
-            for rp in ["tiktok", "instagram", "linkedin"]:
-                quarantined_platforms.add(rp)
-            q_list = ", ".join([p.upper() for p in sorted(quarantined_platforms)])
-            print(f"  {CYAN}↳ Quarantaine préventive : {q_list}{RESET}")
-            print(f"  {DIM}(Ces réseaux sont écartés : 0 tâche = 0 risque du 4ème avertissement fatal){RESET}\n")
+            if w_count >= 3:
+                for rp in ["tiktok", "linkedin"]:
+                    quarantined_platforms.add(rp)
+                q_list = ", ".join([p.upper() for p in sorted(quarantined_platforms)])
+                print(f"  {CYAN}↳ Seuil critique (3/4) - Quarantaine préventive : {q_list}{RESET}\n")
 
         # 1. Détection & déblocage automatique immédiat
         print(f"{YELLOW}🔍 Détection automatique des tâches orphelines...{RESET}")
@@ -500,25 +500,14 @@ class TermuxBotApp:
         if unblocked == 0:
             print(f"{GREEN}✓ Aucune tâche orpheline bloquante. Prêt pour l'automatisation.{RESET}")
 
-        # 1.5. Sentinelle de Qualité : Détection et Auto-Quarantaine avant PR.Social
-        try:
-            from profile_sentinel import ProfileComplianceSentinel
-            sentinel_bad, sentinel_rep = ProfileComplianceSentinel.audit_all(list(self.approved_accounts.values()))
-            for bp in sentinel_bad:
-                quarantined_platforms.add(bp)
-                for iss in sentinel_rep.get(bp, {}).get("issues", []):
-                    print(f"  {YELLOW}🛡️ SENTINELLE PRÉVENTIVE [{bp.upper()}] : {iss}{RESET}")
-            if sentinel_bad:
-                s_list = ", ".join([p.upper() for p in sorted(sentinel_bad)])
-                print(f"  {CYAN}↳ Auto-Quarantaine Sentinelle : {s_list} écartés d'office.{RESET}\n")
-        except Exception:
-            pass
-
-        target_platforms = ["threads", "reddit", "pinterest", "soundcloud", "bluesky", "tiktok", "instagram", "youtube", "facebook", "linkedin", "telegram", "twitter", "snapchat", "github", "discord", "spotify"]
+        target_platforms = list(self.approved_accounts.keys()) or ["instagram", "threads", "reddit", "pinterest", "soundcloud", "bluesky", "tiktok", "youtube", "facebook", "linkedin", "telegram", "twitter", "snapchat", "github", "discord", "spotify"]
         # Tolérance zéro : Uniquement les plateformes ayant un compte explicitement approuvé
         active_list = [p for p in target_platforms if p in self.approved_accounts and p not in quarantined_platforms]
         if not active_list:
-            print(f"{YELLOW}Aucun réseau lié approuvé trouvé. Veuillez associer un compte sur PR.Social.{RESET}")
+            if not self.approved_accounts:
+                print(f"{YELLOW}Aucun réseau lié approuvé trouvé sur PR.Social. Veuillez associer vos comptes sur PR.Social.{RESET}")
+            else:
+                print(f"{YELLOW}Tous vos comptes approuvés ({', '.join([p.upper() for p in self.approved_accounts.keys()])}) sont sous quarantaine d'avertissement.{RESET}")
             input("Appuyez sur Entrée pour revenir au menu...")
             return
 
