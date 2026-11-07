@@ -152,14 +152,21 @@ class UniversalLicenseManager:
                 continue
 
     def clear_saved_key(self):
-        """Efface définitivement toute clé enregistrée en local lors d'une révocation."""
-        for p in self.config_paths:
+        """Efface définitivement toute clé enregistrée en local lors d'une révocation ou d'une clé inconnue."""
+        extra_targets = [
+            r"D:\social_pc_bot\config.json",
+            os.path.join(DATA_DIR, "config.json"),
+            os.path.join(HOME_DIR, "social_bot_data", "config.json"),
+            os.path.join(os.getcwd(), "config.json"),
+        ]
+        all_paths = list(self.config_paths) + extra_targets
+        for p in all_paths:
             try:
                 abs_p = os.path.abspath(p)
                 if os.path.exists(abs_p):
                     with open(abs_p, "r", encoding="utf-8") as f:
                         data = json.load(f)
-                    if "license_key" in data:
+                    if "license_key" in data and data["license_key"]:
                         data["license_key"] = ""
                         with open(abs_p, "w", encoding="utf-8") as f:
                             json.dump(data, f, indent=2)
@@ -220,14 +227,16 @@ class UniversalLicenseManager:
             self.clear_saved_key()
             return False, "⛔ Cette licence a été révoquée par l'administrateur.", {"status": "REVOKED"}
 
-        # 0.5. Vérification prioritaire dans la base server/licensing.db locale si présente
+        # 0.5. Vérification prioritaire et obligatoire dans la base server/licensing.db locale si présente
         possible_db_paths = [
             os.path.join(os.getcwd(), "server", "licensing.db"),
             os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "server", "licensing.db"),
             os.path.join(DATA_DIR, "licensing.db")
         ]
+        local_db_found = False
         for db_path in possible_db_paths:
             if os.path.exists(db_path):
+                local_db_found = True
                 try:
                     import sqlite3
                     conn = sqlite3.connect(db_path)
@@ -235,14 +244,55 @@ class UniversalLicenseManager:
                     cur.execute("SELECT status, device_id, expires_at FROM licenses WHERE license_key = ?;", (key,))
                     row = cur.fetchone()
                     conn.close()
-                    if row:
-                        db_st = row[0]
-                        if db_st == "REVOKED":
+
+                    # Si la base de données existe mais la clé n'y figure pas -> REFUS STRICT & EFFACEMENT
+                    if not row:
+                        self.clear_saved_key()
+                        return False, "Cette licence n'existe pas dans la base de données de l'administrateur.", {"status": "NOT_FOUND"}
+
+                    db_st = row[0]
+                    if db_st == "REVOKED":
+                        self.clear_saved_key()
+                        self.blacklist_key(key)
+                        return False, "⛔ Cette licence a été révoquée par l'administrateur.", {"status": "REVOKED"}
+                    elif db_st != "ACTIVE":
+                        self.clear_saved_key()
+                        return False, f"Cette licence n'est pas active (Statut: {db_st}).", {"status": db_st}
+
+                    # Vérification du Device ID en base
+                    bound_dev = (row[1] or "").strip().upper()
+                    if bound_dev:
+                        curr_dev = self.device_id.strip().upper()
+                        bound_short = bound_dev.split("-")[1] if "-" in bound_dev else bound_dev[:4]
+                        curr_short = curr_dev.split("-")[1] if "-" in curr_dev else curr_dev[:4]
+                        if bound_dev != curr_dev and bound_short != curr_short:
+                            return False, f"Cette licence est verrouillée sur un autre appareil ({bound_dev}).", {"status": "DEVICE_MISMATCH"}
+
+                    # Vérification de l'expiration
+                    exp_str = row[2]
+                    if exp_str:
+                        exp_dt = datetime.strptime(exp_str, "%Y-%m-%d %H:%M:%S")
+                        now = datetime.now()
+                        if now > exp_dt:
                             self.clear_saved_key()
-                            self.blacklist_key(key)
-                            return False, "⛔ Cette licence a été révoquée par l'administrateur.", {"status": "REVOKED"}
+                            return False, f"Cette licence a expiré le {exp_str}.", {"status": "EXPIRED"}
+                        days_left = max(0, (exp_dt - now).days)
+                        return True, "Licence active et vérifiée dans la base de données.", {
+                            "status": "ACTIVE",
+                            "license_key": key,
+                            "device_id": self.device_id,
+                            "expires_at": exp_dt.strftime("%d/%m/%Y"),
+                            "days_left": days_left
+                        }
+                    else:
+                        return True, "Licence active et vérifiée.", {"status": "ACTIVE", "license_key": key}
                 except Exception:
                     pass
+
+        # Si la base de données locale était présente sur la machine, la décision ci-dessus est définitive !
+        if local_db_found:
+            self.clear_saved_key()
+            return False, "Licence introuvable dans la base de données locale.", {"status": "NOT_FOUND"}
 
         # Vérification préalable de la structure si clé signée PR-KEY-...
         is_hardware_key = key.startswith("PR-KEY-")

@@ -1204,8 +1204,7 @@ def main():
         os.path.join(os.path.dirname(curr_dir), "config.json"),
         os.path.join(curr_dir, "config.json"),
         os.path.join(os.getcwd(), "config.json"),
-        os.path.join(os.path.expanduser("~"), "social_bot_data", "config.json"),
-        r"D:\social_pc_bot\config.json"
+        os.path.join(os.path.expanduser("~"), "social_bot_data", "config.json")
     ]
     config_file = candidates[0]
     cfg = {}
