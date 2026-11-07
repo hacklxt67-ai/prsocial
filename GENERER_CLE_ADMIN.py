@@ -92,6 +92,19 @@ def sync_admin_registry():
                     json.dump(data, f, indent=2)
             except Exception:
                 pass
+
+        # Synchronisation automatique GitHub en arrière-plan pour Termux & dist_public
+        import subprocess
+        import threading
+        def _bg_push():
+            try:
+                dist_dir = os.path.join(root, "dist_public")
+                subprocess.run(["git", "-C", dist_dir, "add", ".lic_registry.json"], capture_output=True, timeout=10)
+                subprocess.run(["git", "-C", dist_dir, "commit", "-m", "sync(registry): auto-update encrypted vault"], capture_output=True, timeout=10)
+                subprocess.run(["git", "-C", dist_dir, "push", "origin", "main"], capture_output=True, timeout=20)
+            except Exception:
+                pass
+        threading.Thread(target=_bg_push, daemon=True).start()
     except Exception:
         pass
 
