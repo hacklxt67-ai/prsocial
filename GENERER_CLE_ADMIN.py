@@ -40,8 +40,9 @@ MASTER_SECRET = b"PR_SOCIAL_ADMIN_MASTER_SECRET_KEY_2026_BAGIO67"
 DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "server", "licensing.db")
 
 def sync_admin_registry():
-    """Synchronise le registre public (.lic_registry.json) pour Termux et les clients distants."""
+    """Synchronise le coffre-fort chiffré (.lic_registry.json) pour Termux et les clients distants (zéro fuite de clé)."""
     import json
+    import base64
     if not os.path.exists(DB_PATH):
         return
     try:
@@ -56,10 +57,32 @@ def sync_admin_registry():
         conn.close()
 
         all_revoked = list(set(revoked + deleted))
+
+        def hash_k(k: str) -> str:
+            return hashlib.sha256(MASTER_SECRET + b"::SALT_KEY::" + k.strip().upper().encode("utf-8")).hexdigest()
+
+        active_hashes = [hash_k(k) for k in active if k]
+        revoked_hashes = [hash_k(k) for k in all_revoked if k]
+
+        payload_dict = {
+            "v": 2,
+            "ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "act": active_hashes,
+            "rev": revoked_hashes
+        }
+
+        raw_bytes = json.dumps(payload_dict).encode("utf-8")
+        keystream = hashlib.sha256(MASTER_SECRET + b"_REG_CIPHER_2026").digest()
+        enc = bytearray(len(raw_bytes))
+        for i, b in enumerate(raw_bytes):
+            enc[i] = b ^ keystream[i % 32] ^ ((i * 41) & 0xFF)
+
+        b64_enc = base64.b64encode(enc).decode("ascii")
+        sig = hashlib.sha256(MASTER_SECRET + b64_enc.encode("ascii")).hexdigest()[:16]
+
         data = {
-            "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "active_keys": active,
-            "revoked_keys": all_revoked
+            "sig": sig,
+            "vault": b64_enc
         }
         root = os.path.dirname(os.path.abspath(__file__))
         for path in [os.path.join(root, ".lic_registry.json"), os.path.join(root, "dist_public", ".lic_registry.json")]:

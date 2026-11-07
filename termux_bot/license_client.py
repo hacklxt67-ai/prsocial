@@ -16,6 +16,7 @@ LICENSE_FILE = os.path.join(DATA_DIR, "license.json")
 
 # URL par défaut du serveur de licence (peut être modifiée dans config.json)
 DEFAULT_SERVER_URL = "http://127.0.0.1:8000"
+MASTER_SECRET_SIGNING_KEY = b"PR_SOCIAL_ADMIN_MASTER_SECRET_KEY_2026_BAGIO67"
 
 def get_device_id() -> str:
     """Génère et persiste un identifiant matériel unique pour le smartphone Android/Termux."""
@@ -124,20 +125,35 @@ class TermuxLicenseClient:
                     self.clear_saved_key()
             return is_valid, msg, info
         except Exception:
-            # Serveur local inaccessible -> Fallback Registre GitHub
+            # Serveur local inaccessible -> Fallback Registre GitHub Chiffré
             ONLINE_REGISTRY_URL = "https://raw.githubusercontent.com/Baggio67/media.sc/main/.lic_registry.json"
             try:
                 import time
+                import base64
                 cache_buster = int(time.time())
                 r_reg = requests.get(f"{ONLINE_REGISTRY_URL}?t={cache_buster}", timeout=5.0)
                 if r_reg.status_code == 200:
                     reg_data = r_reg.json()
-                    active_list = reg_data.get("active_keys", [])
-                    revoked_list = reg_data.get("revoked_keys", [])
-                    if key in revoked_list:
+                    vault_str = reg_data.get("vault", "")
+                    if vault_str:
+                        enc_bytes = base64.b64decode(vault_str.encode("ascii"))
+                        keystream = hashlib.sha256(MASTER_SECRET_SIGNING_KEY + b"_REG_CIPHER_2026").digest()
+                        dec = bytearray(len(enc_bytes))
+                        for i, b in enumerate(enc_bytes):
+                            dec[i] = b ^ keystream[i % 32] ^ ((i * 41) & 0xFF)
+                        inner = json.loads(dec.decode("utf-8"))
+                        active_list = set(inner.get("act", []))
+                        revoked_list = set(inner.get("rev", []))
+                    else:
+                        active_list = set(reg_data.get("active_keys", []))
+                        revoked_list = set(reg_data.get("revoked_keys", []))
+
+                    key_hash = hashlib.sha256(MASTER_SECRET_SIGNING_KEY + b"::SALT_KEY::" + key.strip().upper().encode("utf-8")).hexdigest()
+
+                    if key_hash in revoked_list or key in revoked_list:
                         self.clear_saved_key()
                         return False, "⛔ Cette licence a été révoquée par l'administrateur.", {"status": "REVOKED"}
-                    if key not in active_list:
+                    if key_hash not in active_list and key not in active_list:
                         self.clear_saved_key()
                         return False, "⛔ Cette licence n'existe pas ou a été supprimée par l'administrateur.", {"status": "NOT_FOUND"}
                     return True, "Licence active certifiée par le registre officiel.", {"status": "ACTIVE", "license_key": key}

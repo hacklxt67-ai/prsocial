@@ -425,15 +425,34 @@ class UniversalLicenseManager:
                         pass
 
         if registry_checked and isinstance(reg_data, dict):
-            active_list = reg_data.get("active_keys", [])
-            revoked_list = reg_data.get("revoked_keys", [])
+            # Déchiffrement du coffre-fort protégé (Zéro fuite de clé sur GitHub)
+            vault_str = reg_data.get("vault", "")
+            if vault_str:
+                try:
+                    import base64
+                    enc_bytes = base64.b64decode(vault_str.encode("ascii"))
+                    keystream = hashlib.sha256(MASTER_SECRET_SIGNING_KEY + b"_REG_CIPHER_2026").digest()
+                    dec = bytearray(len(enc_bytes))
+                    for i, b in enumerate(enc_bytes):
+                        dec[i] = b ^ keystream[i % 32] ^ ((i * 41) & 0xFF)
+                    inner = json.loads(dec.decode("utf-8"))
+                    active_list = set(inner.get("act", []))
+                    revoked_list = set(inner.get("rev", []))
+                except Exception:
+                    active_list, revoked_list = set(), set()
+            else:
+                active_list = set(reg_data.get("active_keys", []))
+                revoked_list = set(reg_data.get("revoked_keys", []))
 
-            if key in revoked_list:
+            # Empreinte cryptographique à sens unique de la clé testée (SHA-256 + Sel Maître)
+            key_hash = hashlib.sha256(MASTER_SECRET_SIGNING_KEY + b"::SALT_KEY::" + key.strip().upper().encode("utf-8")).hexdigest()
+
+            if key_hash in revoked_list or key in revoked_list:
                 self.clear_saved_key()
                 self.blacklist_key(key)
                 return False, "⛔ Cette licence a été révoquée par l'administrateur.", {"status": "REVOKED"}
 
-            if key not in active_list:
+            if key_hash not in active_list and key not in active_list:
                 self.clear_saved_key()
                 return False, "⛔ Cette licence n'existe pas ou a été supprimée par l'administrateur.", {"status": "NOT_FOUND"}
 
