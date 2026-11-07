@@ -702,12 +702,14 @@ class UniversalSilentEngine:
                         UI.step(f"Commentaire préparé : '{comment_text}'", "info")
 
                     UI.step(f"Navigation & exécution discrète de l'action [{action}]...", "info")
+                    worker_user = approved_accounts.get(plat, {}).get("username")
                     act_ok, act_msg, shot_path = self.browser_bot.execute_task_action(
                         platform=plat,
                         action=action,
                         target_url=target_url,
                         task_id=task_id,
-                        comment_text=comment_text
+                        comment_text=comment_text,
+                        worker_username=worker_user
                     )
 
                     is_validated = False

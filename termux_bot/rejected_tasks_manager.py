@@ -244,12 +244,14 @@ class TermuxRejectedTasksManager:
         print(f"  🛡️ Exécution stricte en cours...")
 
         # 2. Exécution dans le navigateur Termux
+        worker_user = approved_accounts.get(plat, {}).get("username") if approved_accounts else None
         ok_act, msg_act, shot_path = self.browser.execute_task_action(
             platform=plat,
             action=action,
             target_url=target_url,
             task_id=task_id,
-            comment_text=comment_text
+            comment_text=comment_text,
+            worker_username=worker_user
         )
 
         is_validated = False

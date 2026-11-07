@@ -635,8 +635,9 @@ class TermuxBotApp:
 
                         print(f"  🌐 URL : {DIM}{target_url}{RESET}")
                         print(f"  🤖 Exécution en arrière-plan...")
+                        worker_user = self.approved_accounts.get(plat, {}).get("username")
                         ok_act, msg_act, shot_path = self.browser.execute_task_action(
-                            platform=plat, action=action, target_url=target_url, task_id=task_id, comment_text=comment_text
+                            platform=plat, action=action, target_url=target_url, task_id=task_id, comment_text=comment_text, worker_username=worker_user
                         )
 
                         is_valid = False

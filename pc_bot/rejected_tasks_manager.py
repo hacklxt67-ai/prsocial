@@ -120,7 +120,8 @@ class StrictRetryEngine:
         target_url: str,
         task_id: int,
         comment_text: Optional[str] = None,
-        log_cb: Optional[Callable[[str, str], None]] = None
+        log_cb: Optional[Callable[[str, str], None]] = None,
+        worker_username: Optional[str] = None
     ) -> Tuple[bool, str, str]:
         """
         Exécution avec vérification ULTRA-STRICTE :
@@ -152,7 +153,8 @@ class StrictRetryEngine:
                     action=action,
                     target_url=target_url,
                     task_id=task_id,
-                    comment_text=comment_text
+                    comment_text=comment_text,
+                    worker_username=worker_username
                 )
 
             if not self.browser_bot.headless:
@@ -236,7 +238,8 @@ class StrictRetryEngine:
                     action=action,
                     target_url=target_url,
                     task_id=task_id,
-                    comment_text=comment_text
+                    comment_text=comment_text,
+                    worker_username=worker_username
                 )
                 _log(f"Action effectuée : {act_msg}", "info")
                 # Attente post-clic pour laisser le DOM et le serveur valider la transition
@@ -380,7 +383,8 @@ class RejectedTasksManager:
     def retry_single_task(
         self,
         task_info: Dict[str, Any],
-        log_cb: Optional[Callable[[str, str], None]] = None
+        log_cb: Optional[Callable[[str, str], None]] = None,
+        approved_accounts: Optional[Dict[str, Any]] = None
     ) -> Tuple[bool, str]:
         """
         Relance et réessaie une tâche rejetée selon le protocole de vérification STRICT.
@@ -478,13 +482,15 @@ class RejectedTasksManager:
                             "Very good content! 👍")
 
         # 2. Exécution avec vérification ULTRA STRICTE
+        worker_user = approved_accounts.get(plat, {}).get("username") if approved_accounts else None
         success, act_msg, screenshot_path = self.strict_engine.execute_strict_task(
             platform=plat,
             action=action,
             target_url=target_url,
             task_id=task_id,
             comment_text=comment_text,
-            log_cb=log_cb
+            log_cb=log_cb,
+            worker_username=worker_user
         )
 
         is_validated = False
