@@ -293,7 +293,17 @@ def generate_licenses(req: LicenseGenerateRequest, admin: str = Depends(require_
 @app.post("/api/admin/licenses/{license_id}/revoke")
 def revoke_license(license_id: int, admin: str = Depends(require_admin)):
     LicenseManager.revoke(license_id)
-    return {"ok": True, "message": f"Licence #{license_id} révoquée."}
+    return {"ok": True, "message": f"Licence #{license_id} révoquée avec succès."}
+
+@app.post("/api/admin/licenses/{license_id}/reactivate")
+def reactivate_license(license_id: int, admin: str = Depends(require_admin)):
+    LicenseManager.reactivate(license_id)
+    return {"ok": True, "message": f"Licence #{license_id} réactivée avec succès."}
+
+@app.delete("/api/admin/licenses/{license_id}")
+def delete_license(license_id: int, admin: str = Depends(require_admin)):
+    LicenseManager.delete(license_id)
+    return {"ok": True, "message": f"Licence #{license_id} définitivement supprimée."}
 
 @app.post("/api/admin/licenses/{license_id}/extend")
 def extend_license(license_id: int, req: LicenseExtendRequest, admin: str = Depends(require_admin)):

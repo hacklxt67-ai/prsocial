@@ -40,6 +40,7 @@ DIM = "\033[2m"
 HOME_DIR = os.path.expanduser("~")
 DATA_DIR = os.path.join(HOME_DIR, "social_bot_data")
 DEVICE_ID_FILE = os.path.join(DATA_DIR, ".device_id")
+REVOKED_KEYS_FILE = os.path.join(DATA_DIR, ".revoked_keys.json")
 
 # Clé secrète maître d'administration (utilisée pour signer les clés matérielles 1 user = 1 device)
 MASTER_SECRET_SIGNING_KEY = b"PR_SOCIAL_ADMIN_MASTER_SECRET_KEY_2026_BAGIO67"
@@ -150,19 +151,103 @@ class UniversalLicenseManager:
             except Exception:
                 continue
 
+    def clear_saved_key(self):
+        """Efface définitivement toute clé enregistrée en local lors d'une révocation."""
+        for p in self.config_paths:
+            try:
+                abs_p = os.path.abspath(p)
+                if os.path.exists(abs_p):
+                    with open(abs_p, "r", encoding="utf-8") as f:
+                        data = json.load(f)
+                    if "license_key" in data:
+                        data["license_key"] = ""
+                        with open(abs_p, "w", encoding="utf-8") as f:
+                            json.dump(data, f, indent=2)
+            except Exception:
+                pass
+        lic_file = os.path.join(DATA_DIR, "license.json")
+        if os.path.exists(lic_file):
+            try:
+                os.remove(lic_file)
+            except Exception:
+                pass
+
+    def blacklist_key(self, key: str):
+        """Mémorise localement une clé révoquée par l'administrateur."""
+        key = key.strip().upper()
+        if not key:
+            return
+        os.makedirs(DATA_DIR, exist_ok=True)
+        revoked = set()
+        if os.path.exists(REVOKED_KEYS_FILE):
+            try:
+                with open(REVOKED_KEYS_FILE, "r", encoding="utf-8") as f:
+                    revoked = set(json.load(f))
+            except Exception:
+                revoked = set()
+        revoked.add(key)
+        try:
+            with open(REVOKED_KEYS_FILE, "w", encoding="utf-8") as f:
+                json.dump(list(revoked), f)
+        except Exception:
+            pass
+
+    def is_key_blacklisted(self, key: str) -> bool:
+        """Vérifie si la clé a été révoquée par l'administrateur."""
+        key = key.strip().upper()
+        if not key or not os.path.exists(REVOKED_KEYS_FILE):
+            return False
+        try:
+            with open(REVOKED_KEYS_FILE, "r", encoding="utf-8") as f:
+                revoked = json.load(f)
+                return key in revoked
+        except Exception:
+            return False
+
     def verify_key(self, key: str) -> Tuple[bool, str, Dict[str, Any]]:
         """
-        Vérification stricte de la licence :
-        1. Vérifie si c'est une clé signée cryptographiquement verrouillée sur cet appareil (HWID).
-        2. Sinon, interroge le serveur d'administration si disponible.
+        Vérification stricte de la licence avec contrôle administrateur 100% en temps réel :
+        1. Vérifie si la clé est dans la liste des licences révoquées.
+        2. Valide l'intégrité matérielle (HWID) et cryptographique.
+        3. Interroge le serveur central : si révoquée ou supprimée par l'admin -> BLOCAGE & EFFACEMENT IMMÉDIAT.
         """
         key = key.strip().upper()
         if not key:
             return False, "Aucune clé de licence fournie.", {}
 
-        # MODE 1 : Clé Cryptographique Verrouillée Matériellement (1 Appareil = 1 Clé)
-        # Format : PR-KEY-<DEV_SHORT>-<YYYYMMDD>-<SIGNATURE>
-        if key.startswith("PR-KEY-"):
+        # 0. Vérification de la blacklist locale de révocation
+        if self.is_key_blacklisted(key):
+            self.clear_saved_key()
+            return False, "⛔ Cette licence a été révoquée par l'administrateur.", {"status": "REVOKED"}
+
+        # 0.5. Vérification prioritaire dans la base server/licensing.db locale si présente
+        possible_db_paths = [
+            os.path.join(os.getcwd(), "server", "licensing.db"),
+            os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "server", "licensing.db"),
+            os.path.join(DATA_DIR, "licensing.db")
+        ]
+        for db_path in possible_db_paths:
+            if os.path.exists(db_path):
+                try:
+                    import sqlite3
+                    conn = sqlite3.connect(db_path)
+                    cur = conn.cursor()
+                    cur.execute("SELECT status, device_id, expires_at FROM licenses WHERE license_key = ?;", (key,))
+                    row = cur.fetchone()
+                    conn.close()
+                    if row:
+                        db_st = row[0]
+                        if db_st == "REVOKED":
+                            self.clear_saved_key()
+                            self.blacklist_key(key)
+                            return False, "⛔ Cette licence a été révoquée par l'administrateur.", {"status": "REVOKED"}
+                except Exception:
+                    pass
+
+        # Vérification préalable de la structure si clé signée PR-KEY-...
+        is_hardware_key = key.startswith("PR-KEY-")
+        exp_date_obj = None
+        if is_hardware_key:
             parts = key.split("-")
             if len(parts) >= 5:
                 k_dev = parts[2]
@@ -183,45 +268,59 @@ class UniversalLicenseManager:
                 if not hmac.compare_digest(k_sig, expected_sig):
                     return False, "Clé de licence invalide ou signature falsifiée.", {"status": "INVALID_SIGNATURE"}
 
-                # 3. Vérification de la date d'expiration
                 try:
-                    exp_date = datetime.strptime(k_exp, "%Y%m%d")
-                    # Expire à 23h59:59 du jour indiqué
-                    exp_date = exp_date.replace(hour=23, minute=59, second=59)
-                    now = datetime.now()
-                    if now > exp_date:
-                        return False, f"Cette licence a expiré le {exp_date.strftime('%d/%m/%Y')}. Contactez l'administrateur pour la renouveler.", {
+                    exp_date_obj = datetime.strptime(k_exp, "%Y%m%d").replace(hour=23, minute=59, second=59)
+                    if datetime.now() > exp_date_obj:
+                        return False, f"Cette licence a expiré le {exp_date_obj.strftime('%d/%m/%Y')}.", {
                             "status": "EXPIRED",
-                            "expires_at": exp_date.strftime("%Y-%m-%d %H:%M:%S")
+                            "expires_at": exp_date_obj.strftime("%Y-%m-%d %H:%M:%S")
                         }
-
-                    days_left = max(0, (exp_date - now).days)
-                    return True, "Licence matérielle vérifiée et active.", {
-                        "status": "ACTIVE",
-                        "license_key": key,
-                        "device_id": self.device_id,
-                        "expires_at": exp_date.strftime("%d/%m/%Y"),
-                        "days_left": days_left
-                    }
                 except Exception:
                     return False, "Format de date d'expiration invalide dans la clé.", {}
+            else:
+                return False, "Format de clé matérielle invalide.", {}
 
-        # MODE 2 : Clé Serveur de Base de Données (PR-XXXX-XXXX-XXXX)
+        # 2. CONTRÔLE SERVEUR EN TEMPS RÉEL (AUTORITÉ SUPRÊME DE L'ADMIN)
         import requests
+        server_checked = False
         try:
             r = requests.post(
                 f"{self.server_url}/api/v1/license/verify",
                 json={"license_key": key, "device_id": self.device_id},
-                timeout=4
+                timeout=3.5
             )
             if r.status_code == 200:
+                server_checked = True
                 data = r.json()
-                if data.get("is_valid") or data.get("ok"):
-                    return True, data.get("message", "Licence active"), data.get("info", {})
-                else:
-                    return False, data.get("message", "Licence non valide"), data.get("info", {})
+                is_valid = bool(data.get("is_valid", False))
+                msg = data.get("message", "")
+                info = data.get("info", {})
+
+                if not is_valid:
+                    # L'ADMIN A RÉVOQUÉ OU SUPPRIMÉ LA LICENCE
+                    status = info.get("status", "REVOKED")
+                    if status in ["REVOKED", "NOT_FOUND", "EXPIRED"]:
+                        self.clear_saved_key()
+                        self.blacklist_key(key)
+                    return False, f"⛔ {msg}", info
+
+                # Licence confirmée active par le serveur
+                return True, msg or "Licence vérifiée et active auprès du serveur.", info
         except Exception:
-            pass
+            # Le serveur central est momentanément inaccessible
+            server_checked = False
+
+        # Si le serveur était joignable et a répondu, la décision a déjà été retournée ci-dessus.
+        # Si le serveur est HORS LIGNE (pas de réseau) :
+        if is_hardware_key and exp_date_obj:
+            days_left = max(0, (exp_date_obj - datetime.now()).days)
+            return True, "Licence matérielle vérifiée (Mode Secours Local).", {
+                "status": "ACTIVE",
+                "license_key": key,
+                "device_id": self.device_id,
+                "expires_at": exp_date_obj.strftime("%d/%m/%Y"),
+                "days_left": days_left
+            }
 
         return False, "Clé de licence non reconnue ou serveur inaccessible. Veuillez contacter l'administrateur.", {}
 

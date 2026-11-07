@@ -87,10 +87,20 @@ class TermuxLicenseClient:
         except Exception:
             pass
 
+    def clear_saved_key(self):
+        """Efface la clé locale en cas de révocation par l'administrateur."""
+        self.cached_key = ""
+        try:
+            if os.path.exists(LICENSE_FILE):
+                os.remove(LICENSE_FILE)
+        except Exception:
+            pass
+
     def check_license(self, key_override: Optional[str] = None) -> Tuple[bool, str, Dict[str, Any]]:
         """
         Interroge le serveur FastAPI pour vérifier si la licence actuelle est valide.
         Retourne (is_valid, message, info)
+        Si révoquée ou supprimée par l'admin, efface immédiatement la clé en local.
         """
         key = key_override or self.cached_key
         if not key:
@@ -108,6 +118,10 @@ class TermuxLicenseClient:
             is_valid = bool(data.get("is_valid", False))
             msg = data.get("message", "Réponse serveur")
             info = data.get("info", {})
+            if not is_valid:
+                status = info.get("status", "REVOKED")
+                if status in ["REVOKED", "NOT_FOUND", "EXPIRED"]:
+                    self.clear_saved_key()
             return is_valid, msg, info
         except Exception as e:
             return False, f"Impossible de contacter le serveur de licence ({self.server_url}) : {str(e)}", {}

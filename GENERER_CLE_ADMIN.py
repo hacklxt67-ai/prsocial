@@ -39,10 +39,11 @@ MASTER_SECRET = b"PR_SOCIAL_ADMIN_MASTER_SECRET_KEY_2026_BAGIO67"
 
 DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "server", "licensing.db")
 
-def generate_hardware_locked_key(device_input: str, days: int) -> str:
+def generate_hardware_locked_key(device_input: str, days: int, notes: str = "", contact: str = "") -> str:
     """
     Génère une clé de licence cryptographiquement signée et scellée
     sur l'identifiant matériel de l'appareil (1 Clé = 1 Appareil).
+    Enregistre IMMÉDIATEMENT la clé dans server/licensing.db pour un contrôle total en temps réel.
     """
     clean_dev = device_input.strip().upper()
     # Si l'admin colle PC-8F2A-4B91-C3D7, on extrait le bloc discriminant '8F2A'
@@ -53,12 +54,31 @@ def generate_hardware_locked_key(device_input: str, days: int) -> str:
         dev_code = clean_dev[:4]
 
     dev_code = dev_code[:4].upper()
-    exp_date = (datetime.now() + timedelta(days=days)).strftime("%Y%m%d")
+    exp_dt = datetime.now() + timedelta(days=days)
+    exp_date_short = exp_dt.strftime("%Y%m%d")
+    exp_date_full = exp_dt.replace(hour=23, minute=59, second=59).strftime("%Y-%m-%d %H:%M:%S")
 
-    payload = f"{dev_code}:{exp_date}".encode("utf-8")
+    payload = f"{dev_code}:{exp_date_short}".encode("utf-8")
     sig = hmac.new(MASTER_SECRET, payload, hashlib.sha256).hexdigest()[:8].upper()
 
-    return f"PR-KEY-{dev_code}-{exp_date}-{sig}"
+    key = f"PR-KEY-{dev_code}-{exp_date_short}-{sig}"
+
+    # Enregistrement immédiat dans la base de données du serveur
+    if os.path.exists(DB_PATH):
+        try:
+            conn = sqlite3.connect(DB_PATH)
+            cur = conn.cursor()
+            now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            cur.execute("""
+                INSERT OR REPLACE INTO licenses (license_key, duration_days, status, created_at, activated_at, expires_at, device_id, notes, client_contact)
+                VALUES (?, ?, 'ACTIVE', ?, ?, ?, ?, ?, ?);
+            """, (key, days, now_str, now_str, exp_date_full, clean_dev, notes or "Clé Matérielle Admin", contact))
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            print(f"  {YELLOW}Avertissement DB locale : {e}{RESET}")
+
+    return key
 
 def generate_server_database_key(duration_days: int = 7, notes: str = "", contact: str = "") -> str:
     """Génère une clé standard enregistrée dans la base de données du serveur."""
@@ -106,30 +126,97 @@ def list_server_licenses():
         print(f"  {r['id']:<3} | {r['license_key']:<19} | {st_color}{st:<9}{RESET} | {exp:<19} | {dev}")
     print()
 
+def revoke_license_action(target: str) -> bool:
+    """Révoque immédiatement une licence par ID ou clé."""
+    if not os.path.exists(DB_PATH):
+        return False
+    target = target.strip()
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    if target.isdigit():
+        cur.execute("UPDATE licenses SET status = 'REVOKED' WHERE id = ?;", (int(target),))
+    else:
+        cur.execute("UPDATE licenses SET status = 'REVOKED' WHERE license_key = ?;", (target.upper(),))
+    changed = cur.rowcount > 0
+    conn.commit()
+    conn.close()
+    return changed
+
+def reactivate_license_action(target: str) -> bool:
+    """Réactive une licence révoquée par ID ou clé."""
+    if not os.path.exists(DB_PATH):
+        return False
+    target = target.strip()
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    if target.isdigit():
+        cur.execute("UPDATE licenses SET status = 'ACTIVE' WHERE id = ?;", (int(target),))
+    else:
+        cur.execute("UPDATE licenses SET status = 'ACTIVE' WHERE license_key = ?;", (target.upper(),))
+    changed = cur.rowcount > 0
+    conn.commit()
+    conn.close()
+    return changed
+
+def delete_license_action(target: str) -> bool:
+    """Supprime définitivement une licence par ID ou clé et bloque toute réutilisation."""
+    if not os.path.exists(DB_PATH):
+        return False
+    target = target.strip()
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    # Récupérer la clé si ID
+    lic_key = None
+    if target.isdigit():
+        cur.execute("SELECT license_key FROM licenses WHERE id = ?;", (int(target),))
+        row = cur.fetchone()
+        if row:
+            lic_key = row[0]
+        cur.execute("DELETE FROM licenses WHERE id = ?;", (int(target),))
+    else:
+        lic_key = target.upper()
+        cur.execute("DELETE FROM licenses WHERE license_key = ?;", (lic_key,))
+
+    changed = cur.rowcount > 0
+    if lic_key:
+        cur.execute("INSERT OR REPLACE INTO deleted_licenses (license_key, deleted_at) VALUES (?, ?);", (lic_key, now_str))
+
+    conn.commit()
+    conn.close()
+    return changed
+
 def main():
     while True:
         os.system('cls' if os.name == 'nt' else 'clear')
         print(f"""
   {MAGENTA}{BOLD}╔══════════════════════════════════════════════════════════════════════╗{RESET}
-  {MAGENTA}{BOLD}║{RESET}         👑 {WHITE}{BOLD}PR.SOCIAL · GÉNÉRATEUR EXCLUSIF DE CLÉS ADMIN{RESET}             {MAGENTA}{BOLD}║{RESET}
+  {MAGENTA}{BOLD}║{RESET}         👑 {WHITE}{BOLD}PR.SOCIAL · CONTRÔLE TOTAL DES CLÉS ADMIN{RESET}                   {MAGENTA}{BOLD}║{RESET}
   {MAGENTA}{BOLD}╠══════════════════════════════════════════════════════════════════════╣{RESET}
-  {MAGENTA}{BOLD}║{RESET}  {CYAN}Ce menu permet à l'administrateur de générer et délivrer des clés{RESET}  {MAGENTA}{BOLD}║{RESET}
+  {MAGENTA}{BOLD}║{RESET}  {CYAN}Contrôle absolu en temps réel : Activation, Révocation, Suppression{RESET} {MAGENTA}{BOLD}║{RESET}
   {MAGENTA}{BOLD}║{RESET}  {WHITE}Règle d'or : 1 Utilisateur = 1 Appareil (HWID) = 1 Clé Unique{RESET}       {MAGENTA}{BOLD}║{RESET}
   {MAGENTA}{BOLD}╚══════════════════════════════════════════════════════════════════════╝{RESET}
 
-  {GREEN}{BOLD}[ 1 ] 🔐 Générer une Clé Verrouillée 1 Appareil (Recommandé - Sans Serveur){RESET}
-        {WHITE}Lie instantanément la licence à l'identifiant matériel du client.{RESET}
+  {GREEN}{BOLD}[ 1 ] 🔐 Générer une Clé Verrouillée 1 Appareil (Auto-Enregistrée DB){RESET}
+        {WHITE}Lie la licence à l'appareil et l'enregistre pour contrôle en direct.{RESET}
 
   {CYAN}{BOLD}[ 2 ] 🌐 Générer une Clé Serveur de Base de Données (PR-XXXX-XXXX-XXXX){RESET}
         {WHITE}Clé standard enregistrée dans la DB du serveur de licences.{RESET}
 
   {YELLOW}{BOLD}[ 3 ] 📋 Voir la Liste des Licences & Appareils Liés (DB){RESET}
 
-  {RED}{BOLD}[ 4 ] ❌ Quitter{RESET}
+  {RED}{BOLD}[ 4 ] 🚫 Révoquer / Bannir une Licence (Bloquer immédiatement un utilisateur){RESET}
+
+  {GREEN}{BOLD}[ 5 ] 🔄 Réactiver une Licence (Lever la révocation){RESET}
+
+  {RED}{BOLD}[ 6 ] 🗑️ Supprimer définitivement une Licence{RESET}
+
+  {WHITE}{BOLD}[ 7 ] ❌ Quitter{RESET}
 """)
 
         try:
-            choice = input(f"  {MAGENTA}⚡ {WHITE}{BOLD}Votre choix [1-4] :{RESET} ").strip()
+            choice = input(f"  {MAGENTA}⚡ {WHITE}{BOLD}Votre choix [1-7] :{RESET} ").strip()
         except (KeyboardInterrupt, EOFError):
             break
 
@@ -140,6 +227,8 @@ def main():
                 print(f"  {RED}Identifiant obligatoire.{RESET}")
                 input("  Appuyez sur Entrée...")
                 continue
+
+            contact = input(f"  Contact client (optionnel, ex: @telegram / nom) : ").strip()
 
             print(f"\n  Choisissez la durée de validité :")
             print(f"    [1] 7 Jours (1 semaine)")
@@ -153,18 +242,18 @@ def main():
             days_map = {"1": 7, "2": 14, "3": 30, "4": 90, "5": 365, "6": 3650}
             days = days_map.get(d_choice, 7)
 
-            key = generate_hardware_locked_key(dev_id, days)
+            key = generate_hardware_locked_key(dev_id, days, contact=contact)
             exp_date = (datetime.now() + timedelta(days=days)).strftime("%d/%m/%Y")
 
             print(f"""
   {GREEN}{BOLD}══════════════════════════════════════════════════════════════════════{RESET}
-  {GREEN}{BOLD}✅ CLÉ DE LICENCE GÉNÉRÉE AVEC SUCCÈS POUR CET APPAREIL :{RESET}
+  {GREEN}{BOLD}✅ CLÉ DE LICENCE GÉNÉRÉE & ENREGISTRÉE EN BASE DE DONNÉES :{RESET}
 
      👉  {YELLOW}{BOLD}{key}{RESET}
 
   • Appareil client lié : {WHITE}{BOLD}{dev_id.upper()}{RESET}
   • Durée accordée      : {WHITE}{days} jours (Expire le {exp_date}){RESET}
-  • Sécurité            : {CYAN}Verrouillage matériel 1 Appareil = 1 Clé{RESET}
+  • Contrôle direct     : {CYAN}Visible sur le Dashboard Web et révocable à tout moment{RESET}
   {GREEN}{BOLD}══════════════════════════════════════════════════════════════════════{RESET}
   {DIM}(Copiez la clé ci-dessus et transmettez-la à votre utilisateur){RESET}
 """)
@@ -192,7 +281,46 @@ def main():
             list_server_licenses()
             input(f"  Appuyez sur {BOLD}Entrée{RESET} pour continuer...")
 
-        elif choice in ["4", "q", "exit"]:
+        elif choice == "4":
+            print(f"\n  {RED}{BOLD}--- 🚫 RÉVOCATION IMMÉDIATE D'UNE LICENCE ---{RESET}")
+            list_server_licenses()
+            target = input(f"  Entrez l'ID ou la Clé de la licence à révoquer : ").strip()
+            if not target:
+                continue
+            if revoke_license_action(target):
+                print(f"\n  {GREEN}{BOLD}✓ SUCCÈS : La licence '{target}' a été révoquée !{RESET}")
+                print(f"  {YELLOW}L'utilisateur associé sera bloqué dès sa prochaine action.{RESET}")
+            else:
+                print(f"\n  {RED}✖ Aucune licence trouvée correspondant à '{target}'.{RESET}")
+            input(f"\n  Appuyez sur {BOLD}Entrée{RESET} pour continuer...")
+
+        elif choice == "5":
+            print(f"\n  {GREEN}{BOLD}--- 🔄 RÉACTIVATION D'UNE LICENCE ---{RESET}")
+            list_server_licenses()
+            target = input(f"  Entrez l'ID ou la Clé de la licence à réactiver : ").strip()
+            if not target:
+                continue
+            if reactivate_license_action(target):
+                print(f"\n  {GREEN}{BOLD}✓ SUCCÈS : La licence '{target}' a été réactivée !{RESET}")
+            else:
+                print(f"\n  {RED}✖ Aucune licence trouvée correspondant à '{target}'.{RESET}")
+            input(f"\n  Appuyez sur {BOLD}Entrée{RESET} pour continuer...")
+
+        elif choice == "6":
+            print(f"\n  {RED}{BOLD}--- 🗑️ SUPPRESSION DÉFINITIVE D'UNE LICENCE ---{RESET}")
+            list_server_licenses()
+            target = input(f"  Entrez l'ID ou la Clé de la licence à supprimer : ").strip()
+            if not target:
+                continue
+            confirm = input(f"  {RED}Confirmer la suppression définitive de '{target}' ? (o/n) : {RESET}").strip().lower()
+            if confirm in ["o", "oui", "y", "yes"]:
+                if delete_license_action(target):
+                    print(f"\n  {GREEN}{BOLD}✓ SUCCÈS : Licence supprimée définitivement.{RESET}")
+                else:
+                    print(f"\n  {RED}✖ Impossible de supprimer cette licence.{RESET}")
+            input(f"\n  Appuyez sur {BOLD}Entrée{RESET} pour continuer...")
+
+        elif choice in ["7", "q", "exit"]:
             break
 
 if __name__ == "__main__":

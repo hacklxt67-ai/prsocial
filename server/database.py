@@ -80,6 +80,14 @@ def init_db():
     );
     """)
 
+    # 6. Table des Licences Supprimées / Bannies définitivement
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS deleted_licenses (
+        license_key TEXT PRIMARY KEY,
+        deleted_at TEXT NOT NULL
+    );
+    """)
+
     # Insertion des réglages par défaut si non existants
     default_settings = {
         "price_usd": "2.00",

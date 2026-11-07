@@ -428,6 +428,49 @@ class UniversalSilentEngine:
         self.failed_tasks: Dict[int, float] = {}
         self.COOLDOWN_FAILED_SECONDS = 900  # 15 minutes d'exclusion anti-répétition
 
+        # Contrôle permanent de licence en temps réel (Heartbeat Admin)
+        try:
+            from license_manager import UniversalLicenseManager
+        except ImportError:
+            try:
+                from pc_bot.license_manager import UniversalLicenseManager
+            except ImportError:
+                from termux_bot.license_manager import UniversalLicenseManager
+        self.lic_mgr = UniversalLicenseManager()
+        self._last_license_check_time = time.time()
+        self._tasks_since_license_check = 0
+
+    def check_license_heartbeat(self) -> bool:
+        """
+        Vérification continue de la licence en temps réel pendant les tâches.
+        Si l'administrateur révoque ou supprime la clé, stoppe immédiatement le bot.
+        """
+        now = time.time()
+        self._tasks_since_license_check += 1
+        if self._tasks_since_license_check < 3 and (now - self._last_license_check_time) < 60:
+            return True
+
+        self._last_license_check_time = now
+        self._tasks_since_license_check = 0
+
+        saved_key = self.lic_mgr.get_saved_key()
+        if not saved_key:
+            UI.step("⛔ Clé de licence manquante. Arrêt immédiat.", "error")
+            self.stop_requested = True
+            return False
+
+        ok, msg, info = self.lic_mgr.verify_key(saved_key)
+        if not ok:
+            UI.step(f"⛔ ACCÈS COUPÉ PAR L'ADMINISTRATEUR : {msg}", "error")
+            print(f"\n  {ANSI.RED}{ANSI.BOLD}╔══════════════════════════════════════════════════════════════════════╗{ANSI.RESET}")
+            print(f"  {ANSI.RED}{ANSI.BOLD}║{ANSI.RESET}  🚫 {ANSI.WHITE}{ANSI.BOLD}L'ADMINISTRATEUR A RÉVOQUÉ CETTE LICENCE EN TEMPS RÉEL !{ANSI.RESET}         {ANSI.RED}{ANSI.BOLD}║{ANSI.RESET}")
+            print(f"  {ANSI.RED}{ANSI.BOLD}║{ANSI.RESET}  {ANSI.YELLOW}L'accès a été immédiatement coupé et les clés locales effacées.{ANSI.RESET}   {ANSI.RED}{ANSI.BOLD}║{ANSI.RESET}")
+            print(f"  {ANSI.RED}{ANSI.BOLD}╚══════════════════════════════════════════════════════════════════════╝{ANSI.RESET}\n")
+            self.lic_mgr.clear_saved_key()
+            self.stop_requested = True
+            return False
+        return True
+
     def auto_unblock_active_tasks(self) -> int:
         """Détecte et annule toute tâche bloquante en 'in_progress' sur PR.Social."""
         st, data = self.pr_api.get_in_progress_tasks()
@@ -568,6 +611,8 @@ class UniversalSilentEngine:
         platform_counts: Dict[str, int] = {}
 
         while not self.stop_requested:
+            if not self.check_license_heartbeat():
+                break
             tasks_found = 0
             ordered_platforms = sorted(active_list, key=lambda p: platform_counts.get(p, 1), reverse=True)
 
@@ -977,6 +1022,8 @@ class UniversalSilentEngine:
         success_count = 0
 
         while not self.stop_requested and current_step:
+            if not self.check_license_heartbeat():
+                break
             t = current_step.get("t")
             order = current_step.get("order") or "SURF"
             domain = current_step.get("domain") or "Site Web"

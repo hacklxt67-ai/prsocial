@@ -525,9 +525,26 @@ class TermuxBotApp:
         print(f"{WHITE}Réseaux surveillés : {', '.join([f'{CYAN}{p.upper()}{RESET}' for p in active_list])}\n")
 
         tasks_completed_count = 0
+        last_lic_check = time.time()
+        tasks_since_lic_check = 0
 
         try:
             while True:
+                # Contrôle permanent de licence en direct (Heartbeat Admin)
+                tasks_since_lic_check += 1
+                if tasks_since_lic_check >= 3 or (time.time() - last_lic_check) > 60:
+                    last_lic_check = time.time()
+                    tasks_since_lic_check = 0
+                    is_val, msg_lic, _ = self.license_client.check_license()
+                    if not is_val:
+                        print(f"\n{RED}{BOLD}╔══════════════════════════════════════════════════════════════════════╗{RESET}")
+                        print(f"{RED}{BOLD}║{RESET}  🚫 {WHITE}{BOLD}ARRÊT IMMÉDIAT : L'ADMINISTRATEUR A RÉVOQUÉ CETTE LICENCE !{RESET}         {RED}{BOLD}║{RESET}")
+                        print(f"{RED}{BOLD}║{RESET}  {YELLOW}Accès suspendu et clé effacée.{RESET}                                      {RED}{BOLD}║{RESET}")
+                        print(f"{RED}{BOLD}╚══════════════════════════════════════════════════════════════════════╝{RESET}\n")
+                        self.license_client.clear_saved_key()
+                        self.is_licensed = False
+                        break
+
                 tasks_found = 0
                 for plat in active_list:
                     acc_id = self.approved_accounts.get(plat, {}).get("id")

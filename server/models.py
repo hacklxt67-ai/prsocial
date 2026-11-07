@@ -1,10 +1,20 @@
+import os
+import sys
 import sqlite3
+import hmac
+import hashlib
 from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any, Tuple
+
+current_dir = os.path.dirname(os.path.abspath(__file__))
+if current_dir not in sys.path:
+    sys.path.insert(0, current_dir)
+
 from database import get_connection
 from security import generate_license_key, hash_password, verify_password
 
 DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
+MASTER_SECRET_SIGNING_KEY = b"PR_SOCIAL_ADMIN_MASTER_SECRET_KEY_2026_BAGIO67"
 
 class LicenseManager:
     @staticmethod
@@ -41,18 +51,63 @@ class LicenseManager:
         return dict(row) if row else None
 
     @staticmethod
+    def is_deleted(key: str) -> bool:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT 1 FROM deleted_licenses WHERE license_key = ?;", (key.strip().upper(),))
+        row = cursor.fetchone()
+        conn.close()
+        return bool(row)
+
+    @staticmethod
     def verify_license(key: str, device_id: str) -> Tuple[bool, str, Dict[str, Any]]:
         """
         Vérifie la validité d'une licence pour un appareil donné.
-        Retourne (is_valid, message, info_dict)
+        Prend en charge les clés standard (PR-XXXX-XXXX-XXXX) et matérielles signées (PR-KEY-...).
+        Garantit le contrôle absolu en temps réel de l'administrateur :
+        Si une licence est révoquée ou supprimée par l'admin, elle est IMPÉRATIVEMENT rejetée.
         """
+        key = key.strip().upper()
+
+        # Si la licence a été supprimée par l'administrateur -> REJET IMMÉDIAT
+        if LicenseManager.is_deleted(key):
+            return False, "⛔ Cette licence a été définitivement supprimée par l'administrateur.", {"status": "DELETED"}
+
         lic = LicenseManager.get_by_key(key)
+
+        # Si clé matérielle signée PR-KEY-... et non encore en base : auto-enregistrement
+        if not lic and key.startswith("PR-KEY-"):
+            parts = key.split("-")
+            if len(parts) >= 5:
+                k_dev = parts[2]
+                k_exp = parts[3]
+                k_sig = parts[4]
+                payload = f"{k_dev}:{k_exp}".encode("utf-8")
+                expected_sig = hmac.new(MASTER_SECRET_SIGNING_KEY, payload, hashlib.sha256).hexdigest()[:8].upper()
+                if hmac.compare_digest(k_sig, expected_sig):
+                    try:
+                        exp_dt = datetime.strptime(k_exp, "%Y%m%d").replace(hour=23, minute=59, second=59)
+                        exp_str = exp_dt.strftime(DATE_FORMAT)
+                        now_str = datetime.now().strftime(DATE_FORMAT)
+                        days = max(1, (exp_dt - datetime.now()).days)
+                        conn = get_connection()
+                        cur = conn.cursor()
+                        cur.execute("""
+                            INSERT INTO licenses (license_key, duration_days, status, created_at, activated_at, expires_at, device_id, notes)
+                            VALUES (?, ?, 'ACTIVE', ?, ?, ?, ?, 'Clé Matérielle Enregistrée');
+                        """, (key, days, now_str, now_str, exp_str, device_id))
+                        conn.commit()
+                        conn.close()
+                        lic = LicenseManager.get_by_key(key)
+                    except Exception:
+                        pass
+
         if not lic:
-            return False, "Clé de licence introuvable ou invalide.", {}
+            return False, "Clé de licence introuvable ou supprimée par l'administrateur.", {"status": "NOT_FOUND"}
 
         status = lic["status"]
         if status == "REVOKED":
-            return False, "Cette licence a été révoquée par l'administrateur.", {"status": "REVOKED"}
+            return False, "⛔ Cette licence a été révoquée par l'administrateur.", {"status": "REVOKED"}
 
         if status == "UNUSED":
             return False, "Cette licence n'a pas encore été activée sur cet appareil.", {
@@ -61,11 +116,17 @@ class LicenseManager:
             }
 
         # Vérification du Device ID (verrouillage matériel)
-        if lic.get("device_id") and lic["device_id"] != device_id:
-            return False, "Cette licence est déjà associée à un autre smartphone.", {
-                "status": "DEVICE_MISMATCH",
-                "bound_device": lic["device_id"][:6] + "..."
-            }
+        if lic.get("device_id"):
+            bound = lic["device_id"].strip().upper()
+            curr = device_id.strip().upper()
+            # Tolérance si préfixe partagé ou code court (ex: 8F2A)
+            bound_short = bound.split("-")[1] if "-" in bound else bound[:4]
+            curr_short = curr.split("-")[1] if "-" in curr else curr[:4]
+            if bound != curr and bound_short != curr_short:
+                return False, "Cette licence est verrouillée sur un autre appareil.", {
+                    "status": "DEVICE_MISMATCH",
+                    "bound_device": lic["device_id"]
+                }
 
         # Vérification d'expiration
         expires_at_str = lic.get("expires_at")
@@ -198,6 +259,64 @@ class LicenseManager:
         cursor.execute("UPDATE licenses SET status = 'REVOKED' WHERE id = ?;", (license_id,))
         conn.commit()
         conn.close()
+
+    @staticmethod
+    def reactivate(license_id: int):
+        conn = get_connection()
+        cursor = conn.cursor()
+        lic = LicenseManager.get_by_id(license_id)
+        if lic:
+            cursor.execute("DELETE FROM deleted_licenses WHERE license_key = ?;", (lic["license_key"],))
+        cursor.execute("UPDATE licenses SET status = 'ACTIVE' WHERE id = ?;", (license_id,))
+        conn.commit()
+        conn.close()
+
+    @staticmethod
+    def delete(license_id: int):
+        conn = get_connection()
+        cursor = conn.cursor()
+        lic = LicenseManager.get_by_id(license_id)
+        if lic:
+            now_str = datetime.now().strftime(DATE_FORMAT)
+            cursor.execute("INSERT OR REPLACE INTO deleted_licenses (license_key, deleted_at) VALUES (?, ?);", (lic["license_key"], now_str))
+        cursor.execute("DELETE FROM licenses WHERE id = ?;", (license_id,))
+        conn.commit()
+        conn.close()
+
+    @staticmethod
+    def revoke_by_key(key: str) -> bool:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("UPDATE licenses SET status = 'REVOKED' WHERE license_key = ?;", (key.strip().upper(),))
+        changed = cursor.rowcount > 0
+        conn.commit()
+        conn.close()
+        return changed
+
+    @staticmethod
+    def reactivate_by_key(key: str) -> bool:
+        conn = get_connection()
+        cursor = conn.cursor()
+        k = key.strip().upper()
+        cursor.execute("DELETE FROM deleted_licenses WHERE license_key = ?;", (k,))
+        cursor.execute("UPDATE licenses SET status = 'ACTIVE' WHERE license_key = ?;", (k,))
+        changed = cursor.rowcount > 0
+        conn.commit()
+        conn.close()
+        return changed
+
+    @staticmethod
+    def delete_by_key(key: str) -> bool:
+        conn = get_connection()
+        cursor = conn.cursor()
+        k = key.strip().upper()
+        now_str = datetime.now().strftime(DATE_FORMAT)
+        cursor.execute("INSERT OR REPLACE INTO deleted_licenses (license_key, deleted_at) VALUES (?, ?);", (k, now_str))
+        cursor.execute("DELETE FROM licenses WHERE license_key = ?;", (k,))
+        changed = cursor.rowcount > 0
+        conn.commit()
+        conn.close()
+        return changed
 
     @staticmethod
     def extend(license_id: int, extra_days: int = 7) -> Optional[Dict[str, Any]]:

@@ -526,7 +526,10 @@ function renderSubscriptionsTable(licenses) {
         <td>${expDate}</td>
         <td>
           <button class="action-icon-btn" title="Prolonger +7 jours" onclick="extendLicense(${l.id})">✏️</button>
-          <button class="action-icon-btn delete" title="Révoquer" onclick="revokeLicense(${l.id})">🗑️</button>
+          ${l.status !== 'REVOKED' 
+            ? `<button class="action-icon-btn delete" title="Révoquer / Bloquer" onclick="revokeLicense(${l.id})">🚫</button>` 
+            : `<button class="action-icon-btn" title="Réactiver" onclick="reactivateLicense(${l.id})">🔄</button>`}
+          <button class="action-icon-btn delete" title="Supprimer définitivement" onclick="deleteLicense(${l.id})">🗑️</button>
         </td>
       </tr>
     `;
@@ -634,7 +637,10 @@ function renderLicensesTable(licenses) {
         <td>
           <button class="action-icon-btn" title="Copier" onclick="copyToClipboard('${l.license_key}')">📋</button>
           <button class="action-icon-btn" title="Prolonger +7j" onclick="extendLicense(${l.id})">✏️</button>
-          ${l.status !== 'REVOKED' ? `<button class="action-icon-btn delete" title="Révoquer" onclick="revokeLicense(${l.id})">🗑️</button>` : ''}
+          ${l.status !== 'REVOKED' 
+            ? `<button class="action-icon-btn delete" title="Révoquer / Bloquer" onclick="revokeLicense(${l.id})">🚫</button>` 
+            : `<button class="action-icon-btn" title="Réactiver" onclick="reactivateLicense(${l.id})">🔄</button>`}
+          <button class="action-icon-btn delete" title="Supprimer définitivement" onclick="deleteLicense(${l.id})">🗑️</button>
         </td>
       </tr>
     `;
@@ -852,16 +858,44 @@ async function extendLicense(id) {
 }
 
 async function revokeLicense(id) {
-  if (!confirm(`Voulez-vous vraiment révoquer la licence #${id} ?`)) return;
+  if (!confirm(`Voulez-vous vraiment révoquer la licence #${id} ? L'utilisateur sera immédiatement bloqué.`)) return;
   try {
     const res = await fetch(`/api/admin/licenses/${id}/revoke`, { method: 'POST', headers: getAuthHeaders() });
     const data = await res.json();
     if (data.ok) {
-      showToast('Licence révoquée.', 'warning');
+      showToast('Licence révoquée et utilisateur bloqué !', 'warning');
       loadAllData();
     }
   } catch (err) {
     showToast('Erreur révocation', 'error');
+  }
+}
+
+async function reactivateLicense(id) {
+  if (!confirm(`Voulez-vous réactiver la licence #${id} ?`)) return;
+  try {
+    const res = await fetch(`/api/admin/licenses/${id}/reactivate`, { method: 'POST', headers: getAuthHeaders() });
+    const data = await res.json();
+    if (data.ok) {
+      showToast('Licence réactivée avec succès !', 'success');
+      loadAllData();
+    }
+  } catch (err) {
+    showToast('Erreur réactivation', 'error');
+  }
+}
+
+async function deleteLicense(id) {
+  if (!confirm(`ATTENTION : Supprimer définitivement la licence #${id} de la base de données ?`)) return;
+  try {
+    const res = await fetch(`/api/admin/licenses/${id}`, { method: 'DELETE', headers: getAuthHeaders() });
+    const data = await res.json();
+    if (data.ok) {
+      showToast('Licence définitivement supprimée.', 'success');
+      loadAllData();
+    }
+  } catch (err) {
+    showToast('Erreur suppression', 'error');
   }
 }
 
