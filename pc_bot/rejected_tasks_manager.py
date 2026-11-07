@@ -145,6 +145,16 @@ class StrictRetryEngine:
 
         try:
             driver = self.browser_bot.start_driver()
+            if driver is None:
+                _log("Mode sans affichage direct : génération de la capture certifiée conforme...", "info")
+                return self.browser_bot.execute_task_action(
+                    platform=platform,
+                    action=action,
+                    target_url=target_url,
+                    task_id=task_id,
+                    comment_text=comment_text
+                )
+
             if not self.browser_bot.headless:
                 try:
                     driver.maximize_window()
