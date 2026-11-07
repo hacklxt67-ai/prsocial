@@ -123,8 +123,28 @@ class TermuxLicenseClient:
                 if status in ["REVOKED", "NOT_FOUND", "EXPIRED"]:
                     self.clear_saved_key()
             return is_valid, msg, info
-        except Exception as e:
-            return False, f"Impossible de contacter le serveur de licence ({self.server_url}) : {str(e)}", {}
+        except Exception:
+            # Serveur local inaccessible -> Fallback Registre GitHub
+            ONLINE_REGISTRY_URL = "https://raw.githubusercontent.com/Baggio67/media.sc/main/.lic_registry.json"
+            try:
+                import time
+                cache_buster = int(time.time())
+                r_reg = requests.get(f"{ONLINE_REGISTRY_URL}?t={cache_buster}", timeout=5.0)
+                if r_reg.status_code == 200:
+                    reg_data = r_reg.json()
+                    active_list = reg_data.get("active_keys", [])
+                    revoked_list = reg_data.get("revoked_keys", [])
+                    if key in revoked_list:
+                        self.clear_saved_key()
+                        return False, "⛔ Cette licence a été révoquée par l'administrateur.", {"status": "REVOKED"}
+                    if key not in active_list:
+                        self.clear_saved_key()
+                        return False, "⛔ Cette licence n'existe pas ou a été supprimée par l'administrateur.", {"status": "NOT_FOUND"}
+                    return True, "Licence active certifiée par le registre officiel.", {"status": "ACTIVE", "license_key": key}
+            except Exception:
+                pass
+            self.clear_saved_key()
+            return False, "Impossible de contacter le serveur ou le registre officiel de licence. Connexion requise.", {}
 
     def activate_license(self, key: str, contact: str = "") -> Tuple[bool, str, Dict[str, Any]]:
         """Active une nouvelle clé sur ce smartphone."""

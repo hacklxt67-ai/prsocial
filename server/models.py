@@ -51,6 +51,43 @@ class LicenseManager:
         return dict(row) if row else None
 
     @staticmethod
+    def sync_public_registry():
+        """
+        Génère et exporte le registre officiel des licences pour les appareils distants (Termux, etc.)
+        Ce registre permet d'appliquer instantanément la révocation de l'admin même sans serveur local.
+        """
+        import json
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT license_key FROM licenses WHERE status = 'ACTIVE';")
+        active = [r[0] for r in cursor.fetchall()]
+        cursor.execute("SELECT license_key FROM licenses WHERE status = 'REVOKED';")
+        revoked = [r[0] for r in cursor.fetchall()]
+        cursor.execute("SELECT license_key FROM deleted_licenses;")
+        deleted = [r[0] for r in cursor.fetchall()]
+        conn.close()
+
+        all_revoked = list(set(revoked + deleted))
+        registry_data = {
+            "updated_at": datetime.now().strftime(DATE_FORMAT),
+            "active_keys": active,
+            "revoked_keys": all_revoked
+        }
+
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        targets = [
+            os.path.join(base_dir, ".lic_registry.json"),
+            os.path.join(base_dir, "dist_public", ".lic_registry.json")
+        ]
+        for t in targets:
+            try:
+                os.makedirs(os.path.dirname(t), exist_ok=True)
+                with open(t, "w", encoding="utf-8") as f:
+                    json.dump(registry_data, f, indent=2)
+            except Exception:
+                pass
+
+    @staticmethod
     def is_deleted(key: str) -> bool:
         conn = get_connection()
         cursor = conn.cursor()
@@ -259,6 +296,7 @@ class LicenseManager:
         cursor.execute("UPDATE licenses SET status = 'REVOKED' WHERE id = ?;", (license_id,))
         conn.commit()
         conn.close()
+        LicenseManager.sync_public_registry()
 
     @staticmethod
     def reactivate(license_id: int):
@@ -270,6 +308,7 @@ class LicenseManager:
         cursor.execute("UPDATE licenses SET status = 'ACTIVE' WHERE id = ?;", (license_id,))
         conn.commit()
         conn.close()
+        LicenseManager.sync_public_registry()
 
     @staticmethod
     def delete(license_id: int):
@@ -282,6 +321,7 @@ class LicenseManager:
         cursor.execute("DELETE FROM licenses WHERE id = ?;", (license_id,))
         conn.commit()
         conn.close()
+        LicenseManager.sync_public_registry()
 
     @staticmethod
     def revoke_by_key(key: str) -> bool:
@@ -291,6 +331,7 @@ class LicenseManager:
         changed = cursor.rowcount > 0
         conn.commit()
         conn.close()
+        LicenseManager.sync_public_registry()
         return changed
 
     @staticmethod
@@ -303,6 +344,7 @@ class LicenseManager:
         changed = cursor.rowcount > 0
         conn.commit()
         conn.close()
+        LicenseManager.sync_public_registry()
         return changed
 
     @staticmethod
@@ -316,6 +358,7 @@ class LicenseManager:
         changed = cursor.rowcount > 0
         conn.commit()
         conn.close()
+        LicenseManager.sync_public_registry()
         return changed
 
     @staticmethod

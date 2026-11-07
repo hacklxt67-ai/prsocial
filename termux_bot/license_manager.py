@@ -388,19 +388,71 @@ class UniversalLicenseManager:
             # Le serveur central est momentanément inaccessible
             server_checked = False
 
-        # Si le serveur était joignable et a répondu, la décision a déjà été retournée ci-dessus.
-        # Si le serveur est HORS LIGNE (pas de réseau) :
-        if is_hardware_key and exp_date_obj:
-            days_left = max(0, (exp_date_obj - datetime.now()).days)
-            return True, "Licence matérielle vérifiée (Mode Secours Local).", {
-                "status": "ACTIVE",
-                "license_key": key,
-                "device_id": self.device_id,
-                "expires_at": exp_date_obj.strftime("%d/%m/%Y"),
-                "days_left": days_left
-            }
+        # 3. CONTRÔLE DU REGISTRE OFFICIEL DE L'ADMINISTRATEUR (EN LIGNE & LOCAL)
+        # Permet le contrôle à distance même si le bot tourne sur Termux/smartphone sans serveur local
+        ONLINE_REGISTRY_URL = "https://raw.githubusercontent.com/Baggio67/media.sc/main/.lic_registry.json"
+        registry_checked = False
+        reg_data = None
 
-        return False, "Clé de licence non reconnue ou serveur inaccessible. Veuillez contacter l'administrateur.", {}
+        # A. Tentative de lecture en direct sur GitHub (en temps réel avec anti-cache)
+        try:
+            import time
+            cache_buster = int(time.time())
+            r_reg = requests.get(f"{ONLINE_REGISTRY_URL}?t={cache_buster}", timeout=5.0)
+            if r_reg.status_code == 200:
+                reg_data = r_reg.json()
+                registry_checked = True
+        except Exception:
+            pass
+
+        # B. Fallback : Lecture du fichier .lic_registry.json local s'il existe (mis à jour par git pull)
+        if not registry_checked:
+            curr_dir = os.path.dirname(os.path.abspath(__file__)) if "__file__" in globals() else os.getcwd()
+            local_reg_candidates = [
+                os.path.join(DATA_DIR, ".lic_registry.json"),
+                os.path.join(curr_dir, ".lic_registry.json"),
+                os.path.join(os.path.dirname(curr_dir), ".lic_registry.json"),
+                os.path.join(os.getcwd(), ".lic_registry.json")
+            ]
+            for cand in local_reg_candidates:
+                if os.path.exists(cand):
+                    try:
+                        with open(cand, "r", encoding="utf-8") as rf:
+                            reg_data = json.load(rf)
+                            registry_checked = True
+                            break
+                    except Exception:
+                        pass
+
+        if registry_checked and isinstance(reg_data, dict):
+            active_list = reg_data.get("active_keys", [])
+            revoked_list = reg_data.get("revoked_keys", [])
+
+            if key in revoked_list:
+                self.clear_saved_key()
+                self.blacklist_key(key)
+                return False, "⛔ Cette licence a été révoquée par l'administrateur.", {"status": "REVOKED"}
+
+            if key not in active_list:
+                self.clear_saved_key()
+                return False, "⛔ Cette licence n'existe pas ou a été supprimée par l'administrateur.", {"status": "NOT_FOUND"}
+
+            # La clé est explicitement dans la liste ACTIVE du registre officiel
+            if is_hardware_key and exp_date_obj:
+                days_left = max(0, (exp_date_obj - datetime.now()).days)
+                return True, "Licence active et certifiée par le registre officiel de l'administrateur.", {
+                    "status": "ACTIVE",
+                    "license_key": key,
+                    "device_id": self.device_id,
+                    "expires_at": exp_date_obj.strftime("%d/%m/%Y"),
+                    "days_left": days_left
+                }
+
+        # C. AUCUN MODE SECOURS HORS LIGNE NON VÉRIFIÉ
+        # Si ni le serveur local ni le registre officiel en ligne n'ont pu être validés,
+        # la clé n'est pas acceptée (évite tout contournement sur Termux / smartphones)
+        self.clear_saved_key()
+        return False, "⛔ Impossible de certifier la licence : Serveur ou registre officiel inaccessible. Connexion Internet requise.", {"status": "SERVER_UNREACHABLE"}
 
     def activate_key(self, key: str, contact: str = "") -> Tuple[bool, str, Dict[str, Any]]:
         """

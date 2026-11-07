@@ -39,6 +39,39 @@ MASTER_SECRET = b"PR_SOCIAL_ADMIN_MASTER_SECRET_KEY_2026_BAGIO67"
 
 DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "server", "licensing.db")
 
+def sync_admin_registry():
+    """Synchronise le registre public (.lic_registry.json) pour Termux et les clients distants."""
+    import json
+    if not os.path.exists(DB_PATH):
+        return
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cur = conn.cursor()
+        cur.execute("SELECT license_key FROM licenses WHERE status = 'ACTIVE';")
+        active = [r[0] for r in cur.fetchall()]
+        cur.execute("SELECT license_key FROM licenses WHERE status = 'REVOKED';")
+        revoked = [r[0] for r in cur.fetchall()]
+        cur.execute("SELECT license_key FROM deleted_licenses;")
+        deleted = [r[0] for r in cur.fetchall()]
+        conn.close()
+
+        all_revoked = list(set(revoked + deleted))
+        data = {
+            "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "active_keys": active,
+            "revoked_keys": all_revoked
+        }
+        root = os.path.dirname(os.path.abspath(__file__))
+        for path in [os.path.join(root, ".lic_registry.json"), os.path.join(root, "dist_public", ".lic_registry.json")]:
+            try:
+                os.makedirs(os.path.dirname(path), exist_ok=True)
+                with open(path, "w", encoding="utf-8") as f:
+                    json.dump(data, f, indent=2)
+            except Exception:
+                pass
+    except Exception:
+        pass
+
 def generate_hardware_locked_key(device_input: str, days: int, notes: str = "", contact: str = "") -> str:
     """
     Génère une clé de licence cryptographiquement signée et scellée
@@ -75,6 +108,7 @@ def generate_hardware_locked_key(device_input: str, days: int, notes: str = "", 
             """, (key, days, now_str, now_str, exp_date_full, clean_dev, notes or "Clé Matérielle Admin", contact))
             conn.commit()
             conn.close()
+            sync_admin_registry()
         except Exception as e:
             print(f"  {YELLOW}Avertissement DB locale : {e}{RESET}")
 
@@ -100,6 +134,7 @@ def generate_server_database_key(duration_days: int = 7, notes: str = "", contac
             """, (key, duration_days, now_str, notes, contact))
             conn.commit()
             conn.close()
+            sync_admin_registry()
         except Exception as e:
             print(f"Erreur DB locale : {e}")
     return key
@@ -140,6 +175,7 @@ def revoke_license_action(target: str) -> bool:
     changed = cur.rowcount > 0
     conn.commit()
     conn.close()
+    sync_admin_registry()
     return changed
 
 def reactivate_license_action(target: str) -> bool:
@@ -156,6 +192,7 @@ def reactivate_license_action(target: str) -> bool:
     changed = cur.rowcount > 0
     conn.commit()
     conn.close()
+    sync_admin_registry()
     return changed
 
 def delete_license_action(target: str) -> bool:
@@ -185,6 +222,7 @@ def delete_license_action(target: str) -> bool:
 
     conn.commit()
     conn.close()
+    sync_admin_registry()
     return changed
 
 def main():
