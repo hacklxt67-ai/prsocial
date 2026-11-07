@@ -8,22 +8,30 @@ Solution complète d'automatisation intelligente pour **PR.Social**, compatible 
 
 Faites tourner le bot 24h/24 directement sur votre téléphone Android sans laisser votre PC allumé.
 
-### ⚡ A. Installation Complète en 1 Ligne (Premier Démarrage)
+### ⚡ A. Installation Complète en 1 Ligne (Pour Débutant)
 Ouvrez l'application **Termux** et collez cette commande unique :
 
 ```bash
-pkg update -y && pkg install -y git && git clone https://github.com/hacklxt67-ai/prsocial.git && cd prsocial/termux_bot && bash install_termux.sh
+pkg update -y && pkg install -y git python && git clone https://github.com/hacklxt67-ai/prsocial.git && cd prsocial && pip install requests pillow && python pc_bot/http_action_engine.py
 ```
 
 Cette commande installe automatiquement :
-- L'environnement Linux Debian ARM64 (`proot-distro`).
-- Python 3, Selenium, Requests, Pillow.
-- Chromium Headless et Chromedriver adaptés à Android.
-- Les lanceurs rapides `~/lancer_bot.sh` et `~/recuperer_rejets.sh`.
+- Python et Git sur Termux.
+- Les dépendances nécessaires (`requests`, `Pillow`).
+- Télécharge le projet et lance directement le bot interactif.
 
 ---
 
-### 🎮 B. Commandes de Lancement
+### 🔄 B. Mise à Jour Rapide & Exécution (Pour Utilisateur Déjà Installé)
+Si vous avez déjà le bot sur votre téléphone, collez cette commande pour récupérer toutes les dernières mises à jour (Instagram, anti-quarantaine, etc.) et le lancer :
+
+```bash
+cd ~/prsocial && git fetch origin main && git reset --hard origin/main && python pc_bot/http_action_engine.py
+```
+
+---
+
+### 🎮 C. Commandes de Lancement
 
 Depuis Termux, vous disposez de deux commandes directes :
 
