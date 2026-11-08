@@ -323,17 +323,30 @@ class BrowserBot:
                     im = Image.new("RGB", (w, h), color=t["bg"])
                     draw = ImageDraw.Draw(im)
 
-                    def _get_font(size):
+                    def _get_font(size, bold=False):
+                        candidate_fonts = [
+                            "/system/fonts/Roboto-Medium.ttf" if bold else "/system/fonts/Roboto-Regular.ttf",
+                            "/system/fonts/NotoSans-Regular.ttf",
+                            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf" if bold else "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+                            "segoeuib.ttf" if bold else "segoeui.ttf",
+                            "arialbd.ttf" if bold else "arial.ttf",
+                            "Roboto-Bold.ttf" if bold else "Roboto-Regular.ttf",
+                        ]
+                        for c in candidate_fonts:
+                            try:
+                                return ImageFont.truetype(c, size)
+                            except Exception:
+                                continue
                         try:
                             return ImageFont.load_default(size=size)
                         except Exception:
                             return ImageFont.load_default()
 
-                    f_status = _get_font(18)
-                    f_title = _get_font(24)
-                    f_sub = _get_font(18)
-                    f_btn = _get_font(22)
-                    f_body = _get_font(20)
+                    f_status = _get_font(18, bold=False)
+                    f_title = _get_font(24, bold=True)
+                    f_sub = _get_font(18, bold=False)
+                    f_btn = _get_font(22, bold=True)
+                    f_body = _get_font(20, bold=False)
 
                     # 1. Barre de statut mobile réaliste
                     hh = random.randint(9, 22)
