@@ -592,6 +592,14 @@ class TermuxBotApp:
                             self.failed_tasks.add(task_id)
                             continue
 
+                        # Protection Anti-Lien Mort : Vérification stricte du compteur communautaire
+                        task_dead_count = int(res_start.get("task", {}).get("link_dead_count") or 0)
+                        if task_dead_count >= 3:
+                            print(f"  🛡️ {YELLOW}Protection Anti-Lien Mort : Tâche #{task_id} signalée morte ({task_dead_count} fois). Annulation propre...{RESET}")
+                            self.api.cancel_task(task_id)
+                            self.failed_tasks.add(task_id)
+                            continue
+
                         # Résolution URL cible (Threads / Reddit / LinkedIn / Pinterest / etc.)
                         target_url = res_start.get("task", {}).get("target_url") or t.get("target_url") or ""
                         if not target_url:

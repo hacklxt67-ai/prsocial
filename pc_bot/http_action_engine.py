@@ -493,6 +493,10 @@ class UniversalSilentEngine:
 
     def is_task_feasible(self, task: Dict[str, Any]) -> Tuple[bool, str]:
         """Analyse intelligente des critères d'éligibilité des tâches."""
+        dead_count = int(task.get("link_dead_count") or 0)
+        if dead_count >= 5:
+            return False, f"Lien mort signalé ({dead_count} fois par la communauté)"
+
         action = (task.get("action") or "").lower()
         if "comment" in action:
             c_type = (task.get("comment_type") or "").lower()
@@ -691,7 +695,7 @@ class UniversalSilentEngine:
 
                     task_id = t["id"]
                     if task_id in self.failed_tasks:
-                        if time.time() - self.failed_tasks[task_id] < self.COOLDOWN_FAILED_SECONDS:
+                        if time.time() < self.failed_tasks[task_id]:
                             continue
                         else:
                             del self.failed_tasks[task_id]
@@ -714,16 +718,25 @@ class UniversalSilentEngine:
                                    any(k in err_msg.lower() for k in ["все места", "places", "not found", "inactive", "уже выполн"]))
 
                         if is_busy:
-                            self.failed_tasks[task_id] = time.time() - self.COOLDOWN_FAILED_SECONDS + 120
+                            self.failed_tasks[task_id] = time.time() + 120
                             consecutive_busy += 1
                             if consecutive_busy >= 3:
                                 break
                         else:
-                            self.failed_tasks[task_id] = time.time()
+                            self.failed_tasks[task_id] = time.time() + 300
 
                         if "active task" in err_msg.lower() or "task_in_progress" in err_msg.lower():
                             self.auto_unblock_active_tasks()
                             time.sleep(1)
+                        continue
+
+                    # Protection Anti-Lien Mort : Vérification stricte du compteur de liens morts communautaire
+                    task_dead_count = int(start_res.get("task", {}).get("link_dead_count") or 0)
+                    if task_dead_count >= 3:
+                        UI.step(f"🛡️ Protection Anti-Lien Mort : Tâche #{task_id} signalée morte ({task_dead_count} fois par la communauté).", "warning")
+                        UI.step(f"   Annulation immédiate et mise en quarantaine 24h pour protéger le compte.", "info")
+                        self.pr_api.cancel_task(task_id)
+                        self.failed_tasks[task_id] = time.time() + 86400
                         continue
 
                     # Réinitialiser le compteur de saturation dès qu'une tâche est acceptée
@@ -800,17 +813,29 @@ class UniversalSilentEngine:
                         else:
                             err_detail = sub_res.get("error", f"Status {sub_st}") if isinstance(sub_res, dict) else f"Status {sub_st}"
                             UI.step(f"Soumission refusée ({err_detail}). Annulation sécurisée...", "warning")
-                            self.failed_tasks[task_id] = time.time()
+                            self.failed_tasks[task_id] = time.time() + 1800  # Exclusion de 30 min pour cette tâche en échec
                             self.pr_api.cancel_task(task_id)
+
+                            # Détection Circuit Breaker Cloudflare / Erreur Serveur 500
+                            if sub_st == 500 or "server error" in str(err_detail).lower():
+                                server_error_streak += 1
+                                if server_error_streak >= 2:
+                                    UI.step("🛡️ Bouclier Cloudflare / Saturation Serveur PR.Social (500 Server error).", "warning")
+                                    UI.step("   Temporisation de sécurité (30s) pour laisser le serveur se débloquer...", "info")
+                                    time.sleep(30)
+                                    server_error_streak = 0
+                            else:
+                                server_error_streak = 0
                             continue
                     else:
                         UI.step(f"SÉCURITÉ ANTI-REJET : Action non confirmée ({act_msg}). Preuve écartée.", "warning")
                         UI.step(f"Annulation immédiate de #{task_id} pour préserver la réputation.", "info")
-                        self.failed_tasks[task_id] = time.time()
+                        self.failed_tasks[task_id] = time.time() + 600
                         self.pr_api.cancel_task(task_id)
                         continue
 
                     if is_validated:
+                        server_error_streak = 0
                         success_count += 1
                         session_earnings += reward
                         self.failed_tasks[task_id] = time.time() + 86400
