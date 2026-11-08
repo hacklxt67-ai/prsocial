@@ -125,11 +125,32 @@ class UniversalLicenseManager:
     def __init__(self, config_paths: Optional[list] = None):
         self.device_id = get_universal_device_id()
         self.dev_short = self.device_id.split("-")[1] if "-" in self.device_id else self.device_id[:4]
-        self.config_paths = config_paths or [
+        
+        base_dir = os.path.dirname(os.path.abspath(__file__)) if "__file__" in globals() else os.getcwd()
+        parent_dir = os.path.dirname(base_dir)
+        default_candidates = [
             os.path.join(os.getcwd(), "config.json"),
+            os.path.join(base_dir, "config.json"),
+            os.path.join(parent_dir, "config.json"),
+            os.path.join(base_dir, "pc_bot", "config.json"),
+            os.path.join(parent_dir, "pc_bot", "config.json"),
+            os.path.join(base_dir, "termux_bot", "config.json"),
+            os.path.join(parent_dir, "termux_bot", "config.json"),
             os.path.join(DATA_DIR, "config.json"),
-            os.path.join(HOME_DIR, "social_bot_data", "config.json")
+            os.path.join(HOME_DIR, "social_bot_data", "config.json"),
+            os.path.join(DATA_DIR, "license.json"),
         ]
+        seen = set()
+        dedup_paths = []
+        for p in (config_paths or []) + default_candidates:
+            try:
+                norm = os.path.normpath(os.path.abspath(p))
+                if norm not in seen:
+                    seen.add(norm)
+                    dedup_paths.append(norm)
+            except Exception:
+                pass
+        self.config_paths = dedup_paths
         self.server_url = self._detect_server_url()
 
     def _detect_server_url(self) -> str:

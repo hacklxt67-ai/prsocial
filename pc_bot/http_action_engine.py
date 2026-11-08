@@ -451,7 +451,7 @@ class UI:
 # 3. MOTEUR SILENCIEUX & AUTOMATIQUE (100% INVISIBLE / HEADLESS RÉEL)
 # ==============================================================================
 class UniversalSilentEngine:
-    def __init__(self, pr_token: str, cf_clearance: str = "", ig_cookies: str = "", yt_cookies: str = "", tt_cookies: str = ""):
+    def __init__(self, pr_token: str, cf_clearance: str = "", ig_cookies: str = "", yt_cookies: str = "", tt_cookies: str = "", config_paths: Optional[list] = None):
         self.pr_api = PrSocialClient(pr_token, cf_clearance)
         # BrowserBot configuré en mode 100% invisible (headless: True, pas de fenêtre visuelle)
         self.browser_bot = BrowserBot(headless=True)
@@ -469,14 +469,15 @@ class UniversalSilentEngine:
                 from pc_bot.license_manager import UniversalLicenseManager
             except ImportError:
                 from termux_bot.license_manager import UniversalLicenseManager
-        self.lic_mgr = UniversalLicenseManager()
+        self.lic_mgr = UniversalLicenseManager(config_paths)
         self._last_license_check_time = time.time()
         self._tasks_since_license_check = 0
 
     def check_license_heartbeat(self) -> bool:
         """
         Vérification continue de la licence en temps réel pendant les tâches.
-        Si l'administrateur révoque ou supprime la clé, stoppe immédiatement le bot.
+        Si la clé est absente, révoquée ou invalide, redirige immédiatement vers
+        l'écran de saisie/activation de la clé au lieu de stopper brutalement.
         """
         now = time.time()
         self._tasks_since_license_check += 1
@@ -488,20 +489,27 @@ class UniversalSilentEngine:
 
         saved_key = self.lic_mgr.get_saved_key()
         if not saved_key:
-            UI.step("⛔ Clé de licence manquante. Arrêt immédiat.", "error")
-            self.stop_requested = True
-            return False
+            UI.step("⚠️ Clé de licence absente. Redirection vers l'activation de licence...", "warning")
+            time.sleep(1.0)
+            if not self.lic_mgr.enforce_license_login():
+                UI.step("⛔ Aucune licence valide enregistrée. Arrêt.", "error")
+                self.stop_requested = True
+                return False
+            saved_key = self.lic_mgr.get_saved_key()
+            if not saved_key:
+                self.stop_requested = True
+                return False
 
         ok, msg, info = self.lic_mgr.verify_key(saved_key)
         if not ok:
-            UI.step(f"⛔ ACCÈS COUPÉ PAR L'ADMINISTRATEUR : {msg}", "error")
-            print(f"\n  {ANSI.RED}{ANSI.BOLD}╔══════════════════════════════════════════════════════════════════════╗{ANSI.RESET}")
-            print(f"  {ANSI.RED}{ANSI.BOLD}║{ANSI.RESET}  🚫 {ANSI.WHITE}{ANSI.BOLD}L'ADMINISTRATEUR A RÉVOQUÉ CETTE LICENCE EN TEMPS RÉEL !{ANSI.RESET}         {ANSI.RED}{ANSI.BOLD}║{ANSI.RESET}")
-            print(f"  {ANSI.RED}{ANSI.BOLD}║{ANSI.RESET}  {ANSI.YELLOW}L'accès a été immédiatement coupé et les clés locales effacées.{ANSI.RESET}   {ANSI.RED}{ANSI.BOLD}║{ANSI.RESET}")
-            print(f"  {ANSI.RED}{ANSI.BOLD}╚══════════════════════════════════════════════════════════════════════╝{ANSI.RESET}\n")
-            self.lic_mgr.clear_saved_key()
-            self.stop_requested = True
-            return False
+            UI.step(f"⚠️ Licence non reconnue ou expirée : {msg}", "warning")
+            UI.step("Redirection vers l'écran de saisie de licence...", "info")
+            time.sleep(1.0)
+            if not self.lic_mgr.enforce_license_login():
+                UI.step("⛔ Accès refusé. Clé de licence requise.", "error")
+                self.lic_mgr.clear_saved_key()
+                self.stop_requested = True
+                return False
         return True
 
     def auto_unblock_active_tasks(self) -> int:
@@ -1397,7 +1405,8 @@ def main():
                 cf_clearance=cf,
                 ig_cookies=ig_cookies,
                 yt_cookies=yt_cookies,
-                tt_cookies=tt_cookies
+                tt_cookies=tt_cookies,
+                config_paths=candidates
             )
             try:
                 engine.run_all()
@@ -1421,7 +1430,8 @@ def main():
                 cf_clearance=cf,
                 ig_cookies=ig_cookies,
                 yt_cookies=yt_cookies,
-                tt_cookies=tt_cookies
+                tt_cookies=tt_cookies,
+                config_paths=candidates
             )
             try:
                 engine.run_surf_tasks()

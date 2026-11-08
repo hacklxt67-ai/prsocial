@@ -548,13 +548,15 @@ class TermuxBotApp:
                     tasks_since_lic_check = 0
                     is_val, msg_lic, _ = self.license_client.check_license()
                     if not is_val:
-                        print(f"\n{RED}{BOLD}╔══════════════════════════════════════════════════════════════════════╗{RESET}")
-                        print(f"{RED}{BOLD}║{RESET}  🚫 {WHITE}{BOLD}ARRÊT IMMÉDIAT : L'ADMINISTRATEUR A RÉVOQUÉ CETTE LICENCE !{RESET}         {RED}{BOLD}║{RESET}")
-                        print(f"{RED}{BOLD}║{RESET}  {YELLOW}Accès suspendu et clé effacée.{RESET}                                      {RED}{BOLD}║{RESET}")
-                        print(f"{RED}{BOLD}╚══════════════════════════════════════════════════════════════════════╝{RESET}\n")
-                        self.license_client.clear_saved_key()
-                        self.is_licensed = False
-                        break
+                        print(f"\n{YELLOW}⚠️ Clé de licence manquante ou expirée : {msg_lic}{RESET}")
+                        print(f"{CYAN}Redirection immédiate vers le menu d'activation de clé...{RESET}\n")
+                        time.sleep(1.0)
+                        self.show_license_menu()
+                        is_val, _, _ = self.license_client.check_license()
+                        if not is_val:
+                            print(f"{RED}Arrêt du bot : Aucune licence active.{RESET}")
+                            self.is_licensed = False
+                            break
 
                 tasks_found = 0
                 for plat in active_list:
