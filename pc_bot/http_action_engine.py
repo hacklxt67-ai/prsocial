@@ -83,7 +83,11 @@ class PrSocialClient:
             "User-Agent": DEFAULT_UA,
             "Accept": "application/json, text/plain, */*",
             "Accept-Language": "fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7",
+            "Origin": "https://pr.social",
             "Referer": "https://pr.social/tasks",
+            "Sec-Fetch-Site": "same-origin",
+            "Sec-Fetch-Mode": "cors",
+            "Sec-Fetch-Dest": "empty",
             "Cookie": "; ".join(cookies)
         })
 
@@ -127,13 +131,42 @@ class PrSocialClient:
         return self.request("POST", f"/tasks/{task_id}/cancel")
 
     def submit_screenshot_file(self, task_id: int, filepath: str) -> Tuple[int, Dict[str, Any]]:
+        if not os.path.exists(filepath):
+            return 0, {"error": f"Fichier capture introuvable: {filepath}"}
+
+        upload_path = filepath
+        mime_type = "image/png"
+        filename = "screenshot.png"
+
+        # Optimisation RAM Nginx : Compression WebP pour rester sous le tampon RAM de 10 Ko (évite le crash 500 Nginx)
+        try:
+            if os.path.getsize(filepath) > 9500:
+                from PIL import Image
+                im = Image.open(filepath)
+                w, h = im.size
+                ratio = 540 / float(w)
+                new_h = int(h * ratio)
+                im_resized = im.resize((540, new_h), Image.Resampling.LANCZOS)
+                
+                opt_path = filepath + ".ram_opt.webp"
+                im_resized.save(opt_path, format="WEBP", quality=45, method=6)
+                if os.path.getsize(opt_path) > 9500:
+                    im_resized.save(opt_path, format="WEBP", quality=35, method=6)
+                
+                upload_path = opt_path
+                mime_type = "image/webp"
+                filename = "screenshot.webp"
+        except Exception:
+            upload_path = filepath
+
         url = f"{BASE_API_URL}/tasks/{task_id}/submit"
         headers = dict(self.session.headers)
         headers.pop("Content-Type", None)
+
         try:
-            with open(filepath, "rb") as f:
-                files = {"screenshot": (os.path.basename(filepath), f, "image/png")}
-                resp = requests.post(url, files=files, headers=headers, timeout=35)
+            with open(upload_path, "rb") as f:
+                files = {"screenshot": (filename, f, mime_type)}
+                resp = self.session.post(url, files=files, headers=headers, timeout=35)
             try:
                 return resp.status_code, resp.json()
             except Exception:
@@ -639,6 +672,7 @@ class UniversalSilentEngine:
 
         session_earnings = 0.0
         success_count = 0
+        server_error_streak = 0
         platform_counts: Dict[str, int] = {}
 
         while not self.stop_requested:
