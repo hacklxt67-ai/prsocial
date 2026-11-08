@@ -621,6 +621,12 @@ class TermuxBotApp:
                                     bsky_handle = u_name if "." in u_name else f"{u_name}.bsky.social"
                                     target_url = f"https://bsky.app/profile/{bsky_handle}"
 
+                        if not target_url:
+                            print(f"  🛡️ {YELLOW}Cible invalide : Tâche #{task_id} sans URL ni identifiant. Annulation propre...{RESET}")
+                            self.api.cancel_task(task_id)
+                            self.failed_tasks.add(task_id)
+                            continue
+
                         wait_sec = int(res_start.get("submit_after_sec") or 5)
                         api_check = res_start.get("api_check_enabled", 0)
 

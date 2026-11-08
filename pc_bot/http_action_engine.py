@@ -527,8 +527,13 @@ class UniversalSilentEngine:
     def is_task_feasible(self, task: Dict[str, Any]) -> Tuple[bool, str]:
         """Analyse intelligente des critères d'éligibilité des tâches."""
         dead_count = int(task.get("link_dead_count") or 0)
-        if dead_count >= 5:
+        if dead_count >= 3:
             return False, f"Lien mort signalé ({dead_count} fois par la communauté)"
+
+        url = (task.get("target_url") or "").strip()
+        user = (task.get("target_username") or "").strip()
+        if not url and not user and not task.get("target_channel"):
+            return False, "Cible absente (URL et identifiant nuls)"
 
         action = (task.get("action") or "").lower()
         if "comment" in action:
@@ -791,6 +796,13 @@ class UniversalSilentEngine:
                             elif plat in ["bluesky", "bsky"]:
                                 bsky_handle = u_name if "." in u_name else f"{u_name}.bsky.social"
                                 target_url = f"https://bsky.app/profile/{bsky_handle}"
+
+                    if not target_url:
+                        UI.step(f"🛡️ Cible invalide : Tâche #{task_id} sans URL ni identifiant (campagne corrompue).", "warning")
+                        UI.step(f"   Annulation immédiate pour protéger la réputation du compte.", "info")
+                        self.pr_api.cancel_task(task_id)
+                        self.failed_tasks[task_id] = time.time() + 86400
+                        continue
 
                     print()  # Efface la ligne du radar
                     UI.task_card(task_id, plat, action, reward, target_url)
