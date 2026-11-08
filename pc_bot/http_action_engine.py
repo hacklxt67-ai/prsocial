@@ -527,7 +527,7 @@ class UniversalSilentEngine:
     def is_task_feasible(self, task: Dict[str, Any]) -> Tuple[bool, str]:
         """Analyse intelligente des critères d'éligibilité des tâches."""
         dead_count = int(task.get("link_dead_count") or 0)
-        if dead_count >= 3:
+        if dead_count >= 2:
             return False, f"Lien mort signalé ({dead_count} fois par la communauté)"
 
         url = (task.get("target_url") or "").strip()
@@ -691,9 +691,12 @@ class UniversalSilentEngine:
                     break
 
                 acc_id = approved_accounts.get(plat, {}).get("id")
-                # Récupérer un lot complet (limit=500) pour ne pas manquer les tâches disponibles
-                st, data = self.pr_api.get_available_tasks(plat, sort="reward", limit=500)
-                if st != 200:
+                # Récupérer un lot complet (limit=500) en combinant 'reward' ET 'new' pour capturer 100% des tâches
+                st_r, data_r = self.pr_api.get_available_tasks(plat, sort="reward", limit=500)
+                st_n, data_n = self.pr_api.get_available_tasks(plat, sort="new", limit=500)
+
+                data = data_r if st_r == 200 else (data_n if st_n == 200 else {})
+                if not data:
                     continue
 
                 # Détection des limites horaires serveur (exhausted_pairs)
@@ -710,12 +713,19 @@ class UniversalSilentEngine:
                         if isinstance(pc, dict) and "platform" in pc:
                             platform_counts[pc["platform"].lower()] = int(pc.get("count", 0))
 
-                tasks = data.get("tasks", [])
-                if not tasks:
-                    st_new, data_new = self.pr_api.get_available_tasks(plat, sort="new", limit=500)
-                    if st_new == 200:
-                        tasks = data_new.get("tasks", [])
+                tasks_r = data_r.get("tasks", []) if st_r == 200 else []
+                tasks_n = data_n.get("tasks", []) if st_n == 200 else []
 
+                # Fusion sans doublons : priorité aux tâches à forte rémunération
+                merged_tasks = {}
+                for t in tasks_n:
+                    if isinstance(t, dict) and "id" in t:
+                        merged_tasks[t["id"]] = t
+                for t in tasks_r:
+                    if isinstance(t, dict) and "id" in t:
+                        merged_tasks[t["id"]] = t
+
+                tasks = list(merged_tasks.values())
                 if not tasks:
                     continue
 
@@ -771,7 +781,7 @@ class UniversalSilentEngine:
 
                     # Protection Anti-Lien Mort : Vérification stricte du compteur de liens morts communautaire
                     task_dead_count = int(start_res.get("task", {}).get("link_dead_count") or 0)
-                    if task_dead_count >= 3:
+                    if task_dead_count >= 2:
                         UI.step(f"🛡️ Protection Anti-Lien Mort : Tâche #{task_id} signalée morte ({task_dead_count} fois par la communauté).", "warning")
                         UI.step(f"   Annulation immédiate et mise en quarantaine 24h pour protéger le compte.", "info")
                         self.pr_api.cancel_task(task_id)

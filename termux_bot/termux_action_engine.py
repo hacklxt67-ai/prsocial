@@ -559,11 +559,18 @@ class TermuxBotApp:
                 tasks_found = 0
                 for plat in active_list:
                     acc_id = self.approved_accounts.get(plat, {}).get("id")
-                    st_t, data = self.api.get_available_tasks(plat, limit=10)
-                    if st_t != 200:
-                        continue
-
-                    tasks = data.get("tasks", [])
+                    st_r, data_r = self.api.get_available_tasks(plat, sort="reward", limit=500)
+                    st_n, data_n = self.api.get_available_tasks(plat, sort="new", limit=500)
+                    tasks_r = data_r.get("tasks", []) if st_r == 200 else []
+                    tasks_n = data_n.get("tasks", []) if st_n == 200 else []
+                    merged = {}
+                    for t in tasks_n:
+                        if isinstance(t, dict) and "id" in t:
+                            merged[t["id"]] = t
+                    for t in tasks_r:
+                        if isinstance(t, dict) and "id" in t:
+                            merged[t["id"]] = t
+                    tasks = list(merged.values())
                     if not tasks:
                         continue
                     # Tri prioritaire par récompense décroissante (exécute les tâches les plus payantes en premier)
@@ -594,7 +601,7 @@ class TermuxBotApp:
 
                         # Protection Anti-Lien Mort : Vérification stricte du compteur communautaire
                         task_dead_count = int(res_start.get("task", {}).get("link_dead_count") or 0)
-                        if task_dead_count >= 3:
+                        if task_dead_count >= 2:
                             print(f"  🛡️ {YELLOW}Protection Anti-Lien Mort : Tâche #{task_id} signalée morte ({task_dead_count} fois). Annulation propre...{RESET}")
                             self.api.cancel_task(task_id)
                             self.failed_tasks.add(task_id)

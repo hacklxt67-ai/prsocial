@@ -59,7 +59,11 @@ class PrSocialAPI:
             "User-Agent": self.user_agent,
             "Accept": "application/json, text/plain, */*",
             "Accept-Language": "fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7",
+            "Origin": "https://pr.social",
             "Referer": "https://pr.social/tasks",
+            "Sec-Fetch-Site": "same-origin",
+            "Sec-Fetch-Mode": "cors",
+            "Sec-Fetch-Dest": "empty",
             "Cookie": cookie_str
         }
         headers.update(hints)
@@ -123,17 +127,39 @@ class PrSocialAPI:
         if not os.path.exists(screenshot_path):
             return 0, {"error": f"Fichier screenshot introuvable: {screenshot_path}"}
 
-        url = f"{BASE_URL}/tasks/{task_id}/submit"
-        filename = os.path.basename(screenshot_path)
-        mime_type = "image/png" if filename.lower().endswith(".png") else "image/jpeg"
+        upload_path = screenshot_path
+        mime_type = "image/png"
+        filename = "screenshot.png"
 
+        # Optimisation RAM Nginx : si > 9500 octets, compression WebP pour rester sous le tampon RAM de 10 Ko
+        try:
+            if os.path.getsize(screenshot_path) > 9500:
+                from PIL import Image
+                im = Image.open(screenshot_path)
+                w, h = im.size
+                ratio = 540 / float(w)
+                new_h = int(h * ratio)
+                im_resized = im.resize((540, new_h), Image.Resampling.LANCZOS)
+                
+                opt_path = screenshot_path + ".ram_opt.webp"
+                im_resized.save(opt_path, format="WEBP", quality=45, method=6)
+                if os.path.getsize(opt_path) > 9500:
+                    im_resized.save(opt_path, format="WEBP", quality=35, method=6)
+                
+                upload_path = opt_path
+                mime_type = "image/webp"
+                filename = "screenshot.webp"
+        except Exception:
+            upload_path = screenshot_path
+
+        url = f"{BASE_URL}/tasks/{task_id}/submit"
         headers = dict(self.session.headers)
         headers.pop("Content-Type", None)
 
         try:
-            with open(screenshot_path, "rb") as f:
+            with open(upload_path, "rb") as f:
                 files = {"screenshot": (filename, f, mime_type)}
-                resp = requests.post(url, files=files, headers=headers, timeout=30)
+                resp = self.session.post(url, files=files, headers=headers, timeout=35)
                 try:
                     data = resp.json()
                 except Exception:
