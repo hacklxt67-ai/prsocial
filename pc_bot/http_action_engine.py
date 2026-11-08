@@ -516,6 +516,9 @@ class UniversalSilentEngine:
             if act_key not in groups:
                 groups[act_key] = []
             groups[act_key].append(t)
+        # Tri prioritaire au sein de chaque groupe : tâches les plus rémunératrices en tête
+        for k in groups:
+            groups[k].sort(key=lambda x: float(x.get("worker_reward") or x.get("cost_per_task") or 0.0), reverse=True)
         interleaved = []
         max_len = max(len(g) for g in groups.values())
         for i in range(max_len):
@@ -591,16 +594,36 @@ class UniversalSilentEngine:
         except Exception:
             pass
 
-        ALL_SUPPORTED_PLATFORMS = [
-            "instagram", "tiktok", "youtube", "twitter", "threads",
-            "facebook", "snapchat", "github", "reddit", "discord",
-            "soundcloud", "bluesky", "spotify", "telegram", "pinterest", "linkedin"
-        ]
+        # Matrice Prioritaire Haute Vitesse de l'IA Visuelle :
+        # Classement strict pour exécuter les tâches à validation instantanée (<30s) en priorité absolue
+        FAST_AI_PRIORITY = {
+            "youtube": 1,
+            "twitter": 2,
+            "x": 2,
+            "snapchat": 3,
+            "threads": 4,
+            "reddit": 5,
+            "telegram": 6,
+            "soundcloud": 7,
+            "spotify": 8,
+            "bluesky": 9,
+            "github": 10,
+            "discord": 11,
+            "pinterest": 12,
+            "tiktok": 20,
+            "facebook": 21,
+            "instagram": 22,
+            "linkedin": 25,
+        }
+        ALL_SUPPORTED_PLATFORMS = sorted(list(FAST_AI_PRIORITY.keys()), key=lambda k: FAST_AI_PRIORITY[k])
+
         # Si aucune sélection manuelle, on prend toutes les plateformes approuvées par PR.Social
         target_platforms = platforms or list(approved_accounts.keys()) or ALL_SUPPORTED_PLATFORMS
 
         # Tolérance zéro : Uniquement les plateformes ayant un compte explicitement approuvé ET hors quarantaine
         active_list = [p for p in target_platforms if p in approved_accounts and p not in quarantined_platforms]
+        # Tri prioritaire strict : Traiter en PREMIER les plateformes à validation IA instantanée (<30s)
+        active_list.sort(key=lambda p: FAST_AI_PRIORITY.get(p.lower(), 99))
         if not active_list:
             if not approved_accounts:
                 UI.step("Aucun compte lié approuvé trouvé sur PR.Social. Liez vos réseaux dans PR.Social.", "warning")

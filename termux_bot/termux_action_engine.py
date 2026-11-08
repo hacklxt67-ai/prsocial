@@ -500,9 +500,31 @@ class TermuxBotApp:
         if unblocked == 0:
             print(f"{GREEN}✓ Aucune tâche orpheline bloquante. Prêt pour l'automatisation.{RESET}")
 
-        target_platforms = list(self.approved_accounts.keys()) or ["instagram", "threads", "reddit", "pinterest", "soundcloud", "bluesky", "tiktok", "youtube", "facebook", "linkedin", "telegram", "twitter", "snapchat", "github", "discord", "spotify"]
+        FAST_AI_PRIORITY = {
+            "youtube": 1,
+            "twitter": 2,
+            "x": 2,
+            "snapchat": 3,
+            "threads": 4,
+            "reddit": 5,
+            "telegram": 6,
+            "soundcloud": 7,
+            "spotify": 8,
+            "bluesky": 9,
+            "github": 10,
+            "discord": 11,
+            "pinterest": 12,
+            "tiktok": 20,
+            "facebook": 21,
+            "instagram": 22,
+            "linkedin": 25,
+        }
+        all_plat_sorted = sorted(list(FAST_AI_PRIORITY.keys()), key=lambda k: FAST_AI_PRIORITY[k])
+        target_platforms = list(self.approved_accounts.keys()) or all_plat_sorted
         # Tolérance zéro : Uniquement les plateformes ayant un compte explicitement approuvé
         active_list = [p for p in target_platforms if p in self.approved_accounts and p not in quarantined_platforms]
+        # Tri prioritaire IA Visuelle Haute Vitesse (<30s)
+        active_list.sort(key=lambda p: FAST_AI_PRIORITY.get(p.lower(), 99))
         if not active_list:
             if not self.approved_accounts:
                 print(f"{YELLOW}Aucun réseau lié approuvé trouvé sur PR.Social. Veuillez associer vos comptes sur PR.Social.{RESET}")
@@ -544,6 +566,8 @@ class TermuxBotApp:
                     tasks = data.get("tasks", [])
                     if not tasks:
                         continue
+                    # Tri prioritaire par récompense décroissante (exécute les tâches les plus payantes en premier)
+                    tasks.sort(key=lambda x: float(x.get("worker_reward") or x.get("cost_per_task") or 0.0), reverse=True)
 
                     for t in tasks:
                         task_id = t["id"]
