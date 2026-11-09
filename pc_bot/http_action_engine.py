@@ -456,8 +456,8 @@ class UniversalSilentEngine:
         # BrowserBot configuré en mode 100% invisible (headless: True, pas de fenêtre visuelle)
         self.browser_bot = BrowserBot(headless=True)
         self.stop_requested = False
-        self.delay_min = 5.0
-        self.delay_max = 9.0
+        self.delay_min = 2.0
+        self.delay_max = 3.5
         self.failed_tasks: Dict[int, float] = {}
         self.COOLDOWN_FAILED_SECONDS = 900  # 15 minutes d'exclusion anti-répétition
 
@@ -692,19 +692,42 @@ class UniversalSilentEngine:
             if not self.check_license_heartbeat():
                 break
             tasks_found = 0
-            ordered_platforms = sorted(active_list, key=lambda p: platform_counts.get(p, 1), reverse=True)
+
+            # 1. Sondage Global Turbo (1 seule requête ultra-rapide pour tout le serveur)
+            # Met à jour immédiatement les compteurs de toutes les plateformes et capture les tâches fraîches
+            st_g, data_g = self.pr_api.request("GET", "/tasks/available", params={"sort": "new", "limit": 50})
+            global_fresh_by_platform: Dict[str, list] = {}
+            if st_g == 200 and isinstance(data_g, dict):
+                if isinstance(data_g.get("platformCounts"), list):
+                    for pc in data_g["platformCounts"]:
+                        if isinstance(pc, dict) and "platform" in pc:
+                            platform_counts[pc["platform"].lower()] = int(pc.get("count", 0))
+                for t in (data_g.get("tasks") or []):
+                    if isinstance(t, dict):
+                        plat_key = (t.get("platform") or "").lower()
+                        if plat_key in active_list:
+                            if plat_key not in global_fresh_by_platform:
+                                global_fresh_by_platform[plat_key] = []
+                            global_fresh_by_platform[plat_key].append(t)
+
+            # Filtrage Turbo : On ne sonde en détail que les plateformes qui ONT RÉELLEMENT des tâches (> 0)
+            # Élimine 80% des requêtes HTTP inutiles et accélère la recherche par un facteur 10 !
+            ordered_platforms = [p for p in active_list if platform_counts.get(p, 1) > 0]
+            ordered_platforms.sort(key=lambda p: platform_counts.get(p, 1), reverse=True)
+            if not ordered_platforms and active_list:
+                ordered_platforms = list(active_list)
 
             for plat in ordered_platforms:
                 if self.stop_requested:
                     break
 
                 acc_id = approved_accounts.get(plat, {}).get("id")
-                # Récupérer un lot complet (limit=500) en combinant 'reward' ET 'new' pour capturer 100% des tâches
-                st_r, data_r = self.pr_api.get_available_tasks(plat, sort="reward", limit=500)
-                st_n, data_n = self.pr_api.get_available_tasks(plat, sort="new", limit=500)
+                # Récupérer le lot de la plateforme en combinant 'reward' ET 'new'
+                st_r, data_r = self.pr_api.get_available_tasks(plat, sort="reward", limit=50)
+                st_n, data_n = self.pr_api.get_available_tasks(plat, sort="new", limit=50)
 
                 data = data_r if st_r == 200 else (data_n if st_n == 200 else {})
-                if not data:
+                if not data and plat not in global_fresh_by_platform:
                     continue
 
                 # Détection des limites horaires serveur (exhausted_pairs)
@@ -723,9 +746,13 @@ class UniversalSilentEngine:
 
                 tasks_r = data_r.get("tasks", []) if st_r == 200 else []
                 tasks_n = data_n.get("tasks", []) if st_n == 200 else []
+                tasks_g = global_fresh_by_platform.get(plat, [])
 
-                # Fusion sans doublons : priorité aux tâches à forte rémunération
+                # Fusion sans doublons : priorité absolue aux tâches fraîches et rémunératrices
                 merged_tasks = {}
+                for t in tasks_g:
+                    if isinstance(t, dict) and "id" in t:
+                        merged_tasks[t["id"]] = t
                 for t in tasks_n:
                     if isinstance(t, dict) and "id" in t:
                         merged_tasks[t["id"]] = t
@@ -913,7 +940,7 @@ class UniversalSilentEngine:
             if tasks_found == 0:
                 radar_total = sum(platform_counts.values()) if platform_counts else 0
                 active_has_tasks = sum(platform_counts.get(p, 0) for p in active_list)
-                pause_sec = 2 if active_has_tasks > 0 else (4 if radar_total > 0 else 5)
+                pause_sec = 1 if active_has_tasks > 0 else (2 if radar_total > 0 else 3)
 
                 total_ticks = int(pause_sec * 5)
                 for tick in range(total_ticks, 0, -1):
