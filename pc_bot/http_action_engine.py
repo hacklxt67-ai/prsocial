@@ -1371,6 +1371,11 @@ def main():
             print(f"  {ANSI.WHITE}{ANSI.BOLD}┌─ 👤 SESSION ACTIVE PR.SOCIAL ────────────────────────────────────────┐{ANSI.RESET}")
             print(f"  {ANSI.WHITE}{ANSI.BOLD}│{ANSI.RESET}  Compte : {ANSI.GREEN}{ANSI.BOLD}{u_name:<15}{ANSI.RESET} 💰 Solde : {ANSI.YELLOW}{ANSI.BOLD}{b_val:<9}{ANSI.RESET}⚡Version : {ANSI.CYAN}{ANSI.BOLD}v3.0{ANSI.RESET}       {ANSI.WHITE}{ANSI.BOLD}│{ANSI.RESET}")
             print(f"  {ANSI.WHITE}{ANSI.BOLD}└──────────────────────────────────────────────────────────────────────┘{ANSI.RESET}\n")
+            try:
+                from PIL import Image
+            except ImportError:
+                print(f"  {ANSI.RED}{ANSI.BOLD}⚠️  ATTENTION : Module Pillow (PIL) non détecté sur cet appareil !{ANSI.RESET}")
+                print(f"  {ANSI.YELLOW}👉 Sur Termux, exécutez : {ANSI.CYAN}{ANSI.BOLD}pkg install -y python-pillow{ANSI.RESET}{ANSI.YELLOW} pour des preuves validées à 100%.{ANSI.RESET}\n")
         else:
             print(f"  {ANSI.RED}{ANSI.BOLD}┌─ ⚠️  NON CONNECTÉ (Token absent ou expiré) ──────────────────────────┐{ANSI.RESET}")
             print(f"  {ANSI.RED}{ANSI.BOLD}│{ANSI.RESET}  Veuillez configurer un Token PR.Social valide avec l'option [ 3 ]   {ANSI.RED}{ANSI.BOLD}│{ANSI.RESET}")
