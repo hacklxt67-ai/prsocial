@@ -594,7 +594,9 @@ class TermuxBotApp:
                         if st_start != 200 or not res_start.get("ok"):
                             err_msg = str(res_start.get("error", "Erreur"))
                             print(f"  {RED}✖ Échec démarrage: {err_msg}{RESET}")
-                            if "active task" in err_msg.lower() or "task_in_progress" in err_msg.lower():
+                            if "wait" in err_msg.lower() and ("second" in err_msg.lower() or "s before" in err_msg.lower()):
+                                time.sleep(2.5)
+                            elif "active task" in err_msg.lower() or "task_in_progress" in err_msg.lower():
                                 print(f"  {YELLOW}⚠️ Tâche bloquante détectée. Déblocage automatique...{RESET}")
                                 self.auto_unblock_tasks()
                                 time.sleep(1)
