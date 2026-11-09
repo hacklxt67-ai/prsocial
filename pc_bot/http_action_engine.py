@@ -775,9 +775,9 @@ class UniversalSilentEngine:
                                    any(k in err_msg.lower() for k in ["все места", "places", "not found", "inactive", "уже выполн"]))
 
                         if is_busy:
-                            self.failed_tasks[task_id] = time.time() + 120
+                            self.failed_tasks[task_id] = time.time() + 45
                             consecutive_busy += 1
-                            if consecutive_busy >= 3:
+                            if consecutive_busy >= 4:
                                 break
                         else:
                             self.failed_tasks[task_id] = time.time() + 300
@@ -913,7 +913,7 @@ class UniversalSilentEngine:
             if tasks_found == 0:
                 radar_total = sum(platform_counts.values()) if platform_counts else 0
                 active_has_tasks = sum(platform_counts.get(p, 0) for p in active_list)
-                pause_sec = 3 if active_has_tasks > 0 else (5 if radar_total > 0 else 6)
+                pause_sec = 2 if active_has_tasks > 0 else (4 if radar_total > 0 else 5)
 
                 total_ticks = int(pause_sec * 5)
                 for tick in range(total_ticks, 0, -1):
