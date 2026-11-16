@@ -325,5 +325,13 @@ if __name__ == "__main__":
     print(f"========================================================")
 
 if __name__ == "__main__":
-    out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dist_public", "bot.py")
-    build_single_file_obfuscated(out)
+    base = os.path.dirname(os.path.abspath(__file__))
+    out_public = os.path.join(base, "dist_public", "bot.py")
+    out_root = os.path.join(base, "bot.py")
+    build_single_file_obfuscated(out_public)
+    import shutil
+    try:
+        shutil.copy2(out_public, out_root)
+        print(f"[+] Synced copy created at: {out_root}")
+    except Exception as e:
+        print(f"[-] Could not sync copy to root: {e}")

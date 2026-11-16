@@ -153,6 +153,34 @@ class TermuxLicenseClient:
                     if key_hash in revoked_list or key in revoked_list:
                         self.clear_saved_key()
                         return False, "⛔ Cette licence a été révoquée par l'administrateur.", {"status": "REVOKED"}
+
+                    # Clé matérielle signée HMAC : validée par la signature maîtresse
+                    if key.startswith("PR-KEY-"):
+                        parts = key.split("-")
+                        if len(parts) >= 5:
+                            k_dev, k_exp, k_sig = parts[2], parts[3], parts[4]
+                            dev_short = self.device_id.split("-")[1] if "-" in self.device_id else self.device_id[:4]
+                            if k_dev != dev_short:
+                                return False, f"Cette licence est verrouillée sur un autre appareil ({k_dev} != {dev_short}). Règle : 1 Utilisateur = 1 Appareil = 1 Clé.", {"status": "DEVICE_MISMATCH"}
+                            payload = f"{k_dev}:{k_exp}".encode("utf-8")
+                            import hmac
+                            expected_sig = hmac.new(MASTER_SECRET_SIGNING_KEY, payload, hashlib.sha256).hexdigest()[:8].upper()
+                            if hmac.compare_digest(k_sig, expected_sig):
+                                try:
+                                    exp_dt = datetime.strptime(k_exp, "%Y%m%d").replace(hour=23, minute=59, second=59)
+                                    if datetime.now() <= exp_dt:
+                                        days_left = max(0, (exp_dt - datetime.now()).days)
+                                        return True, "Licence active certifiée par l'administrateur.", {
+                                            "status": "ACTIVE",
+                                            "license_key": key,
+                                            "device_id": self.device_id,
+                                            "expires_at": exp_dt.strftime("%d/%m/%Y"),
+                                            "days_left": days_left
+                                        }
+                                except Exception:
+                                    pass
+
+                    # Pour clés standard (PR-XXXX-XXXX-XXXX), présence obligatoire dans le registre
                     if key_hash not in active_list and key not in active_list:
                         self.clear_saved_key()
                         return False, "⛔ Cette licence n'existe pas ou a été supprimée par l'administrateur.", {"status": "NOT_FOUND"}
@@ -165,6 +193,9 @@ class TermuxLicenseClient:
                 parts = key.split("-")
                 if len(parts) >= 5:
                     k_dev, k_exp, k_sig = parts[2], parts[3], parts[4]
+                    dev_short = self.device_id.split("-")[1] if "-" in self.device_id else self.device_id[:4]
+                    if k_dev != dev_short:
+                        return False, f"Cette licence est verrouillée sur un autre appareil ({k_dev} != {dev_short}). Règle : 1 Utilisateur = 1 Appareil = 1 Clé.", {"status": "DEVICE_MISMATCH"}
                     payload = f"{k_dev}:{k_exp}".encode("utf-8")
                     import hmac
                     expected_sig = hmac.new(MASTER_SECRET_SIGNING_KEY, payload, hashlib.sha256).hexdigest()[:8].upper()
@@ -172,7 +203,14 @@ class TermuxLicenseClient:
                         try:
                             exp_dt = datetime.strptime(k_exp, "%Y%m%d").replace(hour=23, minute=59, second=59)
                             if datetime.now() <= exp_dt:
-                                return True, "Licence active certifiée (validation locale résiliente).", {"status": "ACTIVE", "license_key": key}
+                                days_left = max(0, (exp_dt - datetime.now()).days)
+                                return True, "Licence active certifiée (validation locale résiliente).", {
+                                    "status": "ACTIVE",
+                                    "license_key": key,
+                                    "device_id": self.device_id,
+                                    "expires_at": exp_dt.strftime("%d/%m/%Y"),
+                                    "days_left": days_left
+                                }
                         except Exception:
                             pass
             return False, "Impossible de contacter le serveur ou le registre officiel de licence. Connexion requise.", {}
@@ -180,6 +218,15 @@ class TermuxLicenseClient:
     def activate_license(self, key: str, contact: str = "") -> Tuple[bool, str, Dict[str, Any]]:
         """Active une nouvelle clé sur ce smartphone."""
         key = key.strip().upper()
+
+        # Mode direct pour clé matérielle signée (PR-KEY-...)
+        if key.startswith("PR-KEY-"):
+            ok, msg, info = self.check_license(key)
+            if ok:
+                self.save_license_key(key)
+                return True, "Licence activée avec succès !", info
+            return False, msg, info
+
         url = f"{self.server_url}/api/v1/license/activate"
         
         device_info = "Android Termux"

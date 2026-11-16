@@ -490,13 +490,12 @@ class UniversalLicenseManager:
                 self.blacklist_key(key)
                 return False, "⛔ Cette licence a été révoquée par l'administrateur.", {"status": "REVOKED"}
 
-            if key_hash not in active_list and key not in active_list:
-                self.clear_saved_key()
-                return False, "⛔ Cette licence n'existe pas ou a été supprimée par l'administrateur.", {"status": "NOT_FOUND"}
-
-            # La clé est explicitement dans la liste ACTIVE du registre officiel
-            self.unblacklist_key(key)
+            # Pour les clés matérielles signées HMAC (PR-KEY-...), la signature cryptographique et l'HWID
+            # ont déjà été rigoureusement vérifiés par l'autorité de signature locale.
+            # Si elle n'est pas révoquée, elle est 100% authentique et certifiée valide,
+            # même en cas de délai de propagation ou de cache CDN (Fastly/GitHub raw) sur le registre en ligne.
             if is_hardware_key and exp_date_obj:
+                self.unblacklist_key(key)
                 days_left = max(0, (exp_date_obj - datetime.now()).days)
                 return True, "Licence active et certifiée par le registre officiel de l'administrateur.", {
                     "status": "ACTIVE",
@@ -505,12 +504,19 @@ class UniversalLicenseManager:
                     "expires_at": exp_date_obj.strftime("%d/%m/%Y"),
                     "days_left": days_left
                 }
-            elif not is_hardware_key:
-                return True, "Licence active et certifiée par le registre officiel.", {
-                    "status": "ACTIVE",
-                    "license_key": key,
-                    "device_id": self.device_id
-                }
+
+            # Pour les clés standard de base de données (PR-XXXX-XXXX-XXXX), présence obligatoire dans la liste active
+            if key_hash not in active_list and key not in active_list:
+                self.clear_saved_key()
+                return False, "⛔ Cette licence n'existe pas ou a été supprimée par l'administrateur.", {"status": "NOT_FOUND"}
+
+            # La clé standard est explicitement dans la liste ACTIVE du registre officiel
+            self.unblacklist_key(key)
+            return True, "Licence active et certifiée par le registre officiel.", {
+                "status": "ACTIVE",
+                "license_key": key,
+                "device_id": self.device_id
+            }
 
         # C. MODE RÉSILIENCE HORS LIGNE / CONNEXION MOBILE INSTABLE
         # Si la clé était révoquée localement et que le réseau est indisponible :

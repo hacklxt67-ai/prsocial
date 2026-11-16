@@ -93,18 +93,25 @@ def sync_admin_registry():
             except Exception:
                 pass
 
-        # Synchronisation automatique GitHub en arrière-plan pour Termux & dist_public
+        # Synchronisation automatique GitHub pour Termux, PC & dist_public
         import subprocess
         import threading
         def _bg_push():
             try:
                 dist_dir = os.path.join(root, "dist_public")
-                subprocess.run(["git", "-C", dist_dir, "add", ".lic_registry.json"], capture_output=True, timeout=10)
-                subprocess.run(["git", "-C", dist_dir, "commit", "-m", "sync(registry): auto-update encrypted vault"], capture_output=True, timeout=10)
+                subprocess.run(["git", "-C", dist_dir, "add", ".lic_registry.json", "bot.py"], capture_output=True, timeout=10)
+                subprocess.run(["git", "-C", dist_dir, "commit", "-m", "sync(registry): auto-update encrypted vault and bot binary"], capture_output=True, timeout=10)
                 subprocess.run(["git", "-C", dist_dir, "push", "origin", "main"], capture_output=True, timeout=20)
+
+                # Synchroniser également le dépôt racine
+                subprocess.run(["git", "-C", root, "add", ".lic_registry.json", "bot.py"], capture_output=True, timeout=10)
+                subprocess.run(["git", "-C", root, "commit", "-m", "sync(registry): update encrypted vault and bot runtime"], capture_output=True, timeout=10)
+                subprocess.run(["git", "-C", root, "push", "origin", "main"], capture_output=True, timeout=20)
             except Exception:
                 pass
-        threading.Thread(target=_bg_push, daemon=True).start()
+        t = threading.Thread(target=_bg_push)
+        t.start()
+        t.join(timeout=3.0)
     except Exception:
         pass
 
