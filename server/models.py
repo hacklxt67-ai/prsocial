@@ -71,7 +71,8 @@ class LicenseManager:
         deleted = [r[0] for r in cursor.fetchall()]
         conn.close()
 
-        all_revoked = list(set(revoked + deleted))
+        # Une clé ACTIVE ne doit JAMAIS se retrouver dans la liste révoquée
+        all_revoked = list(set([k for k in (revoked + deleted) if k and k not in active]))
 
         def hash_k(k: str) -> str:
             return hashlib.sha256(MASTER_SECRET_SIGNING_KEY + b"::SALT_KEY::" + k.strip().upper().encode("utf-8")).hexdigest()
@@ -270,6 +271,7 @@ class LicenseManager:
             expires_at = now + timedelta(days=duration)
             expires_at_str = expires_at.strftime(DATE_FORMAT)
 
+            cursor.execute("DELETE FROM deleted_licenses WHERE license_key = ?;", (lic["license_key"],))
             cursor.execute("""
                 UPDATE licenses 
                 SET status = 'ACTIVE', activated_at = ?, expires_at = ?, device_id = ?, client_contact = COALESCE(NULLIF(?, ''), client_contact)

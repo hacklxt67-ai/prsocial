@@ -500,6 +500,20 @@ class TermuxBotApp:
         if unblocked == 0:
             print(f"{GREEN}✓ Aucune tâche orpheline bloquante. Prêt pour l'automatisation.{RESET}")
 
+        # Détection automatique des comptes renouvelés (Levée automatique sous surveillance prudente)
+        renewed_platforms = set()
+        for p, acc in self.approved_accounts.items():
+            p_sub = str(acc.get("submitted_at") or acc.get("verified_at") or "")
+            plat_warnings = [w for w in active_warnings if str(w.get("platform", "")).lower() == p]
+            if plat_warnings and p_sub:
+                latest_warn = max(str(w.get("created_at") or "") for w in plat_warnings)
+                if p_sub > latest_warn:
+                    renewed_platforms.add(p)
+                    if p in quarantined_platforms:
+                        quarantined_platforms.remove(p)
+                    print(f"  {GREEN}{BOLD}✨ COMPTE RENOUVELÉ APPROUVÉ [{p.upper()}] : @{acc.get('username')} lié après l'avertissement.{RESET}")
+                    print(f"     {CYAN}↳ Quarantaine levée automatiquement en MODE PRUDENCE (Cadence humaine sécurisée).{RESET}")
+
         FAST_AI_PRIORITY = {
             "youtube": 1,
             "twitter": 2,
@@ -514,9 +528,9 @@ class TermuxBotApp:
             "github": 10,
             "discord": 11,
             "pinterest": 12,
+            "instagram": 14,
             "tiktok": 20,
             "facebook": 21,
-            "instagram": 22,
             "linkedin": 25,
         }
         all_plat_sorted = sorted(list(FAST_AI_PRIORITY.keys()), key=lambda k: FAST_AI_PRIORITY[k])
@@ -561,22 +575,36 @@ class TermuxBotApp:
                 tasks_found = 0
                 for plat in active_list:
                     acc_id = self.approved_accounts.get(plat, {}).get("id")
-                    st_r, data_r = self.api.get_available_tasks(plat, sort="reward", limit=500)
-                    st_n, data_n = self.api.get_available_tasks(plat, sort="new", limit=500)
-                    tasks_r = data_r.get("tasks", []) if st_r == 200 else []
-                    tasks_n = data_n.get("tasks", []) if st_n == 200 else []
                     merged = {}
-                    for t in tasks_n:
-                        if isinstance(t, dict) and "id" in t:
-                            merged[t["id"]] = t
-                    for t in tasks_r:
-                        if isinstance(t, dict) and "id" in t:
-                            merged[t["id"]] = t
+                    for sort_mode in ["reward", "new"]:
+                        for pg in range(1, 4):
+                            st_p, data_p = self.api.get_available_tasks(plat, sort=sort_mode, limit=50, page=pg)
+                            p_tasks = data_p.get("tasks", []) if (st_p == 200 and isinstance(data_p, dict)) else []
+                            if not p_tasks:
+                                break
+                            for t in p_tasks:
+                                if isinstance(t, dict) and "id" in t:
+                                    merged[t["id"]] = t
+                            if not data_p.get("has_more", False):
+                                break
+
                     tasks = list(merged.values())
                     if not tasks:
                         continue
-                    # Tri prioritaire par récompense décroissante (exécute les tâches les plus payantes en premier)
-                    tasks.sort(key=lambda x: float(x.get("worker_reward") or x.get("cost_per_task") or 0.0), reverse=True)
+
+                    # Calcul et filtrage des quotas annonceurs
+                    for t in tasks:
+                        tot_slots = int(t.get("total_count") or 0)
+                        done_slots = int(t.get("completed_count") or 0)
+                        t["_slots_left"] = tot_slots - done_slots
+
+                    # Écarter les tâches dont les quotas sont déjà saturés
+                    tasks = [t for t in tasks if not (int(t.get("total_count") or 0) > 0 and t.get("_slots_left", 1) <= 0)]
+                    if not tasks:
+                        continue
+
+                    # Tri prioritaire : Campagnes annonceurs avec le plus de places ouvertes et meilleur gain
+                    tasks.sort(key=lambda x: (x.get("_slots_left", 0) > 0, x.get("_slots_left", 0), float(x.get("worker_reward") or x.get("cost_per_task") or 0.0)), reverse=True)
 
                     for t in tasks:
                         task_id = t["id"]
@@ -603,10 +631,11 @@ class TermuxBotApp:
                             self.failed_tasks.add(task_id)
                             continue
 
-                        # Protection Anti-Lien Mort : Vérification stricte du compteur communautaire
+                        # Protection Anti-Lien Mort : Vérification raisonnée (uniquement si lien confirmé inactif)
                         task_dead_count = int(res_start.get("task", {}).get("link_dead_count") or 0)
-                        if task_dead_count >= 2:
-                            print(f"  🛡️ {YELLOW}Protection Anti-Lien Mort : Tâche #{task_id} signalée morte ({task_dead_count} fois). Annulation propre...{RESET}")
+                        task_completed = int(res_start.get("task", {}).get("completed_count") or 0)
+                        if task_dead_count > 500 and task_completed == 0:
+                            print(f"  🛡️ {YELLOW}Protection Anti-Lien Mort : Tâche #{task_id} confirmée morte. Annulation propre...{RESET}")
                             self.api.cancel_task(task_id)
                             self.failed_tasks.add(task_id)
                             continue
@@ -639,6 +668,8 @@ class TermuxBotApp:
                             continue
 
                         wait_sec = int(res_start.get("submit_after_sec") or 5)
+                        if plat in renewed_platforms:
+                            wait_sec = max(wait_sec, 6)
                         api_check = res_start.get("api_check_enabled", 0)
 
                         # Préparation rigoureuse du commentaire si l'action est un commentaire

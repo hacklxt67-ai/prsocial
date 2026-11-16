@@ -109,8 +109,11 @@ class PrSocialClient:
     def get_socials(self) -> Tuple[int, Dict[str, Any]]:
         return self.request("GET", "/profile/socials")
 
-    def get_available_tasks(self, platform: str, sort: str = "reward", limit: int = 50) -> Tuple[int, Dict[str, Any]]:
-        return self.request("GET", "/tasks/available", params={"platform": platform, "sort": sort, "limit": limit})
+    def get_available_tasks(self, platform: str, sort: str = "reward", limit: int = 50, page: int = 1) -> Tuple[int, Dict[str, Any]]:
+        params = {"platform": platform, "sort": sort, "limit": limit}
+        if page > 1:
+            params["page"] = page
+        return self.request("GET", "/tasks/available", params=params)
 
     def get_warnings(self) -> Tuple[int, Dict[str, Any]]:
         return self.request("GET", "/profile/warnings")
@@ -534,15 +537,6 @@ class UniversalSilentEngine:
 
     def is_task_feasible(self, task: Dict[str, Any]) -> Tuple[bool, str]:
         """Analyse intelligente des critères d'éligibilité des tâches."""
-        dead_count = int(task.get("link_dead_count") or 0)
-        if dead_count >= 2:
-            return False, f"Lien mort signalé ({dead_count} fois par la communauté)"
-
-        url = (task.get("target_url") or "").strip()
-        user = (task.get("target_username") or "").strip()
-        if not url and not user and not task.get("target_channel"):
-            return False, "Cible absente (URL et identifiant nuls)"
-
         action = (task.get("action") or "").lower()
         if "comment" in action:
             c_type = (task.get("comment_type") or "").lower()
@@ -577,7 +571,7 @@ class UniversalSilentEngine:
                     interleaved.append(groups[k][i])
         return interleaved
 
-    def run_all(self, platforms: Optional[List[str]] = None):
+    def run_all(self, platforms: Optional[List[str]] = None, max_tasks: Optional[int] = None):
         UI.clear_screen()
         UI.header("⚡ ENGINEERING REVERSED SOCIAL BOT·v3.0 ⚡")
 
@@ -634,6 +628,20 @@ class UniversalSilentEngine:
 
         UI.accounts_grid(approved_accounts)
 
+        # 4.1 Détection automatique des comptes renouvelés (Levée automatique sous surveillance prudente)
+        renewed_platforms = set()
+        for p, acc in approved_accounts.items():
+            p_sub = str(acc.get("submitted_at") or acc.get("verified_at") or "")
+            plat_warnings = [w for w in active_warnings if str(w.get("platform", "")).lower() == p]
+            if plat_warnings and p_sub:
+                latest_warn = max(str(w.get("created_at") or "") for w in plat_warnings)
+                if p_sub > latest_warn:
+                    renewed_platforms.add(p)
+                    if p in quarantined_platforms:
+                        quarantined_platforms.remove(p)
+                    UI.step(f"✨ COMPTE RENOUVELÉ APPROUVÉ [{p.upper()}] : @{acc.get('username')} lié après l'avertissement ({p_sub[:10]} > {latest_warn[:10]}).", "success")
+                    UI.step(f"   ↳ Quarantaine levée automatiquement en MODE PRUDENCE (Délais humains sécurisés).", "info")
+
         # 4.5. Sentinelle de Qualité : Vérification consultative (sans bloquer les comptes approuvés PR.Social)
         try:
             import re
@@ -660,9 +668,9 @@ class UniversalSilentEngine:
             "github": 10,
             "discord": 11,
             "pinterest": 12,
+            "instagram": 14,
             "tiktok": 20,
             "facebook": 21,
-            "instagram": 22,
             "linkedin": 25,
         }
         ALL_SUPPORTED_PLATFORMS = sorted(list(FAST_AI_PRIORITY.keys()), key=lambda k: FAST_AI_PRIORITY[k])
@@ -710,55 +718,57 @@ class UniversalSilentEngine:
                                 global_fresh_by_platform[plat_key] = []
                             global_fresh_by_platform[plat_key].append(t)
 
-            # Filtrage Turbo : On ne sonde en détail que les plateformes qui ONT RÉELLEMENT des tâches (> 0)
-            # Élimine 80% des requêtes HTTP inutiles et accélère la recherche par un facteur 10 !
-            ordered_platforms = [p for p in active_list if platform_counts.get(p, 1) > 0]
-            ordered_platforms.sort(key=lambda p: platform_counts.get(p, 1), reverse=True)
-            if not ordered_platforms and active_list:
-                ordered_platforms = list(active_list)
+            # Priorisation intelligente : on traite d'abord les plateformes avec des tâches détectées au radar,
+            # puis systématiquement toutes les autres plateformes actives non averties du compte
+            ordered_platforms = [p for p in active_list if platform_counts.get(p, 0) > 0]
+            ordered_platforms.sort(key=lambda p: platform_counts.get(p, 0), reverse=True)
+            for p in active_list:
+                if p not in ordered_platforms:
+                    ordered_platforms.append(p)
 
             for plat in ordered_platforms:
                 if self.stop_requested:
                     break
 
                 acc_id = approved_accounts.get(plat, {}).get("id")
-                # Récupérer le lot de la plateforme en combinant 'reward' ET 'new'
-                st_r, data_r = self.pr_api.get_available_tasks(plat, sort="reward", limit=50)
-                st_n, data_n = self.pr_api.get_available_tasks(plat, sort="new", limit=50)
-
-                data = data_r if st_r == 200 else (data_n if st_n == 200 else {})
-                if not data and plat not in global_fresh_by_platform:
-                    continue
-
-                # Détection des limites horaires serveur (exhausted_pairs)
-                exhausted = data.get("exhausted_pairs") or []
+                merged_tasks = {}
+                data = {}
                 exhausted_actions = set()
-                if isinstance(exhausted, list):
-                    for ep in exhausted:
-                        if isinstance(ep, dict) and ep.get("platform", "").lower() == plat.lower():
-                            exhausted_actions.add(ep.get("action", "").lower())
+
+                # Moissonneur ciblé multi-pages & multi-tris (Capture profonde des campagnes annonceurs)
+                for sort_mode in ["reward", "new"]:
+                    for pg in range(1, 4):  # Scanne jusqu'à 3 pages (150 tâches) par plateforme
+                        st_p, data_p = self.pr_api.get_available_tasks(plat, sort=sort_mode, limit=50, page=pg)
+                        if st_p == 200 and isinstance(data_p, dict):
+                            data = data_p
+                            # Détection des limites horaires serveur (exhausted_pairs)
+                            exhausted = data_p.get("exhausted_pairs") or []
+                            if isinstance(exhausted, list):
+                                for ep in exhausted:
+                                    if isinstance(ep, dict) and ep.get("platform", "").lower() == plat.lower():
+                                        exhausted_actions.add(ep.get("action", "").lower())
+
+                            p_tasks = data_p.get("tasks", []) or []
+                            if not p_tasks:
+                                break
+                            for t in p_tasks:
+                                if isinstance(t, dict) and "id" in t:
+                                    merged_tasks[t["id"]] = t
+                            if not data_p.get("has_more", False):
+                                break
+                        else:
+                            break
+
+                # Intégrer les tâches fraîches du flux global pour cette plateforme
+                for t in global_fresh_by_platform.get(plat, []):
+                    if isinstance(t, dict) and "id" in t:
+                        merged_tasks[t["id"]] = t
 
                 # Mise à jour du radar serveur en temps réel
                 if isinstance(data.get("platformCounts"), list):
                     for pc in data["platformCounts"]:
                         if isinstance(pc, dict) and "platform" in pc:
                             platform_counts[pc["platform"].lower()] = int(pc.get("count", 0))
-
-                tasks_r = data_r.get("tasks", []) if st_r == 200 else []
-                tasks_n = data_n.get("tasks", []) if st_n == 200 else []
-                tasks_g = global_fresh_by_platform.get(plat, [])
-
-                # Fusion sans doublons : priorité absolue aux tâches fraîches et rémunératrices
-                merged_tasks = {}
-                for t in tasks_g:
-                    if isinstance(t, dict) and "id" in t:
-                        merged_tasks[t["id"]] = t
-                for t in tasks_n:
-                    if isinstance(t, dict) and "id" in t:
-                        merged_tasks[t["id"]] = t
-                for t in tasks_r:
-                    if isinstance(t, dict) and "id" in t:
-                        merged_tasks[t["id"]] = t
 
                 tasks = list(merged_tasks.values())
                 if not tasks:
@@ -768,6 +778,20 @@ class UniversalSilentEngine:
                     tasks = [t for t in tasks if (t.get("action") or "").lower() not in exhausted_actions]
                     if not tasks:
                         continue
+
+                # Calcul des places restantes par annonceur (total_count - completed_count)
+                for t in tasks:
+                    tot_slots = int(t.get("total_count") or 0)
+                    done_slots = int(t.get("completed_count") or 0)
+                    t["_slots_left"] = tot_slots - done_slots
+
+                # Écarter immédiatement les campagnes dont tous les slots sont déjà pris à 100%
+                tasks = [t for t in tasks if not (int(t.get("total_count") or 0) > 0 and t.get("_slots_left", 1) <= 0)]
+                if not tasks:
+                    continue
+
+                # Ciblage prioritaire chirurgical : Campagnes avec le plus de places ouvertes par l'annonceur
+                tasks.sort(key=lambda t: (t.get("_slots_left", 0) > 0, t.get("_slots_left", 0), float(t.get("worker_reward") or t.get("cost_per_task") or 0.0)), reverse=True)
 
                 # Alterner intelligemment les actions (Follow, Like, Comment, etc.)
                 tasks = self.interleave_task_actions(tasks)
@@ -802,9 +826,9 @@ class UniversalSilentEngine:
                                    any(k in err_msg.lower() for k in ["все места", "places", "not found", "inactive", "уже выполн"]))
 
                         if is_busy:
-                            self.failed_tasks[task_id] = time.time() + 45
+                            self.failed_tasks[task_id] = time.time() + 60
                             consecutive_busy += 1
-                            if consecutive_busy >= 4:
+                            if consecutive_busy >= 15:
                                 break
                         else:
                             self.failed_tasks[task_id] = time.time() + 300
@@ -814,10 +838,11 @@ class UniversalSilentEngine:
                             time.sleep(1)
                         continue
 
-                    # Protection Anti-Lien Mort : Vérification stricte du compteur de liens morts communautaire
+                    # Protection Anti-Lien Mort : Vérification raisonnée (uniquement si lien confirmé inactif à 100%)
                     task_dead_count = int(start_res.get("task", {}).get("link_dead_count") or 0)
-                    if task_dead_count >= 2:
-                        UI.step(f"🛡️ Protection Anti-Lien Mort : Tâche #{task_id} signalée morte ({task_dead_count} fois par la communauté).", "warning")
+                    task_completed = int(start_res.get("task", {}).get("completed_count") or 0)
+                    if task_dead_count > 500 and task_completed == 0:
+                        UI.step(f"🛡️ Protection Anti-Lien Mort : Tâche #{task_id} confirmée morte ({task_dead_count} signalements, 0 réalisation).", "warning")
                         UI.step(f"   Annulation immédiate et mise en quarantaine 24h pour protéger le compte.", "info")
                         self.pr_api.cancel_task(task_id)
                         self.failed_tasks[task_id] = time.time() + 86400
@@ -838,6 +863,9 @@ class UniversalSilentEngine:
                             elif plat == "tiktok": target_url = f"https://www.tiktok.com/@{u_name}"
                             elif plat == "pinterest": target_url = f"https://www.pinterest.com/{u_name}/"
                             elif plat in ["soundcloud", "sound_cloud"]: target_url = f"https://soundcloud.com/{u_name}"
+                            elif plat == "github": target_url = f"https://github.com/{u_name}"
+                            elif plat == "discord": target_url = f"https://discord.gg/{u_name}"
+                            elif plat == "youtube": target_url = f"https://www.youtube.com/@{u_name}"
                             elif plat in ["bluesky", "bsky"]:
                                 bsky_handle = u_name if "." in u_name else f"{u_name}.bsky.social"
                                 target_url = f"https://bsky.app/profile/{bsky_handle}"
@@ -853,6 +881,8 @@ class UniversalSilentEngine:
                     UI.task_card(task_id, plat, action, reward, target_url)
 
                     wait_sec = int(start_res.get("submit_after_sec") or 5)
+                    if plat in renewed_platforms:
+                        wait_sec = max(wait_sec, 6)
                     api_check_enabled = start_res.get("api_check_enabled", 0)
 
                     comment_text = None
@@ -934,8 +964,19 @@ class UniversalSilentEngine:
                         new_bal = float(fresh_me.get("user", {}).get("balance", 0.0)) if fresh_me.get("user") else 0.0
                         UI.success(task_id, reward, session_earnings, new_bal)
 
-                    delay = random.uniform(self.delay_min, self.delay_max)
+                        if max_tasks and success_count >= max_tasks:
+                            UI.step(f"🎯 Objectif de validation atteint : {success_count}/{max_tasks} tâches exécutées avec succès !", "success")
+                            self.stop_requested = True
+                            break
+
+                    if plat in renewed_platforms:
+                        delay = random.uniform(4.0, 6.5)
+                    else:
+                        delay = random.uniform(self.delay_min, self.delay_max)
                     UI.safety_pause(delay)
+
+            if max_tasks and success_count >= max_tasks:
+                break
 
             if tasks_found == 0:
                 radar_total = sum(platform_counts.values()) if platform_counts else 0
@@ -1384,6 +1425,33 @@ def main():
         return
 
     client = PrSocialClient(token, cf)
+
+    # Support d'exécution directe en ligne de commande (ex: --tasks 30)
+    if "--tasks" in sys.argv or "--run" in sys.argv:
+        max_t = None
+        for i, arg in enumerate(sys.argv):
+            if arg == "--tasks" and i + 1 < len(sys.argv):
+                try:
+                    max_t = int(sys.argv[i + 1])
+                except Exception:
+                    pass
+        print(f"\n  {ANSI.CYAN}{ANSI.BOLD}⚡ DÉMARRAGE DIRECT ({max_t if max_t else 'Illimité'} TÂCHES)...{ANSI.RESET}")
+        engine = UniversalSilentEngine(
+            pr_token=token,
+            cf_clearance=cf,
+            ig_cookies=ig_cookies,
+            yt_cookies=yt_cookies,
+            tt_cookies=tt_cookies,
+            config_paths=candidates
+        )
+        try:
+            engine.run_all(max_tasks=max_t)
+        except KeyboardInterrupt:
+            print(f"\n  {ANSI.YELLOW}Arrêt demandé par l'utilisateur...{ANSI.RESET}")
+            engine.stop_requested = True
+        finally:
+            engine.browser_bot.stop_driver()
+        return
 
     while True:
         os.system('cls' if os.name == 'nt' else 'clear')

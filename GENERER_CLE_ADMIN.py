@@ -56,7 +56,7 @@ def sync_admin_registry():
         deleted = [r[0] for r in cur.fetchall()]
         conn.close()
 
-        all_revoked = list(set(revoked + deleted))
+        all_revoked = list(set([k for k in (revoked + deleted) if k and k not in active]))
 
         def hash_k(k: str) -> str:
             return hashlib.sha256(MASTER_SECRET + b"::SALT_KEY::" + k.strip().upper().encode("utf-8")).hexdigest()
@@ -138,6 +138,7 @@ def generate_hardware_locked_key(device_input: str, days: int, notes: str = "", 
             conn = sqlite3.connect(DB_PATH)
             cur = conn.cursor()
             now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            cur.execute("DELETE FROM deleted_licenses WHERE license_key = ?;", (key,))
             cur.execute("""
                 INSERT OR REPLACE INTO licenses (license_key, duration_days, status, created_at, activated_at, expires_at, device_id, notes, client_contact)
                 VALUES (?, ?, 'ACTIVE', ?, ?, ?, ?, ?, ?);
@@ -222,8 +223,13 @@ def reactivate_license_action(target: str) -> bool:
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
     if target.isdigit():
+        cur.execute("SELECT license_key FROM licenses WHERE id = ?;", (int(target),))
+        row = cur.fetchone()
+        if row:
+            cur.execute("DELETE FROM deleted_licenses WHERE license_key = ?;", (row[0],))
         cur.execute("UPDATE licenses SET status = 'ACTIVE' WHERE id = ?;", (int(target),))
     else:
+        cur.execute("DELETE FROM deleted_licenses WHERE license_key = ?;", (target.upper(),))
         cur.execute("UPDATE licenses SET status = 'ACTIVE' WHERE license_key = ?;", (target.upper(),))
     changed = cur.rowcount > 0
     conn.commit()

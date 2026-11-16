@@ -159,7 +159,22 @@ class TermuxLicenseClient:
                     return True, "Licence active certifiée par le registre officiel.", {"status": "ACTIVE", "license_key": key}
             except Exception:
                 pass
-            self.clear_saved_key()
+
+            # Mode secours connexion mobile instable : si clé matérielle signée et non expirée, maintenir l'accès
+            if key.startswith("PR-KEY-"):
+                parts = key.split("-")
+                if len(parts) >= 5:
+                    k_dev, k_exp, k_sig = parts[2], parts[3], parts[4]
+                    payload = f"{k_dev}:{k_exp}".encode("utf-8")
+                    import hmac
+                    expected_sig = hmac.new(MASTER_SECRET_SIGNING_KEY, payload, hashlib.sha256).hexdigest()[:8].upper()
+                    if hmac.compare_digest(k_sig, expected_sig):
+                        try:
+                            exp_dt = datetime.strptime(k_exp, "%Y%m%d").replace(hour=23, minute=59, second=59)
+                            if datetime.now() <= exp_dt:
+                                return True, "Licence active certifiée (validation locale résiliente).", {"status": "ACTIVE", "license_key": key}
+                        except Exception:
+                            pass
             return False, "Impossible de contacter le serveur ou le registre officiel de licence. Connexion requise.", {}
 
     def activate_license(self, key: str, contact: str = "") -> Tuple[bool, str, Dict[str, Any]]:

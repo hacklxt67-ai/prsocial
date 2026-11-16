@@ -260,6 +260,21 @@ class UniversalLicenseManager:
         except Exception:
             return False
 
+    def unblacklist_key(self, key: str):
+        """Retire une clé de la blacklist locale si elle a été réactivée par l'administrateur."""
+        key = key.strip().upper()
+        if not key or not os.path.exists(REVOKED_KEYS_FILE):
+            return
+        try:
+            with open(REVOKED_KEYS_FILE, "r", encoding="utf-8") as f:
+                revoked = set(json.load(f))
+            if key in revoked:
+                revoked.remove(key)
+                with open(REVOKED_KEYS_FILE, "w", encoding="utf-8") as f:
+                    json.dump(list(revoked), f)
+        except Exception:
+            pass
+
     def verify_key(self, key: str) -> Tuple[bool, str, Dict[str, Any]]:
         """
         Vérification stricte de la licence avec contrôle administrateur 100% en temps réel :
@@ -271,10 +286,10 @@ class UniversalLicenseManager:
         if not key:
             return False, "Aucune clé de licence fournie.", {}
 
-        # 0. Vérification de la blacklist locale de révocation
-        if self.is_key_blacklisted(key):
-            self.clear_saved_key()
-            return False, "⛔ Cette licence a été révoquée par l'administrateur.", {"status": "REVOKED"}
+        # 0. Vérification préliminaire de blacklist
+        # Si la clé est déjà marquée comme révoquée localement, on attendra la confirmation en ligne
+        # pour permettre à l'administrateur de réactiver une clé.
+        is_locally_blacklisted = self.is_key_blacklisted(key)
 
         # 0.5. Vérification prioritaire et obligatoire dans la base server/licensing.db locale si présente
         possible_db_paths = [
@@ -326,6 +341,7 @@ class UniversalLicenseManager:
                             self.clear_saved_key()
                             return False, f"Cette licence a expiré le {exp_str}.", {"status": "EXPIRED"}
                         days_left = max(0, (exp_dt - now).days)
+                        self.unblacklist_key(key)
                         return True, "Licence active et vérifiée dans la base de données.", {
                             "status": "ACTIVE",
                             "license_key": key,
@@ -404,6 +420,7 @@ class UniversalLicenseManager:
                     return False, f"⛔ {msg}", info
 
                 # Licence confirmée active par le serveur
+                self.unblacklist_key(key)
                 return True, msg or "Licence vérifiée et active auprès du serveur.", info
         except Exception:
             # Le serveur central est momentanément inaccessible
@@ -478,6 +495,7 @@ class UniversalLicenseManager:
                 return False, "⛔ Cette licence n'existe pas ou a été supprimée par l'administrateur.", {"status": "NOT_FOUND"}
 
             # La clé est explicitement dans la liste ACTIVE du registre officiel
+            self.unblacklist_key(key)
             if is_hardware_key and exp_date_obj:
                 days_left = max(0, (exp_date_obj - datetime.now()).days)
                 return True, "Licence active et certifiée par le registre officiel de l'administrateur.", {
@@ -487,12 +505,40 @@ class UniversalLicenseManager:
                     "expires_at": exp_date_obj.strftime("%d/%m/%Y"),
                     "days_left": days_left
                 }
+            elif not is_hardware_key:
+                return True, "Licence active et certifiée par le registre officiel.", {
+                    "status": "ACTIVE",
+                    "license_key": key,
+                    "device_id": self.device_id
+                }
 
-        # C. AUCUN MODE SECOURS HORS LIGNE NON VÉRIFIÉ
-        # Si ni le serveur local ni le registre officiel en ligne n'ont pu être validés,
-        # la clé n'est pas acceptée (évite tout contournement sur Termux / smartphones)
-        self.clear_saved_key()
-        return False, "⛔ Impossible de certifier la licence : Serveur ou registre officiel inaccessible. Connexion Internet requise.", {"status": "SERVER_UNREACHABLE"}
+        # C. MODE RÉSILIENCE HORS LIGNE / CONNEXION MOBILE INSTABLE
+        # Si la clé était révoquée localement et que le réseau est indisponible :
+        if is_locally_blacklisted:
+            self.clear_saved_key()
+            return False, "⛔ Cette licence a été révoquée par l'administrateur.", {"status": "REVOKED"}
+
+        # Si le serveur et GitHub sont inaccessibles (mauvaise connexion ou coupure temporaire) :
+        if is_hardware_key and exp_date_obj:
+            now = datetime.now()
+            if now <= exp_date_obj:
+                # Clé matérielle signée, vérifiée sur cet appareil et non expirée.
+                # On maintient la session sans effacer la clé pour ne pas déconnecter le client en cas de lag réseau.
+                days_left = max(0, (exp_date_obj - now).days)
+                return True, "Licence active (validation matérielle locale - connexion temporairement instable).", {
+                    "status": "ACTIVE",
+                    "license_key": key,
+                    "device_id": self.device_id,
+                    "expires_at": exp_date_obj.strftime("%d/%m/%Y"),
+                    "days_left": days_left,
+                    "offline_grace": True
+                }
+            else:
+                self.clear_saved_key()
+                return False, f"Cette licence a expiré le {exp_date_obj.strftime('%d/%m/%Y')}.", {"status": "EXPIRED"}
+
+        # Si clé non vérifiable hors ligne, ne pas effacer si c'était juste un timeout réseau
+        return False, "⛔ Impossible de certifier la licence : Connexion Internet instable ou registre inaccessible.", {"status": "SERVER_UNREACHABLE"}
 
     def activate_key(self, key: str, contact: str = "") -> Tuple[bool, str, Dict[str, Any]]:
         """
@@ -503,6 +549,7 @@ class UniversalLicenseManager:
         if key.startswith("PR-KEY-"):
             ok, msg, info = self.verify_key(key)
             if ok:
+                self.unblacklist_key(key)
                 self.save_license_key(key)
             return ok, msg, info
 
@@ -522,6 +569,7 @@ class UniversalLicenseManager:
             if r.status_code == 200:
                 data = r.json()
                 if data.get("ok"):
+                    self.unblacklist_key(key)
                     self.save_license_key(key)
                     return True, data.get("message", "Clé activée avec succès !"), data.get("info", {})
                 else:

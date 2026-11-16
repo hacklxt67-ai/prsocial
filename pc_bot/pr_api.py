@@ -78,8 +78,11 @@ class PrSocialAPI:
     def get_socials(self) -> Tuple[int, Dict[str, Any]]:
         return self.request("GET", "/profile/socials")
 
-    def get_available_tasks(self, platform: str, sort: str = "reward", limit: int = 50) -> Tuple[int, Dict[str, Any]]:
-        return self.request("GET", "/tasks/available", params={"platform": platform, "sort": sort, "limit": limit})
+    def get_available_tasks(self, platform: str, sort: str = "reward", limit: int = 50, page: int = 1) -> Tuple[int, Dict[str, Any]]:
+        params = {"platform": platform, "sort": sort, "limit": limit}
+        if page > 1:
+            params["page"] = page
+        return self.request("GET", "/tasks/available", params=params)
 
     def get_active_tasks(self) -> Tuple[int, Dict[str, Any]]:
         return self.request("GET", "/tasks/my/list", params={"status": "in_progress"})
