@@ -1693,7 +1693,9 @@ def main():
                             print(f"      {ANSI.GREEN}↳ Profil 100% prêt, aucun critère manquant.{ANSI.RESET}")
                         print()
 
-                    print(f"  {ANSI.GREEN}{ANSI.BOLD}✓ Tous les avatars et packs de posts nécessaires ont été générés dans 'generated_profiles/' !{ANSI.RESET}")
+                    print(f"  {ANSI.GREEN}{ANSI.BOLD}✓ Tous les avatars (.png) et packs de posts nécessaires sont prêts dans :{ANSI.RESET}")
+                    print(f"    {ANSI.CYAN}{ANSI.BOLD}📁 {completer.output_dir}{ANSI.RESET}")
+                    print(f"    {ANSI.DIM}(Dossier Téléchargements / Stockage public accessible){ANSI.RESET}")
             except Exception as e:
                 print(f"  {ANSI.RED}Erreur lors de l'auto-complétion : {e}{ANSI.RESET}")
 

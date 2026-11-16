@@ -361,7 +361,9 @@ class TermuxBotApp:
                         print(f"      {GREEN}↳ Profil 100% prêt, aucun critère manquant.{RESET}")
                     print()
 
-                print(f"{GREEN}{BOLD}✓ Avatars et packs de publications prêts dans 'generated_profiles/' !{RESET}")
+                print(f"{GREEN}{BOLD}✓ Tous les avatars (.png) et packs de publications sont prêts dans :{RESET}")
+                print(f"  {CYAN}{BOLD}📁 {completer.output_dir}{RESET}")
+                print(f"  {DIM}(Accessible directement dans votre Galerie ou le dossier Téléchargements/Download){RESET}")
         except Exception as e:
             print(f"{RED}Erreur lors de l'auto-complétion : {e}{RESET}")
 

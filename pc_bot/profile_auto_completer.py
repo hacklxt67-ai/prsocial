@@ -30,16 +30,85 @@ SAMPLE_TWEETS = [
     "Keep things simple, stay dedicated, and embrace every challenge along the way. ✨"
 ]
 
+def get_user_storage_dir(subdir: str = "PR_Social_Profiles") -> str:
+    """
+    Détermine l'emplacement public et visible de stockage utilisateur :
+    - Android / Termux : /sdcard/Download/PR_Social_Profiles ou /storage/emulated/0/Download/PR_Social_Profiles
+      (directement accessible dans la Galerie Android et le gestionnaire de fichiers).
+    - Windows / PC     : ~/Downloads/PR_Social_Profiles ou ~/Pictures/PR_Social_Profiles.
+    - Linux / Mac      : ~/Downloads/PR_Social_Profiles.
+    """
+    home = os.path.expanduser("~")
+    candidates = []
+
+    # 1. Détection prioritaire Android / Termux
+    is_android = (
+        os.path.exists("/sdcard") or 
+        os.path.exists("/storage/emulated/0") or 
+        "ANDROID_ROOT" in os.environ or 
+        "TERMUX_VERSION" in os.environ or 
+        "termux" in home.lower()
+    )
+
+    if is_android:
+        candidates.extend([
+            os.path.join("/sdcard", "Download", subdir),
+            os.path.join("/storage/emulated/0", "Download", subdir),
+            os.path.join("/sdcard", "Pictures", subdir),
+            os.path.join("/storage/emulated/0", "Pictures", subdir),
+            os.path.join(home, "storage", "downloads", subdir),
+            os.path.join(home, "storage", "shared", "Download", subdir),
+            os.path.join(home, "storage", "pictures", subdir),
+        ])
+
+    # 2. Emplacements standards (Windows / Mac / Linux)
+    candidates.extend([
+        os.path.join(home, "Downloads", subdir),
+        os.path.join(home, "Téléchargements", subdir),
+        os.path.join(home, "Pictures", subdir),
+        os.path.join(home, "Images", subdir),
+        os.path.join(home, "Documents", subdir),
+        os.path.join(home, "social_bot_data", subdir),
+    ])
+
+    for target in candidates:
+        try:
+            os.makedirs(target, exist_ok=True)
+            test_file = os.path.join(target, ".test_write")
+            with open(test_file, "w") as f:
+                f.write("1")
+            os.remove(test_file)
+            return target
+        except Exception:
+            continue
+
+    fallback = os.path.join(home, "social_bot_data", subdir)
+    try:
+        os.makedirs(fallback, exist_ok=True)
+        return fallback
+    except Exception:
+        pass
+
+    return os.path.abspath(subdir)
+
+def _notify_media_store(filepath: str):
+    """Notifie le MediaStore Android sous Termux pour affichage immédiat dans la Galerie."""
+    try:
+        import subprocess
+        subprocess.run(["termux-media-scan", filepath], capture_output=True, timeout=2)
+    except Exception:
+        pass
+
 class ProfileAutoCompleter:
     """
     Système d'Auto-Complétion et de mise en conformité des profils sociaux.
     Génère automatiquement les éléments requis par PR.Social (Avatar, Posts Instagram,
     Vidéos TikTok, Contenu minimal) pour lever la quarantaine et éliminer tout avertissement.
+    Enregistre directement les fichiers (.png / .jpg) dans le stockage utilisateur public.
     """
 
     def __init__(self, output_dir: Optional[str] = None):
-        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        self.output_dir = output_dir or os.path.join(base_dir, "generated_profiles")
+        self.output_dir = output_dir or get_user_storage_dir("PR_Social_Profiles")
         os.makedirs(self.output_dir, exist_ok=True)
 
     def generate_compliant_avatar(self, username: str) -> str:
@@ -60,6 +129,7 @@ class ProfileAutoCompleter:
                 if r.status_code == 200 and len(r.content) > 1000:
                     with open(filepath, "wb") as f:
                         f.write(r.content)
+                    _notify_media_store(filepath)
                     return filepath
             except Exception:
                 continue
@@ -74,10 +144,12 @@ class ProfileAutoCompleter:
                 letter = (username[0] if username else "P").upper()
                 draw.text((180, 170), letter, fill=(30, 30, 30))
                 img.save(filepath, "PNG")
+                _notify_media_store(filepath)
                 return filepath
             except Exception:
                 pass
 
+        _notify_media_store(filepath)
         return filepath
 
     def generate_instagram_pack(self, username: str, count: int = 5) -> List[Dict[str, str]]:
@@ -98,10 +170,12 @@ class ProfileAutoCompleter:
                 if r.status_code == 200:
                     with open(img_path, "wb") as f:
                         f.write(r.content)
+                    _notify_media_store(img_path)
             except Exception:
                 if HAS_PIL:
                     img = Image.new("RGB", (800, 800), color=(random.randint(50, 180), random.randint(50, 180), random.randint(50, 180)))
                     img.save(img_path, "JPEG")
+                    _notify_media_store(img_path)
 
             caption = random.choice(SAMPLE_CAPTIONS)
             pack.append({
@@ -137,12 +211,13 @@ class ProfileAutoCompleter:
         # Règle Avatar
         if "avatar" in rules:
             avatar_path = self.generate_compliant_avatar(u)
-            plan.append(f"🖼️ AVATAR PRÊT : Fichier généré ({os.path.basename(avatar_path)}). À définir comme photo de profil.")
+            plan.append(f"🖼️ AVATAR PRÊT : Enregistré dans '{avatar_path}'. À définir comme photo de profil (accessible dans vos Téléchargements / Galerie).")
 
         # Règle Instagram post5
         if plat == "instagram":
             pack = self.generate_instagram_pack(u, 5)
-            plan.append(f"📸 PACK 5 POSTS INSTAGRAM : 5 photos HD + légendes créées dans le dossier 'generated_profiles/insta_{u}'.")
+            insta_folder = os.path.join(self.output_dir, f"insta_{u}")
+            plan.append(f"📸 PACK 5 POSTS INSTAGRAM : 5 photos créées dans '{insta_folder}' (accessibles dans vos Téléchargements / Galerie).")
 
         # Règle TikTok video1
         if plat == "tiktok":
