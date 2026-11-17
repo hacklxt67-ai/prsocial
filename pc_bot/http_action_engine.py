@@ -459,8 +459,8 @@ class UniversalSilentEngine:
         # BrowserBot configuré en mode 100% invisible (headless: True, pas de fenêtre visuelle)
         self.browser_bot = BrowserBot(headless=True)
         self.stop_requested = False
-        self.delay_min = 2.0
-        self.delay_max = 3.5
+        self.delay_min = 1.0
+        self.delay_max = 1.8
         self.failed_tasks: Dict[int, float] = {}
         self.COOLDOWN_FAILED_SECONDS = 900  # 15 minutes d'exclusion anti-répétition
 
@@ -691,6 +691,12 @@ class UniversalSilentEngine:
 
         UI.step(f"Surveillance active sur {len(active_list)} plateformes sécurisées (Autoroute Anti-Ban) : {', '.join([p.upper() for p in active_list])}", "info")
 
+        # Régulateur de cadence intelligent : séparation stricte des réseaux à quotas horaires (TikTok, YouTube, Instagram)
+        # des réseaux normaux (Twitter/X, Threads, Snapchat, Reddit, Pinterest...) qui tournent à vitesse maximale
+        STRICT_PAUSE_PLATFORMS = {"tiktok", "youtube", "instagram"}
+        platform_hourly_history: Dict[str, list] = {p: [] for p in STRICT_PAUSE_PLATFORMS}
+        platform_cooldowns: Dict[str, float] = {}
+
         session_earnings = 0.0
         success_count = 0
         server_error_streak = 0
@@ -700,12 +706,20 @@ class UniversalSilentEngine:
             if not self.check_license_heartbeat():
                 break
             tasks_found = 0
+            now_ts = time.time()
 
             # 1. Sondage Global Turbo (1 seule requête ultra-rapide pour tout le serveur)
             # Met à jour immédiatement les compteurs de toutes les plateformes et capture les tâches fraîches
             st_g, data_g = self.pr_api.request("GET", "/tasks/available", params={"sort": "new", "limit": 50})
             global_fresh_by_platform: Dict[str, list] = {}
             if st_g == 200 and isinstance(data_g, dict):
+                # Récupération en temps réel des exhausted_pairs du serveur pour TikTok/YouTube/Instagram
+                for ep in (data_g.get("exhausted_pairs") or []):
+                    if isinstance(ep, dict) and "platform" in ep:
+                        ep_plat = ep["platform"].lower()
+                        ep_retry = int(ep.get("retry_after_min") or 1)
+                        platform_cooldowns[ep_plat] = max(platform_cooldowns.get(ep_plat, 0), now_ts + (ep_retry * 60))
+
                 if isinstance(data_g.get("platformCounts"), list):
                     for pc in data_g["platformCounts"]:
                         if isinstance(pc, dict) and "platform" in pc:
@@ -730,6 +744,24 @@ class UniversalSilentEngine:
                 if self.stop_requested:
                     break
 
+                now_ts = time.time()
+
+                # Gestion stricte du rythme humain pour TikTok, YouTube et Instagram (évite la pause orange de 30 min)
+                if plat in STRICT_PAUSE_PLATFORMS:
+                    # Nettoyage de la fenêtre glissante d'1 heure (3600s)
+                    platform_hourly_history[plat] = [ts for ts in platform_hourly_history[plat] if now_ts - ts < 3600]
+
+                    # Si cette plateforme est en cooldown (serveur ou régulation préventive), on la passe pour faire les autres réseaux
+                    if now_ts < platform_cooldowns.get(plat, 0):
+                        continue
+
+                    # Soft-limit préventif (max 9 tâches en 1h pour ne JAMAIS dépasser la limite de 10)
+                    if len(platform_hourly_history[plat]) >= 9:
+                        oldest = platform_hourly_history[plat][0]
+                        wait_sec = max(30, int(3600 - (now_ts - oldest)) + 15)
+                        platform_cooldowns[plat] = now_ts + wait_sec
+                        continue
+
                 acc_id = approved_accounts.get(plat, {}).get("id")
                 merged_tasks = {}
                 data = {}
@@ -747,6 +779,8 @@ class UniversalSilentEngine:
                                 for ep in exhausted:
                                     if isinstance(ep, dict) and ep.get("platform", "").lower() == plat.lower():
                                         exhausted_actions.add(ep.get("action", "").lower())
+                                        retry_min = int(ep.get("retry_after_min") or 10)
+                                        platform_cooldowns[plat] = time.time() + (retry_min * 60)
 
                             p_tasks = data_p.get("tasks", []) or []
                             if not p_tasks:
@@ -964,15 +998,25 @@ class UniversalSilentEngine:
                         new_bal = float(fresh_me.get("user", {}).get("balance", 0.0)) if fresh_me.get("user") else 0.0
                         UI.success(task_id, reward, session_earnings, new_bal)
 
+                        # Enregistrement horaire pour le pacing strict (TikTok, YouTube, Insta)
+                        if plat in STRICT_PAUSE_PLATFORMS:
+                            platform_hourly_history[plat].append(time.time())
+
                         if max_tasks and success_count >= max_tasks:
                             UI.step(f"🎯 Objectif de validation atteint : {success_count}/{max_tasks} tâches exécutées avec succès !", "success")
                             self.stop_requested = True
                             break
 
-                    if plat in renewed_platforms:
-                        delay = random.uniform(4.0, 6.5)
+                    # Différenciation de vitesse et cadence :
+                    if plat in STRICT_PAUSE_PLATFORMS:
+                        # TikTok, YouTube, Instagram : cadence humaine maîtrisée (profil utilisateur expérimenté)
+                        delay = random.uniform(3.0, 4.5)
+                    elif plat in renewed_platforms:
+                        delay = random.uniform(2.5, 4.0)
                     else:
-                        delay = random.uniform(self.delay_min, self.delay_max)
+                        # TOUS LES AUTRES RÉSEAUX (Twitter/X, Threads, Snapchat, Reddit, Pinterest...) :
+                        # VITESSE MAXIMALE ET RENTABILITÉ MAXIMALE !
+                        delay = random.uniform(1.0, 1.8)
                     UI.safety_pause(delay)
 
             if max_tasks and success_count >= max_tasks:
