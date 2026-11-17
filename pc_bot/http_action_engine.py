@@ -571,6 +571,34 @@ class UniversalSilentEngine:
                     interleaved.append(groups[k][i])
         return interleaved
 
+    def interleave_across_platforms(
+        self,
+        tasks_by_platform: Dict[str, List[Dict[str, Any]]],
+        priority_order: List[str]
+    ) -> List[Dict[str, Any]]:
+        """
+        Alterne dynamiquement les plateformes (Round-Robin multi-réseaux) :
+        TikTok -> YouTube -> Twitter -> Threads -> Snapchat -> Reddit -> ...
+        Permet d'exécuter une autre tâche d'un autre réseau pendant le décalage/pause
+        de chaque réseau social, sans aucun blocage ni temps mort !
+        """
+        queues = {p: list(tasks) for p, tasks in tasks_by_platform.items() if tasks}
+        if not queues:
+            return []
+
+        ordered_keys = [p for p in priority_order if p in queues]
+        for p in queues:
+            if p not in ordered_keys:
+                ordered_keys.append(p)
+
+        interleaved: List[Dict[str, Any]] = []
+        max_len = max(len(q) for q in queues.values())
+        for i in range(max_len):
+            for p in ordered_keys:
+                if i < len(queues[p]):
+                    interleaved.append(queues[p][i])
+        return interleaved
+
     def run_all(self, platforms: Optional[List[str]] = None, max_tasks: Optional[int] = None):
         UI.clear_screen()
         UI.header("⚡ ENGINEERING REVERSED SOCIAL BOT·v3.0 ⚡")
@@ -701,6 +729,8 @@ class UniversalSilentEngine:
         success_count = 0
         server_error_streak = 0
         platform_counts: Dict[str, int] = {}
+        last_executed_platform: Optional[str] = None
+        consecutive_busy_by_plat: Dict[str, int] = {}
 
         while not self.stop_requested:
             if not self.check_license_heartbeat():
@@ -740,6 +770,9 @@ class UniversalSilentEngine:
                 if p not in ordered_platforms:
                     ordered_platforms.append(p)
 
+            # Moissonnage multi-plateformes en réservoirs distincts
+            platform_tasks_buckets: Dict[str, List[Dict[str, Any]]] = {}
+
             for plat in ordered_platforms:
                 if self.stop_requested:
                     break
@@ -761,15 +794,17 @@ class UniversalSilentEngine:
                         wait_sec = max(30, int(3600 - (now_ts - oldest)) + 15)
                         platform_cooldowns[plat] = now_ts + wait_sec
                         continue
+                else:
+                    if now_ts < platform_cooldowns.get(plat, 0):
+                        continue
 
-                acc_id = approved_accounts.get(plat, {}).get("id")
                 merged_tasks = {}
                 data = {}
                 exhausted_actions = set()
 
                 # Moissonneur ciblé multi-pages & multi-tris (Capture profonde des campagnes annonceurs)
                 for sort_mode in ["reward", "new"]:
-                    for pg in range(1, 4):  # Scanne jusqu'à 3 pages (150 tâches) par plateforme
+                    for pg in range(1, 3):  # 2 pages par plateforme suffisent par rotation pour rester vif
                         st_p, data_p = self.pr_api.get_available_tasks(plat, sort=sort_mode, limit=50, page=pg)
                         if st_p == 200 and isinstance(data_p, dict):
                             data = data_p
@@ -787,6 +822,7 @@ class UniversalSilentEngine:
                                 break
                             for t in p_tasks:
                                 if isinstance(t, dict) and "id" in t:
+                                    t["platform"] = plat
                                     merged_tasks[t["id"]] = t
                             if not data_p.get("has_more", False):
                                 break
@@ -796,6 +832,7 @@ class UniversalSilentEngine:
                 # Intégrer les tâches fraîches du flux global pour cette plateforme
                 for t in global_fresh_by_platform.get(plat, []):
                     if isinstance(t, dict) and "id" in t:
+                        t["platform"] = plat
                         merged_tasks[t["id"]] = t
 
                 # Mise à jour du radar serveur en temps réel
@@ -830,194 +867,222 @@ class UniversalSilentEngine:
                 # Alterner intelligemment les actions (Follow, Like, Comment, etc.)
                 tasks = self.interleave_task_actions(tasks)
 
-                consecutive_busy = 0
-                for t in tasks:
-                    if self.stop_requested:
+                # Réservoir par plateforme : jusqu'à 4 tâches par passe pour une variation dynamique
+                platform_tasks_buckets[plat] = tasks[:4]
+
+            # Entrelacement multi-plateformes (Round-Robin dynamique) :
+            # Alterne à chaque tâche (TikTok -> YouTube -> Twitter -> Threads -> Snapchat -> ...)
+            # Chaque réseau se repose naturellement pendant l'exécution d'une tâche d'un autre réseau !
+            interleaved_tasks = self.interleave_across_platforms(platform_tasks_buckets, ordered_platforms)
+
+            for t in interleaved_tasks:
+                if self.stop_requested:
+                    break
+
+                plat = (t.get("platform") or "").lower()
+                acc_id = approved_accounts.get(plat, {}).get("id")
+                now_ts = time.time()
+
+                # Vérification en direct du cooldown et des quotas horaires de la plateforme
+                if now_ts < platform_cooldowns.get(plat, 0):
+                    continue
+
+                if plat in STRICT_PAUSE_PLATFORMS:
+                    platform_hourly_history[plat] = [ts for ts in platform_hourly_history[plat] if now_ts - ts < 3600]
+                    if len(platform_hourly_history[plat]) >= 9:
+                        oldest = platform_hourly_history[plat][0]
+                        wait_sec = max(30, int(3600 - (now_ts - oldest)) + 15)
+                        platform_cooldowns[plat] = now_ts + wait_sec
+                        continue
+
+                task_id = t["id"]
+                if task_id in self.failed_tasks:
+                    if time.time() < self.failed_tasks[task_id]:
+                        continue
+                    else:
+                        del self.failed_tasks[task_id]
+
+                action = (t.get("action") or "FOLLOW").upper()
+                reward = float(t.get("worker_reward") or t.get("cost_per_task") or 0.0)
+
+                feasible, _ = self.is_task_feasible(t)
+                if not feasible:
+                    continue
+
+                # Réservation de la tâche auprès du serveur PR.Social
+                start_st, start_res = self.pr_api.start_task(task_id, acc_id)
+
+                if start_st != 200 or not start_res.get("ok"):
+                    err_msg = str(start_res.get("error", ""))
+                    err_code = str(start_res.get("code", ""))
+
+                    is_busy = (err_code in ["SLOTS_TAKEN", "NOT_FOUND"] or
+                               any(k in err_msg.lower() for k in ["все места", "places", "not found", "inactive", "уже выполн"]))
+
+                    if is_busy:
+                        self.failed_tasks[task_id] = time.time() + 60
+                        consecutive_busy_by_plat[plat] = consecutive_busy_by_plat.get(plat, 0) + 1
+                        if consecutive_busy_by_plat[plat] >= 8:
+                            platform_cooldowns[plat] = time.time() + 60
+                    else:
+                        self.failed_tasks[task_id] = time.time() + 300
+
+                    if "active task" in err_msg.lower() or "task_in_progress" in err_msg.lower():
+                        self.auto_unblock_active_tasks()
+                        time.sleep(1)
+                    continue
+
+                # Dès qu'une tâche est acceptée, on réinitialise la saturation de la plateforme
+                consecutive_busy_by_plat[plat] = 0
+                tasks_found += 1
+
+                # Protection Anti-Lien Mort : Vérification raisonnée (uniquement si lien confirmé inactif à 100%)
+                task_dead_count = int(start_res.get("task", {}).get("link_dead_count") or 0)
+                task_completed = int(start_res.get("task", {}).get("completed_count") or 0)
+                if task_dead_count > 500 and task_completed == 0:
+                    UI.step(f"🛡️ Protection Anti-Lien Mort : Tâche #{task_id} confirmée morte ({task_dead_count} signalements, 0 réalisation).", "warning")
+                    UI.step(f"   Annulation immédiate et mise en quarantaine 24h pour protéger le compte.", "info")
+                    self.pr_api.cancel_task(task_id)
+                    self.failed_tasks[task_id] = time.time() + 86400
+                    continue
+
+                target_url = start_res.get("task", {}).get("target_url") or t.get("target_url") or ""
+                if not target_url:
+                    u_name = (start_res.get("task", {}).get("target_username") or t.get("target_username") or "").strip().lstrip("@")
+                    if u_name:
+                        if plat == "threads": target_url = f"https://www.threads.net/@{u_name}"
+                        elif plat == "reddit": target_url = f"https://www.reddit.com/user/{u_name}"
+                        elif plat in ["twitter", "x"]: target_url = f"https://x.com/{u_name}"
+                        elif plat == "instagram": target_url = f"https://www.instagram.com/{u_name}"
+                        elif plat == "tiktok": target_url = f"https://www.tiktok.com/@{u_name}"
+                        elif plat == "pinterest": target_url = f"https://www.pinterest.com/{u_name}/"
+                        elif plat in ["soundcloud", "sound_cloud"]: target_url = f"https://soundcloud.com/{u_name}"
+                        elif plat == "github": target_url = f"https://github.com/{u_name}"
+                        elif plat == "discord": target_url = f"https://discord.gg/{u_name}"
+                        elif plat == "youtube": target_url = f"https://www.youtube.com/@{u_name}"
+                        elif plat in ["bluesky", "bsky"]:
+                            bsky_handle = u_name if "." in u_name else f"{u_name}.bsky.social"
+                            target_url = f"https://bsky.app/profile/{bsky_handle}"
+
+                if not target_url:
+                    UI.step(f"🛡️ Cible invalide : Tâche #{task_id} sans URL ni identifiant (campagne corrompue).", "warning")
+                    UI.step(f"   Annulation immédiate pour protéger la réputation du compte.", "info")
+                    self.pr_api.cancel_task(task_id)
+                    self.failed_tasks[task_id] = time.time() + 86400
+                    continue
+
+                print()  # Efface la ligne du radar
+                UI.task_card(task_id, plat, action, reward, target_url)
+
+                wait_sec = int(start_res.get("submit_after_sec") or 5)
+                if plat in renewed_platforms:
+                    wait_sec = max(wait_sec, 6)
+                api_check_enabled = start_res.get("api_check_enabled", 0)
+
+                comment_text = None
+                if "comment" in action.lower():
+                    assigned = start_res.get("completion", {}).get("assigned_comment") or start_res.get("task", {}).get("assigned_comment") or t.get("assigned_comment")
+                    if not assigned:
+                        c_list = start_res.get("task", {}).get("comment_list") or t.get("comment_list")
+                        if isinstance(c_list, str):
+                            try: c_list = json.loads(c_list)
+                            except Exception: c_list = [line.strip() for line in c_list.split("\n") if line.strip()]
+                        if isinstance(c_list, list) and c_list:
+                            assigned = random.choice(c_list)
+                    if not assigned and ("emoji" in (start_res.get("task", {}).get("comment_type") or "").lower() or "emoji" in action.lower()):
+                        assigned = random.choice(["🔥", "👏", "🚀", "❤️", "👍", "✨", "💯", "🙌"])
+                    if not assigned:
+                        assigned = random.choice([
+                            "Great content! 👍",
+                            "Very interesting, thanks for sharing! ✨",
+                            "Top ! 🔥",
+                            "Nice post! 👏"
+                        ])
+                    comment_text = str(assigned).strip()
+                    UI.step(f"Commentaire préparé : '{comment_text}'", "info")
+
+                UI.step(f"Navigation & exécution discrète de l'action [{action}]...", "info")
+                worker_user = approved_accounts.get(plat, {}).get("username")
+                act_ok, act_msg, shot_path = self.browser_bot.execute_task_action(
+                    platform=plat,
+                    action=action,
+                    target_url=target_url,
+                    task_id=task_id,
+                    comment_text=comment_text,
+                    worker_username=worker_user
+                )
+
+                is_validated = False
+
+                # SÉCURITÉ ABSOLUE : Bypass complet de l'API Check (qui déclenche les rejets/sanctions)
+                # Passage direct en soumission de preuve visuelle sécurisée avec hash unique
+                if act_ok and shot_path and os.path.exists(shot_path):
+                    UI.step(f"Délai de sécurité humaine ({wait_sec}s) puis soumission de la preuve...", "info")
+                    time.sleep(wait_sec)
+
+                    sub_st, sub_res = self.pr_api.submit_screenshot_file(task_id, shot_path)
+                    if sub_st == 200 and sub_res.get("ok"):
+                        status_val = sub_res.get("completion", {}).get("status", "pending_review")
+                        is_validated = True
+                        UI.step(f"Preuve d'écran acceptée par PR.Social (Statut : {status_val})", "success")
+                    else:
+                        err_detail = sub_res.get("error", f"Status {sub_st}") if isinstance(sub_res, dict) else f"Status {sub_st}"
+                        UI.step(f"Soumission refusée ({err_detail}). Annulation sécurisée...", "warning")
+                        self.failed_tasks[task_id] = time.time() + 1800  # Exclusion de 30 min pour cette tâche en échec
+                        self.pr_api.cancel_task(task_id)
+
+                        # Détection Circuit Breaker Cloudflare / Erreur Serveur 500
+                        if sub_st == 500 or "server error" in str(err_detail).lower():
+                            server_error_streak += 1
+                            if server_error_streak >= 2:
+                                UI.step("🛡️ Bouclier Cloudflare / Saturation Serveur PR.Social (500 Server error).", "warning")
+                                UI.step("   Temporisation de sécurité (30s) pour laisser le serveur se débloquer...", "info")
+                                time.sleep(30)
+                                server_error_streak = 0
+                        else:
+                            server_error_streak = 0
+                        continue
+                else:
+                    UI.step(f"SÉCURITÉ ANTI-REJET : Action non confirmée ({act_msg}). Preuve écartée.", "warning")
+                    UI.step(f"Annulation immédiate de #{task_id} pour préserver la réputation.", "info")
+                    self.failed_tasks[task_id] = time.time() + 600
+                    self.pr_api.cancel_task(task_id)
+                    continue
+
+                if is_validated:
+                    server_error_streak = 0
+                    success_count += 1
+                    session_earnings += reward
+                    self.failed_tasks[task_id] = time.time() + 86400
+                    _, fresh_me = self.pr_api.get_me()
+                    new_bal = float(fresh_me.get("user", {}).get("balance", 0.0)) if fresh_me.get("user") else 0.0
+                    UI.success(task_id, reward, session_earnings, new_bal)
+
+                    # Enregistrement horaire pour le pacing strict (TikTok, YouTube, Insta)
+                    if plat in STRICT_PAUSE_PLATFORMS:
+                        platform_hourly_history[plat].append(time.time())
+
+                    if max_tasks and success_count >= max_tasks:
+                        UI.step(f"🎯 Objectif de validation atteint : {success_count}/{max_tasks} tâches exécutées avec succès !", "success")
+                        self.stop_requested = True
                         break
 
-                    task_id = t["id"]
-                    if task_id in self.failed_tasks:
-                        if time.time() < self.failed_tasks[task_id]:
-                            continue
-                        else:
-                            del self.failed_tasks[task_id]
+                # Différenciation de vitesse et cadence intelligente :
+                if last_executed_platform is not None and plat != last_executed_platform:
+                    # Changement de réseau social : le réseau précédent se repose naturellement.
+                    # Rotation ultra-rapide pour enchaîner le réseau suivant immédiatement !
+                    delay = random.uniform(1.0, 1.8)
+                elif plat in STRICT_PAUSE_PLATFORMS:
+                    # Même réseau restreint exécuté consécutivement : cadence humaine obligatoire (profil expérimenté)
+                    delay = random.uniform(3.0, 4.5)
+                elif plat in renewed_platforms:
+                    delay = random.uniform(2.5, 4.0)
+                else:
+                    # Réseau normal consécutif (Twitter, Threads, etc.) : vitesse maximale
+                    delay = random.uniform(1.0, 1.8)
 
-                    action = (t.get("action") or "FOLLOW").upper()
-                    reward = float(t.get("worker_reward") or t.get("cost_per_task") or 0.0)
-
-                    feasible, _ = self.is_task_feasible(t)
-                    if not feasible:
-                        continue
-
-                    # Réservation de la tâche auprès du serveur PR.Social
-                    start_st, start_res = self.pr_api.start_task(task_id, acc_id)
-
-                    if start_st != 200 or not start_res.get("ok"):
-                        err_msg = str(start_res.get("error", ""))
-                        err_code = str(start_res.get("code", ""))
-
-                        is_busy = (err_code in ["SLOTS_TAKEN", "NOT_FOUND"] or
-                                   any(k in err_msg.lower() for k in ["все места", "places", "not found", "inactive", "уже выполн"]))
-
-                        if is_busy:
-                            self.failed_tasks[task_id] = time.time() + 60
-                            consecutive_busy += 1
-                            if consecutive_busy >= 15:
-                                break
-                        else:
-                            self.failed_tasks[task_id] = time.time() + 300
-
-                        if "active task" in err_msg.lower() or "task_in_progress" in err_msg.lower():
-                            self.auto_unblock_active_tasks()
-                            time.sleep(1)
-                        continue
-
-                    # Protection Anti-Lien Mort : Vérification raisonnée (uniquement si lien confirmé inactif à 100%)
-                    task_dead_count = int(start_res.get("task", {}).get("link_dead_count") or 0)
-                    task_completed = int(start_res.get("task", {}).get("completed_count") or 0)
-                    if task_dead_count > 500 and task_completed == 0:
-                        UI.step(f"🛡️ Protection Anti-Lien Mort : Tâche #{task_id} confirmée morte ({task_dead_count} signalements, 0 réalisation).", "warning")
-                        UI.step(f"   Annulation immédiate et mise en quarantaine 24h pour protéger le compte.", "info")
-                        self.pr_api.cancel_task(task_id)
-                        self.failed_tasks[task_id] = time.time() + 86400
-                        continue
-
-                    # Réinitialiser le compteur de saturation dès qu'une tâche est acceptée
-                    consecutive_busy = 0
-                    tasks_found += 1
-
-                    target_url = start_res.get("task", {}).get("target_url") or t.get("target_url") or ""
-                    if not target_url:
-                        u_name = (start_res.get("task", {}).get("target_username") or t.get("target_username") or "").strip().lstrip("@")
-                        if u_name:
-                            if plat == "threads": target_url = f"https://www.threads.net/@{u_name}"
-                            elif plat == "reddit": target_url = f"https://www.reddit.com/user/{u_name}"
-                            elif plat in ["twitter", "x"]: target_url = f"https://x.com/{u_name}"
-                            elif plat == "instagram": target_url = f"https://www.instagram.com/{u_name}"
-                            elif plat == "tiktok": target_url = f"https://www.tiktok.com/@{u_name}"
-                            elif plat == "pinterest": target_url = f"https://www.pinterest.com/{u_name}/"
-                            elif plat in ["soundcloud", "sound_cloud"]: target_url = f"https://soundcloud.com/{u_name}"
-                            elif plat == "github": target_url = f"https://github.com/{u_name}"
-                            elif plat == "discord": target_url = f"https://discord.gg/{u_name}"
-                            elif plat == "youtube": target_url = f"https://www.youtube.com/@{u_name}"
-                            elif plat in ["bluesky", "bsky"]:
-                                bsky_handle = u_name if "." in u_name else f"{u_name}.bsky.social"
-                                target_url = f"https://bsky.app/profile/{bsky_handle}"
-
-                    if not target_url:
-                        UI.step(f"🛡️ Cible invalide : Tâche #{task_id} sans URL ni identifiant (campagne corrompue).", "warning")
-                        UI.step(f"   Annulation immédiate pour protéger la réputation du compte.", "info")
-                        self.pr_api.cancel_task(task_id)
-                        self.failed_tasks[task_id] = time.time() + 86400
-                        continue
-
-                    print()  # Efface la ligne du radar
-                    UI.task_card(task_id, plat, action, reward, target_url)
-
-                    wait_sec = int(start_res.get("submit_after_sec") or 5)
-                    if plat in renewed_platforms:
-                        wait_sec = max(wait_sec, 6)
-                    api_check_enabled = start_res.get("api_check_enabled", 0)
-
-                    comment_text = None
-                    if "comment" in action.lower():
-                        assigned = start_res.get("completion", {}).get("assigned_comment") or start_res.get("task", {}).get("assigned_comment") or t.get("assigned_comment")
-                        if not assigned:
-                            c_list = start_res.get("task", {}).get("comment_list") or t.get("comment_list")
-                            if isinstance(c_list, str):
-                                try: c_list = json.loads(c_list)
-                                except Exception: c_list = [line.strip() for line in c_list.split("\n") if line.strip()]
-                            if isinstance(c_list, list) and c_list:
-                                assigned = random.choice(c_list)
-                        if not assigned and ("emoji" in (start_res.get("task", {}).get("comment_type") or "").lower() or "emoji" in action.lower()):
-                            assigned = random.choice(["🔥", "👏", "🚀", "❤️", "👍", "✨", "💯", "🙌"])
-                        if not assigned:
-                            assigned = random.choice([
-                                "Great content! 👍",
-                                "Very interesting, thanks for sharing! ✨",
-                                "Top ! 🔥",
-                                "Nice post! 👏"
-                            ])
-                        comment_text = str(assigned).strip()
-                        UI.step(f"Commentaire préparé : '{comment_text}'", "info")
-
-                    UI.step(f"Navigation & exécution discrète de l'action [{action}]...", "info")
-                    worker_user = approved_accounts.get(plat, {}).get("username")
-                    act_ok, act_msg, shot_path = self.browser_bot.execute_task_action(
-                        platform=plat,
-                        action=action,
-                        target_url=target_url,
-                        task_id=task_id,
-                        comment_text=comment_text,
-                        worker_username=worker_user
-                    )
-
-                    is_validated = False
-
-                    # SÉCURITÉ ABSOLUE : Bypass complet de l'API Check (qui déclenche les rejets/sanctions)
-                    # Passage direct en soumission de preuve visuelle sécurisée avec hash unique
-                    if act_ok and shot_path and os.path.exists(shot_path):
-                        UI.step(f"Délai de sécurité humaine ({wait_sec}s) puis soumission de la preuve...", "info")
-                        time.sleep(wait_sec)
-
-                        sub_st, sub_res = self.pr_api.submit_screenshot_file(task_id, shot_path)
-                        if sub_st == 200 and sub_res.get("ok"):
-                            status_val = sub_res.get("completion", {}).get("status", "pending_review")
-                            is_validated = True
-                            UI.step(f"Preuve d'écran acceptée par PR.Social (Statut : {status_val})", "success")
-                        else:
-                            err_detail = sub_res.get("error", f"Status {sub_st}") if isinstance(sub_res, dict) else f"Status {sub_st}"
-                            UI.step(f"Soumission refusée ({err_detail}). Annulation sécurisée...", "warning")
-                            self.failed_tasks[task_id] = time.time() + 1800  # Exclusion de 30 min pour cette tâche en échec
-                            self.pr_api.cancel_task(task_id)
-
-                            # Détection Circuit Breaker Cloudflare / Erreur Serveur 500
-                            if sub_st == 500 or "server error" in str(err_detail).lower():
-                                server_error_streak += 1
-                                if server_error_streak >= 2:
-                                    UI.step("🛡️ Bouclier Cloudflare / Saturation Serveur PR.Social (500 Server error).", "warning")
-                                    UI.step("   Temporisation de sécurité (30s) pour laisser le serveur se débloquer...", "info")
-                                    time.sleep(30)
-                                    server_error_streak = 0
-                            else:
-                                server_error_streak = 0
-                            continue
-                    else:
-                        UI.step(f"SÉCURITÉ ANTI-REJET : Action non confirmée ({act_msg}). Preuve écartée.", "warning")
-                        UI.step(f"Annulation immédiate de #{task_id} pour préserver la réputation.", "info")
-                        self.failed_tasks[task_id] = time.time() + 600
-                        self.pr_api.cancel_task(task_id)
-                        continue
-
-                    if is_validated:
-                        server_error_streak = 0
-                        success_count += 1
-                        session_earnings += reward
-                        self.failed_tasks[task_id] = time.time() + 86400
-                        _, fresh_me = self.pr_api.get_me()
-                        new_bal = float(fresh_me.get("user", {}).get("balance", 0.0)) if fresh_me.get("user") else 0.0
-                        UI.success(task_id, reward, session_earnings, new_bal)
-
-                        # Enregistrement horaire pour le pacing strict (TikTok, YouTube, Insta)
-                        if plat in STRICT_PAUSE_PLATFORMS:
-                            platform_hourly_history[plat].append(time.time())
-
-                        if max_tasks and success_count >= max_tasks:
-                            UI.step(f"🎯 Objectif de validation atteint : {success_count}/{max_tasks} tâches exécutées avec succès !", "success")
-                            self.stop_requested = True
-                            break
-
-                    # Différenciation de vitesse et cadence :
-                    if plat in STRICT_PAUSE_PLATFORMS:
-                        # TikTok, YouTube, Instagram : cadence humaine maîtrisée (profil utilisateur expérimenté)
-                        delay = random.uniform(3.0, 4.5)
-                    elif plat in renewed_platforms:
-                        delay = random.uniform(2.5, 4.0)
-                    else:
-                        # TOUS LES AUTRES RÉSEAUX (Twitter/X, Threads, Snapchat, Reddit, Pinterest...) :
-                        # VITESSE MAXIMALE ET RENTABILITÉ MAXIMALE !
-                        delay = random.uniform(1.0, 1.8)
-                    UI.safety_pause(delay)
+                last_executed_platform = plat
+                UI.safety_pause(delay)
 
             if max_tasks and success_count >= max_tasks:
                 break

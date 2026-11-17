@@ -468,6 +468,34 @@ class TermuxBotApp:
 
     # ==========================================================================
     # OPTION 1 : START TOUT (AVEC DÉTECTION ET DÉBLOCAGE ORPHELIN)
+    def interleave_across_platforms(
+        self,
+        tasks_by_platform: Dict[str, List[Dict[str, Any]]],
+        priority_order: List[str]
+    ) -> List[Dict[str, Any]]:
+        """
+        Alterne dynamiquement les plateformes (Round-Robin multi-réseaux) :
+        TikTok -> YouTube -> Twitter -> Threads -> Snapchat -> Reddit -> ...
+        Permet d'exécuter une autre tâche d'un autre réseau pendant le décalage/pause
+        de chaque réseau social, sans aucun blocage ni temps mort !
+        """
+        queues = {p: list(tasks) for p, tasks in tasks_by_platform.items() if tasks}
+        if not queues:
+            return []
+
+        ordered_keys = [p for p in priority_order if p in queues]
+        for p in queues:
+            if p not in ordered_keys:
+                ordered_keys.append(p)
+
+        interleaved: List[Dict[str, Any]] = []
+        max_len = max(len(q) for q in queues.values())
+        for i in range(max_len):
+            for p in ordered_keys:
+                if i < len(queues[p]):
+                    interleaved.append(queues[p][i])
+        return interleaved
+
     # ==========================================================================
     def start_all_tasks(self):
         clear_screen()
@@ -554,6 +582,11 @@ class TermuxBotApp:
         tasks_completed_count = 0
         last_lic_check = time.time()
         tasks_since_lic_check = 0
+        last_executed_platform: Optional[str] = None
+        consecutive_busy_by_plat: Dict[str, int] = {}
+        STRICT_PAUSE_PLATFORMS = {"tiktok", "youtube", "instagram"}
+        platform_hourly_history: Dict[str, list] = {p: [] for p in STRICT_PAUSE_PLATFORMS}
+        platform_cooldowns: Dict[str, float] = {}
 
         try:
             while True:
@@ -575,24 +608,57 @@ class TermuxBotApp:
                             break
 
                 tasks_found = 0
+                now_ts = time.time()
+                platform_tasks_buckets: Dict[str, List[Dict[str, Any]]] = {}
+
+                # Moissonnage par plateforme (réservoirs distincts)
                 for plat in active_list:
-                    acc_id = self.approved_accounts.get(plat, {}).get("id")
+                    # Vérification cooldown et limite horaire stricte
+                    if now_ts < platform_cooldowns.get(plat, 0):
+                        continue
+
+                    if plat in STRICT_PAUSE_PLATFORMS:
+                        platform_hourly_history[plat] = [ts for ts in platform_hourly_history[plat] if now_ts - ts < 3600]
+                        if len(platform_hourly_history[plat]) >= 9:
+                            oldest = platform_hourly_history[plat][0]
+                            wait_sec = max(30, int(3600 - (now_ts - oldest)) + 15)
+                            platform_cooldowns[plat] = now_ts + wait_sec
+                            continue
+
                     merged = {}
+                    exhausted_actions = set()
                     for sort_mode in ["reward", "new"]:
-                        for pg in range(1, 4):
+                        for pg in range(1, 3):
                             st_p, data_p = self.api.get_available_tasks(plat, sort=sort_mode, limit=50, page=pg)
-                            p_tasks = data_p.get("tasks", []) if (st_p == 200 and isinstance(data_p, dict)) else []
-                            if not p_tasks:
-                                break
-                            for t in p_tasks:
-                                if isinstance(t, dict) and "id" in t:
-                                    merged[t["id"]] = t
-                            if not data_p.get("has_more", False):
+                            if st_p == 200 and isinstance(data_p, dict):
+                                exhausted = data_p.get("exhausted_pairs") or []
+                                if isinstance(exhausted, list):
+                                    for ep in exhausted:
+                                        if isinstance(ep, dict) and ep.get("platform", "").lower() == plat.lower():
+                                            exhausted_actions.add(ep.get("action", "").lower())
+                                            retry_min = int(ep.get("retry_after_min") or 10)
+                                            platform_cooldowns[plat] = time.time() + (retry_min * 60)
+
+                                p_tasks = data_p.get("tasks", [])
+                                if not p_tasks:
+                                    break
+                                for t in p_tasks:
+                                    if isinstance(t, dict) and "id" in t:
+                                        t["platform"] = plat
+                                        merged[t["id"]] = t
+                                if not data_p.get("has_more", False):
+                                    break
+                            else:
                                 break
 
                     tasks = list(merged.values())
                     if not tasks:
                         continue
+
+                    if exhausted_actions:
+                        tasks = [t for t in tasks if (t.get("action") or "").lower() not in exhausted_actions]
+                        if not tasks:
+                            continue
 
                     # Calcul et filtrage des quotas annonceurs
                     for t in tasks:
@@ -607,169 +673,202 @@ class TermuxBotApp:
 
                     # Tri prioritaire : Campagnes annonceurs avec le plus de places ouvertes et meilleur gain
                     tasks.sort(key=lambda x: (x.get("_slots_left", 0) > 0, x.get("_slots_left", 0), float(x.get("worker_reward") or x.get("cost_per_task") or 0.0)), reverse=True)
+                    platform_tasks_buckets[plat] = tasks[:4]
 
-                    for t in tasks:
-                        task_id = t["id"]
-                        if task_id in self.failed_tasks:
+                # Entrelacement multi-plateformes (Round-Robin dynamique)
+                interleaved_tasks = self.interleave_across_platforms(platform_tasks_buckets, active_list)
+
+                for t in interleaved_tasks:
+                    plat = (t.get("platform") or "").lower()
+                    acc_id = self.approved_accounts.get(plat, {}).get("id")
+                    now_ts = time.time()
+
+                    if now_ts < platform_cooldowns.get(plat, 0):
+                        continue
+
+                    if plat in STRICT_PAUSE_PLATFORMS:
+                        platform_hourly_history[plat] = [ts for ts in platform_hourly_history[plat] if now_ts - ts < 3600]
+                        if len(platform_hourly_history[plat]) >= 9:
+                            oldest = platform_hourly_history[plat][0]
+                            wait_sec = max(30, int(3600 - (now_ts - oldest)) + 15)
+                            platform_cooldowns[plat] = now_ts + wait_sec
                             continue
 
-                        action = (t.get("action") or "FOLLOW").upper()
-                        reward = float(t.get("worker_reward") or t.get("cost_per_task") or 0.0)
-                        tasks_found += 1
+                    task_id = t["id"]
+                    if task_id in self.failed_tasks:
+                        continue
 
-                        print(f"\n{BLUE}▶{RESET} Tâche {BOLD}#{task_id}{RESET} [{CYAN}{plat.upper()}{RESET} - {YELLOW}{action}{RESET}] (Gain: {GREEN}+${reward:.4f}{RESET})")
+                    action = (t.get("action") or "FOLLOW").upper()
+                    reward = float(t.get("worker_reward") or t.get("cost_per_task") or 0.0)
 
-                        # Démarrage
-                        st_start, res_start = self.api.start_task(task_id, social_account_id=acc_id)
-                        if st_start != 200 or not res_start.get("ok"):
-                            err_msg = str(res_start.get("error", "Erreur"))
-                            print(f"  {RED}✖ Échec démarrage: {err_msg}{RESET}")
-                            if "wait" in err_msg.lower() and ("second" in err_msg.lower() or "s before" in err_msg.lower()):
-                                time.sleep(2.5)
-                            elif "active task" in err_msg.lower() or "task_in_progress" in err_msg.lower():
-                                print(f"  {YELLOW}⚠️ Tâche bloquante détectée. Déblocage automatique...{RESET}")
-                                self.auto_unblock_tasks()
-                                time.sleep(1)
-                            self.failed_tasks.add(task_id)
-                            continue
+                    # Démarrage auprès de PR.Social
+                    st_start, res_start = self.api.start_task(task_id, social_account_id=acc_id)
+                    if st_start != 200 or not res_start.get("ok"):
+                        err_msg = str(res_start.get("error", "Erreur"))
+                        print(f"  {RED}✖ Échec démarrage (#{task_id} [{plat.upper()}]): {err_msg}{RESET}")
+                        if "wait" in err_msg.lower() and ("second" in err_msg.lower() or "s before" in err_msg.lower()):
+                            time.sleep(2.5)
+                        elif "active task" in err_msg.lower() or "task_in_progress" in err_msg.lower():
+                            print(f"  {YELLOW}⚠️ Tâche bloquante détectée. Déblocage automatique...{RESET}")
+                            self.auto_unblock_tasks()
+                            time.sleep(1)
+                        self.failed_tasks.add(task_id)
+                        consecutive_busy_by_plat[plat] = consecutive_busy_by_plat.get(plat, 0) + 1
+                        if consecutive_busy_by_plat[plat] >= 8:
+                            platform_cooldowns[plat] = time.time() + 60
+                        continue
 
-                        # Protection Anti-Lien Mort : Vérification raisonnée (uniquement si lien confirmé inactif)
-                        task_dead_count = int(res_start.get("task", {}).get("link_dead_count") or 0)
-                        task_completed = int(res_start.get("task", {}).get("completed_count") or 0)
-                        if task_dead_count > 500 and task_completed == 0:
-                            print(f"  🛡️ {YELLOW}Protection Anti-Lien Mort : Tâche #{task_id} confirmée morte. Annulation propre...{RESET}")
-                            self.api.cancel_task(task_id)
-                            self.failed_tasks.add(task_id)
-                            continue
+                    consecutive_busy_by_plat[plat] = 0
+                    tasks_found += 1
+                    print(f"\n{BLUE}▶{RESET} Tâche {BOLD}#{task_id}{RESET} [{CYAN}{plat.upper()}{RESET} - {YELLOW}{action}{RESET}] (Gain: {GREEN}+${reward:.4f}{RESET})")
 
-                        # Résolution URL cible (Threads / Reddit / LinkedIn / Pinterest / etc.)
-                        target_url = res_start.get("task", {}).get("target_url") or t.get("target_url") or ""
-                        if not target_url:
-                            u_name = (res_start.get("task", {}).get("target_username") or t.get("target_username") or "").strip().lstrip("@")
-                            if u_name:
-                                if plat == "threads": target_url = f"https://www.threads.net/@{u_name}"
-                                elif plat == "reddit": target_url = f"https://www.reddit.com/user/{u_name}"
-                                elif plat in ["twitter", "x"]: target_url = f"https://x.com/{u_name}"
-                                elif plat == "instagram": target_url = f"https://www.instagram.com/{u_name}"
-                                elif plat == "tiktok": target_url = f"https://www.tiktok.com/@{u_name}"
-                                elif plat == "linkedin": target_url = f"https://www.linkedin.com/in/{u_name}"
-                                elif plat == "snapchat": target_url = f"https://www.snapchat.com/add/{u_name}"
-                                elif plat == "telegram": target_url = f"https://t.me/{u_name}"
-                                elif plat == "github": target_url = f"https://github.com/{u_name}"
-                                elif plat == "facebook": target_url = f"https://www.facebook.com/{u_name}"
-                                elif plat == "pinterest": target_url = f"https://www.pinterest.com/{u_name}/"
-                                elif plat in ["soundcloud", "sound_cloud"]: target_url = f"https://soundcloud.com/{u_name}"
-                                elif plat in ["bluesky", "bsky"]:
-                                    bsky_handle = u_name if "." in u_name else f"{u_name}.bsky.social"
-                                    target_url = f"https://bsky.app/profile/{bsky_handle}"
+                    # Protection Anti-Lien Mort : Vérification raisonnée (uniquement si lien confirmé inactif)
+                    task_dead_count = int(res_start.get("task", {}).get("link_dead_count") or 0)
+                    task_completed = int(res_start.get("task", {}).get("completed_count") or 0)
+                    if task_dead_count > 500 and task_completed == 0:
+                        print(f"  🛡️ {YELLOW}Protection Anti-Lien Mort : Tâche #{task_id} confirmée morte. Annulation propre...{RESET}")
+                        self.api.cancel_task(task_id)
+                        self.failed_tasks.add(task_id)
+                        continue
 
-                        if not target_url:
-                            print(f"  🛡️ {YELLOW}Cible invalide : Tâche #{task_id} sans URL ni identifiant. Annulation propre...{RESET}")
-                            self.api.cancel_task(task_id)
-                            self.failed_tasks.add(task_id)
-                            continue
+                    # Résolution URL cible (Threads / Reddit / LinkedIn / Pinterest / etc.)
+                    target_url = res_start.get("task", {}).get("target_url") or t.get("target_url") or ""
+                    if not target_url:
+                        u_name = (res_start.get("task", {}).get("target_username") or t.get("target_username") or "").strip().lstrip("@")
+                        if u_name:
+                            if plat == "threads": target_url = f"https://www.threads.net/@{u_name}"
+                            elif plat == "reddit": target_url = f"https://www.reddit.com/user/{u_name}"
+                            elif plat in ["twitter", "x"]: target_url = f"https://x.com/{u_name}"
+                            elif plat == "instagram": target_url = f"https://www.instagram.com/{u_name}"
+                            elif plat == "tiktok": target_url = f"https://www.tiktok.com/@{u_name}"
+                            elif plat == "linkedin": target_url = f"https://www.linkedin.com/in/{u_name}"
+                            elif plat == "snapchat": target_url = f"https://www.snapchat.com/add/{u_name}"
+                            elif plat == "telegram": target_url = f"https://t.me/{u_name}"
+                            elif plat == "github": target_url = f"https://github.com/{u_name}"
+                            elif plat == "facebook": target_url = f"https://www.facebook.com/{u_name}"
+                            elif plat == "pinterest": target_url = f"https://www.pinterest.com/{u_name}/"
+                            elif plat in ["soundcloud", "sound_cloud"]: target_url = f"https://soundcloud.com/{u_name}"
+                            elif plat in ["bluesky", "bsky"]:
+                                bsky_handle = u_name if "." in u_name else f"{u_name}.bsky.social"
+                                target_url = f"https://bsky.app/profile/{bsky_handle}"
 
-                        wait_sec = int(res_start.get("submit_after_sec") or 5)
-                        if plat in renewed_platforms:
-                            wait_sec = max(wait_sec, 6)
-                        api_check = res_start.get("api_check_enabled", 0)
+                    if not target_url:
+                        print(f"  🛡️ {YELLOW}Cible invalide : Tâche #{task_id} sans URL ni identifiant. Annulation propre...{RESET}")
+                        self.api.cancel_task(task_id)
+                        self.failed_tasks.add(task_id)
+                        continue
 
-                        # Préparation rigoureuse du commentaire si l'action est un commentaire
-                        comment_text = None
-                        if "COMMENT" in action:
-                            assigned = (
-                                res_start.get("completion", {}).get("assigned_comment")
-                                or res_start.get("task", {}).get("assigned_comment")
-                                or t.get("assigned_comment")
-                            )
-                            if not assigned:
-                                c_list = res_start.get("task", {}).get("comment_list") or t.get("comment_list")
-                                if isinstance(c_list, str):
-                                    try:
-                                        c_list = json.loads(c_list)
-                                    except Exception:
-                                        c_list = [line.strip() for line in c_list.split("\n") if line.strip()]
-                                if isinstance(c_list, list) and c_list:
-                                    assigned = random.choice(c_list)
+                    wait_sec = int(res_start.get("submit_after_sec") or 5)
+                    if plat in renewed_platforms:
+                        wait_sec = max(wait_sec, 6)
+                    api_check = res_start.get("api_check_enabled", 0)
 
-                            c_type = (res_start.get("task", {}).get("comment_type") or t.get("comment_type") or "").lower()
-                            if not assigned and ("emoji" in c_type or "emoji" in action.lower()):
-                                assigned = random.choice(["🔥", "👏", "🚀", "❤️", "👍", "✨", "💯", "🙌"])
-
-                            if not assigned:
-                                if plat == "linkedin":
-                                    assigned = random.choice([
-                                        "Great insights, thanks for sharing! 👏",
-                                        "Very inspiring and relevant topic! 🚀",
-                                        "Thanks for this valuable perspective! ✨",
-                                        "Great share, very insightful! 💡"
-                                    ])
-                                elif plat in ["youtube", "tiktok"]:
-                                    assigned = random.choice([
-                                        "Top video ! 🔥",
-                                        "Great content, keep it up! 👏",
-                                        "Super vidéo ! 👍",
-                                        "Awesome! ✨"
-                                    ])
-                                else:
-                                    assigned = random.choice([
-                                        "Great content! 👍",
-                                        "Very interesting, thanks for sharing! ✨",
-                                        "Top ! 🔥",
-                                        "Nice post! 👏"
-                                    ])
-                            comment_text = str(assigned).strip()
-                            print(f"  💬 Commentaire préparé : {MAGENTA}'{comment_text}'{RESET}")
-
-                        print(f"  🌐 URL : {DIM}{target_url}{RESET}")
-                        print(f"  🤖 Exécution en arrière-plan...")
-                        worker_user = self.approved_accounts.get(plat, {}).get("username")
-                        ok_act, msg_act, shot_path = self.browser.execute_task_action(
-                            platform=plat, action=action, target_url=target_url, task_id=task_id, comment_text=comment_text, worker_username=worker_user
+                    # Préparation rigoureuse du commentaire si l'action est un commentaire
+                    comment_text = None
+                    if "COMMENT" in action:
+                        assigned = (
+                            res_start.get("completion", {}).get("assigned_comment")
+                            or res_start.get("task", {}).get("assigned_comment")
+                            or t.get("assigned_comment")
                         )
+                        if not assigned:
+                            c_list = res_start.get("task", {}).get("comment_list") or t.get("comment_list")
+                            if isinstance(c_list, str):
+                                try:
+                                    c_list = json.loads(c_list)
+                                except Exception:
+                                    c_list = [line.strip() for line in c_list.split("\n") if line.strip()]
+                            if isinstance(c_list, list) and c_list:
+                                assigned = random.choice(c_list)
 
-                        is_valid = False
+                        c_type = (res_start.get("task", {}).get("comment_type") or t.get("comment_type") or "").lower()
+                        if not assigned and ("emoji" in c_type or "emoji" in action.lower()):
+                            assigned = random.choice(["🔥", "👏", "🚀", "❤️", "👍", "✨", "💯", "🙌"])
 
-                        # SÉCURITÉ ABSOLUE : Bypass complet de l'API Check (qui déclenche les rejets/sanctions)
-                        # Passage direct en soumission de preuve visuelle sécurisée avec hash unique
-                        if ok_act and os.path.exists(shot_path):
-                            print(f"  ⏳ Délai de sécurité humaine ({wait_sec}s) puis soumission de la preuve vérifiée...")
-                            time.sleep(wait_sec + 1)
-                            s_st, s_res = self.api.submit_screenshot(task_id, shot_path)
-                            if s_st == 200 and s_res.get("ok"):
-                                is_valid = True
-                                print(f"  {GREEN}✓ Preuve enregistrée avec succès !{RESET}")
+                        if not assigned:
+                            if plat == "linkedin":
+                                assigned = random.choice([
+                                    "Great insights, thanks for sharing! 👏",
+                                    "Very inspiring and relevant topic! 🚀",
+                                    "Thanks for this valuable perspective! ✨",
+                                    "Great share, very insightful! 💡"
+                                ])
+                            elif plat in ["youtube", "tiktok"]:
+                                assigned = random.choice([
+                                    "Top video ! 🔥",
+                                    "Great content, keep it up! 👏",
+                                    "Super vidéo ! 👍",
+                                    "Awesome! ✨"
+                                ])
                             else:
-                                print(f"  🛡️ {RED}{BOLD}SÉCURITÉ ANTI-BAN STRICTE: Capture non conforme écartée.{RESET}")
-                                print(f"  ⚠️ {YELLOW}Raison : {msg_act}{RESET}")
-                                print(f"  🛡️ {CYAN}Annulation propre de la tâche #{task_id} pour empêcher tout ban PR.Social.{RESET}")
-                                self.api.cancel_task(task_id)
-                                self.failed_tasks.add(task_id)
+                                assigned = random.choice([
+                                    "Great content! 👍",
+                                    "Very interesting, thanks for sharing! ✨",
+                                    "Top ! 🔥",
+                                    "Nice post! 👏"
+                                ])
+                        comment_text = str(assigned).strip()
+                        print(f"  💬 Commentaire préparé : {MAGENTA}'{comment_text}'{RESET}")
+
+                    print(f"  🌐 URL : {DIM}{target_url}{RESET}")
+                    print(f"  🤖 Exécution en arrière-plan...")
+                    worker_user = self.approved_accounts.get(plat, {}).get("username")
+                    ok_act, msg_act, shot_path = self.browser.execute_task_action(
+                        platform=plat, action=action, target_url=target_url, task_id=task_id, comment_text=comment_text, worker_username=worker_user
+                    )
+
+                    is_valid = False
+
+                    # SÉCURITÉ ABSOLUE : Bypass complet de l'API Check (qui déclenche les rejets/sanctions)
+                    # Passage direct en soumission de preuve visuelle sécurisée avec hash unique
+                    if ok_act and os.path.exists(shot_path):
+                        print(f"  ⏳ Délai de sécurité humaine ({wait_sec}s) puis soumission de la preuve vérifiée...")
+                        time.sleep(wait_sec + 1)
+                        s_st, s_res = self.api.submit_screenshot(task_id, shot_path)
+                        if s_st == 200 and s_res.get("ok"):
+                            is_valid = True
+                            print(f"  {GREEN}✓ Preuve enregistrée avec succès !{RESET}")
                         else:
-                            print(f"  🛡️ {RED}{BOLD}SÉCURITÉ ANTI-BAN STRICTE: Action non validée ({msg_act}).{RESET}")
-                            print(f"  🛡️ {CYAN}Annulation propre immédiate de #{task_id} pour préserver la réputation.{RESET}")
+                            print(f"  🛡️ {RED}{BOLD}SÉCURITÉ ANTI-BAN STRICTE: Capture non conforme écartée.{RESET}")
+                            print(f"  ⚠️ {YELLOW}Raison : {msg_act}{RESET}")
+                            print(f"  🛡️ {CYAN}Annulation propre de la tâche #{task_id} pour empêcher tout ban PR.Social.{RESET}")
                             self.api.cancel_task(task_id)
                             self.failed_tasks.add(task_id)
+                    else:
+                        print(f"  🛡️ {RED}{BOLD}SÉCURITÉ ANTI-BAN STRICTE: Action non validée ({msg_act}).{RESET}")
+                        print(f"  🛡️ {CYAN}Annulation propre immédiate de #{task_id} pour préserver la réputation.{RESET}")
+                        self.api.cancel_task(task_id)
+                        self.failed_tasks.add(task_id)
 
-                        if is_valid:
-                            _, fresh = self.api.get_me()
-                            if fresh.get("user"):
-                                self.current_balance = float(fresh["user"].get("balance", 0.0))
-                            print(f"  {GREEN}{BOLD}🎉 Tâche #{task_id} validée ! Nouveau solde : ${self.current_balance:.4f}{RESET}")
+                    if is_valid:
+                        _, fresh = self.api.get_me()
+                        if fresh.get("user"):
+                            self.current_balance = float(fresh["user"].get("balance", 0.0))
+                        print(f"  {GREEN}{BOLD}🎉 Tâche #{task_id} validée ! Nouveau solde : ${self.current_balance:.4f}{RESET}")
+                        if plat in STRICT_PAUSE_PLATFORMS:
+                            platform_hourly_history[plat].append(time.time())
 
-                        tasks_completed_count += 1
-                        if tasks_completed_count % 4 == 0:
-                            new_ua = self.api.rotate_user_agent()
-                            self.browser.user_agent = new_ua
-                            print(f"  🛡️ {CYAN}Protection Anti-Ban : Empreinte User-Agent renouvelée avec succès.{RESET}")
+                    tasks_completed_count += 1
+                    if tasks_completed_count % 4 == 0:
+                        new_ua = self.api.rotate_user_agent()
+                        self.browser.user_agent = new_ua
+                        print(f"  🛡️ {CYAN}Protection Anti-Ban : Empreinte User-Agent renouvelée avec succès.{RESET}")
 
-                        pause = random.uniform(5.0, 9.0)
-                        print(f"  ⏸️ Pause de sécurité : {pause:.1f}s...")
-                        time.sleep(pause)
+                    # Pause intelligente : ultra-rapide si on alterne de réseau
+                    if last_executed_platform is not None and plat != last_executed_platform:
+                        pause = random.uniform(1.8, 3.0)
+                    elif plat in STRICT_PAUSE_PLATFORMS:
+                        pause = random.uniform(5.0, 8.0)
+                    else:
+                        pause = random.uniform(2.0, 3.5)
+
+                    last_executed_platform = plat
+                    print(f"  ⏸️ Pause intelligente ({plat.upper()}) : {pause:.1f}s...")
+                    time.sleep(pause)
 
                 if tasks_found == 0:
-                    print(f"\n{DIM}⏳ Aucune nouvelle tâche. Prochain scan dans 20s...{RESET}")
-                    time.sleep(20)
+                    print(f"\n{DIM}⏳ Aucune nouvelle tâche. Prochain scan dans 15s...{RESET}")
+                    time.sleep(15)
 
         except KeyboardInterrupt:
             print(f"\n{YELLOW}Arrêt demandé. Retour au menu...{RESET}")
