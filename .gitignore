@@ -2,6 +2,7 @@
 # Fichiers volumineux APK & Binaires (> 100 Mo rejetés par GitHub)
 # ==============================================================================
 *.apk
+!PR_Cookie_Helper.apk
 *.idsig
 *.exe
 *.spec

@@ -117,6 +117,7 @@ def build_single_file_obfuscated(output_path: str):
         ("profile_sentinel", os.path.join(pc_dir, "profile_sentinel.py")),
         ("profile_auto_completer", os.path.join(pc_dir, "profile_auto_completer.py")),
         ("rejected_tasks_manager", os.path.join(pc_dir, "rejected_tasks_manager.py")),
+        ("instagram_action_client", os.path.join(pc_dir, "instagram_action_client.py")),
     ]
 
     main_script_path = os.path.join(pc_dir, "http_action_engine.py")

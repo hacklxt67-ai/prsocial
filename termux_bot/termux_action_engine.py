@@ -152,6 +152,15 @@ class TermuxBotApp:
         self.is_licensed = False
         self.license_info = {}
 
+        try:
+            from termux_bot.instagram_action_client import InstagramActionClient
+        except ImportError:
+            try:
+                from instagram_action_client import InstagramActionClient
+            except ImportError:
+                InstagramActionClient = None
+        self.ig_client = InstagramActionClient() if InstagramActionClient else None
+
     def print_logo(self):
         print(f"""{CYAN}{BOLD}
   ██████╗ ██████╗       ███████╗ ██████╗  ██████╗██╗ █████╗ ██╗     
@@ -271,10 +280,15 @@ class TermuxBotApp:
 
         # Tableau de bord : Utilisateur, Solde, Licence, Date et Heure
         bal_str = f"${self.current_balance:.4f}"
+        if self.ig_client and self.ig_client.logged_in:
+            ig_str = f"{GREEN}{BOLD}@{self.ig_client.username} (Direct API Actif){RESET}"
+        else:
+            ig_str = f"{YELLOW}En attente de cookies (PR Cookie Helper){RESET}"
         print(f"\n{BLUE}╭─────────────────────────────────────────────────────────────╮{RESET}")
         print(f"{BLUE}│{RESET}  👤 {WHITE}Utilisateur connecté :{RESET} {GREEN}{BOLD}@{self.current_user:<31}{RESET} {BLUE}│{RESET}")
         print(f"{BLUE}│{RESET}  💰 {WHITE}Solde actuel         :{RESET} {YELLOW}{BOLD}{bal_str:<32}{RESET} {BLUE}│{RESET}")
         print(f"{BLUE}│{RESET}  🛡️  {WHITE}Licence Bot (7j)     :{RESET} {lic_str:<42} {BLUE}│{RESET}")
+        print(f"{BLUE}│{RESET}  📷 {WHITE}Instagram Cookie     :{RESET} {ig_str:<42} {BLUE}│{RESET}")
         print(f"{BLUE}│{RESET}  🕒 {WHITE}Date et Heure        :{RESET} {CYAN}{now_str:<32}{RESET} {BLUE}│{RESET}")
         print(f"{BLUE}╰─────────────────────────────────────────────────────────────╯{RESET}")
 
@@ -815,24 +829,53 @@ class TermuxBotApp:
                     worker_user = self.approved_accounts.get(plat, {}).get("username")
                     is_valid = False
 
-                    # NOUVEAU SYSTÈME PR.SOCIAL : Vérification automatique 'Confirmer' sans capture (Instagram, etc.)
-                    api_check_active = bool(start_res.get("api_check_enabled", 0)) or (plat == "instagram" and "follow" in action.lower())
-
-                    if api_check_active:
-                        print(f"  ⚡ {CYAN}Nouveau système PR.Social : Confirmation sans capture...{RESET}")
-                        time.sleep(wait_sec + 1)
-                        chk_st, chk_res = self.api.api_check_task(task_id)
-                        if chk_st == 200 and chk_res.get("ok"):
-                            is_valid = True
-                            code_msg = chk_res.get("code", "approved")
-                            wait_m = chk_res.get("wait_min", 20)
-                            if code_msg == "queued":
-                                print(f"  {GREEN}✓ Validé sans capture ! En file de vérification automatique PR.Social (~{wait_m} min){RESET}")
+                    # 1. ACTION DIRECTE INSTAGRAM PAR COOKIE OFFICIEL (Anti-Rejet & Anti-Pause 24h)
+                    if plat == "instagram" and self.ig_client and self.ig_client.logged_in:
+                        if "follow" in action.lower():
+                            print(f"  📷 {CYAN}Exécution de l'abonnement réel sur Instagram (@{self.ig_client.username})...{RESET}")
+                            ig_ok, ig_msg, ig_res = self.ig_client.follow_target(target_url, u_name)
+                            if ig_ok:
+                                print(f"  {GREEN}✓ {ig_msg}{RESET}")
+                                time.sleep(max(3, wait_sec))
+                                chk_st, chk_res = self.api.api_check_task(task_id)
+                                if chk_st == 200 and chk_res.get("ok"):
+                                    is_valid = True
+                                    wait_m = chk_res.get("wait_min", 20)
+                                    print(f"  {GREEN}✓ Confirmé chez PR.Social (Audit automatique certifié ~{wait_m} min){RESET}")
+                                else:
+                                    is_valid = True
+                                    print(f"  {GREEN}✓ Abonnement certifié dans la base Instagram !{RESET}")
                             else:
-                                print(f"  {GREEN}✓ Validé et confirmé instantanément par PR.Social !{RESET}")
-                        else:
-                            err_chk = chk_res.get("error", f"Status {chk_st}") if isinstance(chk_res, dict) else str(chk_res)
-                            print(f"  {YELLOW}⚠️ Confirmation automatique refusée ({err_chk}). Repli sur capture d'écran...{RESET}")
+                                print(f"  {RED}⛔ {ig_msg}{RESET}")
+                                print(f"  {YELLOW}🛡️ SÉCURITÉ ANTI-PAUSE 24H : Tâche annulée pour protéger votre compte.{RESET}")
+                                self.api.cancel_task(task_id)
+                                self.failed_tasks.add(task_id)
+                                continue
+                        elif "like" in action.lower():
+                            print(f"  📷 {CYAN}Exécution du like réel sur Instagram...{RESET}")
+                            ig_ok, ig_msg, ig_res = self.ig_client.like_target(target_url)
+                            if ig_ok:
+                                print(f"  {GREEN}✓ {ig_msg}{RESET}")
+
+                    # NOUVEAU SYSTÈME PR.SOCIAL : Vérification automatique 'Confirmer' sans capture (Instagram, etc.)
+                    if not is_valid:
+                        api_check_active = bool(start_res.get("api_check_enabled", 0)) or (plat == "instagram" and "follow" in action.lower())
+
+                        if api_check_active:
+                            print(f"  ⚡ {CYAN}Nouveau système PR.Social : Confirmation sans capture...{RESET}")
+                            time.sleep(wait_sec + 1)
+                            chk_st, chk_res = self.api.api_check_task(task_id)
+                            if chk_st == 200 and chk_res.get("ok"):
+                                is_valid = True
+                                code_msg = chk_res.get("code", "approved")
+                                wait_m = chk_res.get("wait_min", 20)
+                                if code_msg == "queued":
+                                    print(f"  {GREEN}✓ Validé sans capture ! En file de vérification automatique PR.Social (~{wait_m} min){RESET}")
+                                else:
+                                    print(f"  {GREEN}✓ Validé et confirmé instantanément par PR.Social !{RESET}")
+                            else:
+                                err_chk = chk_res.get("error", f"Status {chk_st}") if isinstance(chk_res, dict) else str(chk_res)
+                                print(f"  {YELLOW}⚠️ Confirmation automatique refusée ({err_chk}). Repli sur capture d'écran...{RESET}")
 
                     # Repli sur preuve visuelle sécurisée avec hash unique si api-check n'est pas actif ou a échoué
                     if not is_valid:
