@@ -19,7 +19,7 @@ class PRSocialApp(ctk.CTk):
         super().__init__()
 
         # Configuration de la fenêtre principale
-        self.title("PR.Social Bot PC - Édition Professionnelle v1.2.0")
+        self.title("PR.Social Bot PC - Édition Professionnelle v3.1")
         self.geometry("1100, 720")
         self.minsize(950, 650)
         ctk.set_appearance_mode("dark")

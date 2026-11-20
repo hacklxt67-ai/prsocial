@@ -160,7 +160,7 @@ class TermuxBotApp:
   ██╔═══╝ ██╔══██╗╚════╝╚════██║██║   ██║██║     ██║██╔══██║██║     
   ██║     ██║  ██║      ███████║╚██████╔╝╚██████╗██║██║  ██║███████╗
   ╚═╝     ╚═╝  ╚═╝      ╚══════╝ ╚═════╝  ╚═════╝╚═╝╚═╝  ╚═╝╚══════╝
-           {MAGENTA}★ ANDROID TERMUX EDITION • V1.2.0 ★{RESET}""")
+           {MAGENTA}⚡ ANDROID TERMUX EDITION • v3.1 ⚡{RESET}""")
 
     def verify_login(self) -> bool:
         if not self.token:

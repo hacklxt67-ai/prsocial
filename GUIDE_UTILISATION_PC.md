@@ -1,4 +1,4 @@
-# 📘 Guide d'Utilisation - PR.Social Bot PC v1.2.0
+# 📘 Guide d'Utilisation - PR.Social Bot PC v3.1
 
 Bienvenue dans l'application **PR.Social Bot PC**.  
 Cette version a été spécialement conçue pour fonctionner de manière autonome directement sur ordinateur **Windows**, sans aucun smartphone Android ni émulateur requis.

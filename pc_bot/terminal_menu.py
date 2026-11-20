@@ -76,7 +76,7 @@ LOGO = f"""{C.CYAN}{C.BOLD}
   ██╔═══╝ ██╔══██╗╚════╝╚════██║██║   ██║██║     ██║██╔══██║██║     
   ██║     ██║  ██║      ███████║╚██████╔╝╚██████╗██║██║  ██║███████╗
   ╚═╝     ╚═╝  ╚═╝      ╚══════╝ ╚═════╝  ╚═════╝╚═╝╚═╝  ╚═╝╚══════╝{C.RESET}
-       {C.MAGENTA}{C.BOLD}⚡ REVERSED ENGINEERING BOT PC — ÉDITION PRO v3.0 ⚡{C.RESET}
+       {C.MAGENTA}{C.BOLD}⚡ REVERSED ENGINEERING BOT PC — ÉDITION PRO v3.1 ⚡{C.RESET}
        {C.YELLOW}{C.DIM}— L'argent c'est un chiffre —{C.RESET}
   {C.GRAY}─────────────────────────────────────────────────────────────{C.RESET}"""
 

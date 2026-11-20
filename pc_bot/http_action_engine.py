@@ -382,7 +382,7 @@ class UI:
         a_str = f"${total_amount:.4f}"
         print(f"  {cls.YELLOW}{cls.BOLD}╔══ 📊 ANALYSE DU COMPTE : TÂCHES REJETÉES ════════════════════════════╗{cls.RESET}")
         cls.box_row(f"Total Détecté : {cls.WHITE}{cls.BOLD}{c_str:<18}{cls.RESET}  💰 Valeur à Récupérer : {cls.GREEN}{cls.BOLD}{a_str:<10}{cls.RESET}", width=64, border="║", border_color=cls.YELLOW)
-        cls.box_row(f"Algorithme    : {cls.CYAN}{cls.BOLD}Strict Anti-Rejet v3.0{cls.RESET}   🛡️  Protection Anti-Ban : {cls.GREEN}Active{cls.RESET}", width=64, border="║", border_color=cls.YELLOW)
+        cls.box_row(f"Algorithme    : {cls.CYAN}{cls.BOLD}Strict Anti-Rejet v3.1{cls.RESET}   🛡️  Protection Anti-Ban : {cls.GREEN}Active{cls.RESET}", width=64, border="║", border_color=cls.YELLOW)
         print(f"  {cls.YELLOW}{cls.BOLD}╚══════════════════════════════════════════════════════════════════════╝{cls.RESET}\n")
 
     @classmethod
@@ -442,7 +442,7 @@ class UI:
         cls.clear_line()
         s_val = f"+${recovered_amount:.4f}"
         print(f"\n  {cls.CYAN}{cls.BOLD}╔══════════════════════════════════════════════════════════════════════╗{cls.RESET}")
-        print(f"  {cls.CYAN}{cls.BOLD}║{cls.RESET}  {cls.WHITE}{cls.BOLD}{'📊 RÉCAPITULATIF DU RÉESSAI EN LOT STRICT (v3.0)'.center(64)}{cls.RESET}  {cls.CYAN}{cls.BOLD}║{cls.RESET}")
+        print(f"  {cls.CYAN}{cls.BOLD}║{cls.RESET}  {cls.WHITE}{cls.BOLD}{'📊 RÉCAPITULATIF DU RÉESSAI EN LOT STRICT (v3.1)'.center(64)}{cls.RESET}  {cls.CYAN}{cls.BOLD}║{cls.RESET}")
         print(f"  {cls.CYAN}{cls.BOLD}╠══════════════════════════════════════════════════════════════════════╣{cls.RESET}")
         cls.box_row(f"{cls.GREEN}✅ Validées et Resoumises avec succès : {cls.WHITE}{cls.BOLD}{success:<4}{cls.RESET} {cls.GREEN}({s_val}){cls.RESET}", width=64, border="║", border_color=cls.CYAN)
         cls.box_row(f"{cls.YELLOW}⏳ Places temporairement occupées    : {cls.WHITE}{cls.BOLD}{slots:<4}{cls.RESET} {cls.YELLOW}(SLOTS_TAKEN){cls.RESET}", width=64, border="║", border_color=cls.CYAN)
@@ -601,7 +601,7 @@ class UniversalSilentEngine:
 
     def run_all(self, platforms: Optional[List[str]] = None, max_tasks: Optional[int] = None):
         UI.clear_screen()
-        UI.header("⚡ ENGINEERING REVERSED SOCIAL BOT·v3.0 ⚡")
+        UI.header("⚡ ENGINEERING REVERSED SOCIAL BOT·v3.1 ⚡")
 
         # 1. Vérification connexion
         status, me = self.pr_api.get_me()
@@ -1282,7 +1282,7 @@ class UniversalSilentEngine:
     def run_surf_tasks(self, max_tasks: Optional[int] = None):
         """Moteur 100% dédié au Surf Réel de PR.Social (https://pr.social/surf/view?z=180)."""
         UI.clear_screen()
-        UI.header("🌐 AUTO-SURFEUR PR.SOCIAL EN CONTINU (v3.0) 🌐")
+        UI.header("🌐 AUTO-SURFEUR PR.SOCIAL EN CONTINU (v3.1) 🌐")
 
         status, me = self.pr_api.get_me()
         if status != 200 or not me.get("user"):
@@ -1592,7 +1592,7 @@ def main():
             u_name = f"@{u.get('username')}"
             b_val = f"${bal:.4f}"
             print(f"  {ANSI.WHITE}{ANSI.BOLD}┌─ 👤 SESSION ACTIVE PR.SOCIAL ────────────────────────────────────────┐{ANSI.RESET}")
-            print(f"  {ANSI.WHITE}{ANSI.BOLD}│{ANSI.RESET}  Compte : {ANSI.GREEN}{ANSI.BOLD}{u_name:<15}{ANSI.RESET} 💰 Solde : {ANSI.YELLOW}{ANSI.BOLD}{b_val:<9}{ANSI.RESET}⚡Version : {ANSI.CYAN}{ANSI.BOLD}v3.0{ANSI.RESET}       {ANSI.WHITE}{ANSI.BOLD}│{ANSI.RESET}")
+            print(f"  {ANSI.WHITE}{ANSI.BOLD}│{ANSI.RESET}  Compte : {ANSI.GREEN}{ANSI.BOLD}{u_name:<15}{ANSI.RESET} 💰 Solde : {ANSI.YELLOW}{ANSI.BOLD}{b_val:<9}{ANSI.RESET}⚡Version : {ANSI.CYAN}{ANSI.BOLD}v3.1{ANSI.RESET}       {ANSI.WHITE}{ANSI.BOLD}│{ANSI.RESET}")
             print(f"  {ANSI.WHITE}{ANSI.BOLD}└──────────────────────────────────────────────────────────────────────┘{ANSI.RESET}\n")
             try:
                 from PIL import Image
@@ -1604,7 +1604,7 @@ def main():
             print(f"  {ANSI.RED}{ANSI.BOLD}│{ANSI.RESET}  Veuillez configurer un Token PR.Social valide avec l'option [ 3 ]   {ANSI.RED}{ANSI.BOLD}│{ANSI.RESET}")
             print(f"  {ANSI.RED}{ANSI.BOLD}└──────────────────────────────────────────────────────────────────────┘{ANSI.RESET}\n")
 
-        print(f"  {ANSI.CYAN}{ANSI.BOLD}╔══ ⚡MENU PRINCIPAL · MODE SILENCIEUX (v3.0) ═════════════════════════╗{ANSI.RESET}")
+        print(f"  {ANSI.CYAN}{ANSI.BOLD}╔══ ⚡MENU PRINCIPAL · MODE SILENCIEUX (v3.1) ═════════════════════════╗{ANSI.RESET}")
         print(f"  {ANSI.CYAN}{ANSI.BOLD}║{ANSI.RESET}                                                                      {ANSI.CYAN}{ANSI.BOLD}║{ANSI.RESET}")
         print(f"  {ANSI.CYAN}{ANSI.BOLD}║{ANSI.RESET}  {ANSI.GREEN}{ANSI.BOLD}[ 1 ] 🚀 START{ANSI.RESET}      {ANSI.WHITE}{ANSI.BOLD}Lancer (Tâches Réseaux Sociaux)        {ANSI.RESET}         {ANSI.CYAN}{ANSI.BOLD}║{ANSI.RESET}")
         print(f"  {ANSI.CYAN}{ANSI.BOLD}║{ANSI.RESET}  {ANSI.CYAN}{ANSI.BOLD}[ 2 ] 🌐 SURF WEBSITE{ANSI.RESET}{ANSI.WHITE}{ANSI.BOLD}        Auto-Surfeur(Sites Web)       {ANSI.RESET}         {ANSI.CYAN}{ANSI.BOLD}║{ANSI.RESET}")
