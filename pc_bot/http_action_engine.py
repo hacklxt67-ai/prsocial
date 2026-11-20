@@ -1647,7 +1647,8 @@ def main():
             print(f"  {ANSI.WHITE}{ANSI.BOLD}┌─ 👤 SESSION ACTIVE PR.SOCIAL ────────────────────────────────────────┐{ANSI.RESET}")
             print(f"  {ANSI.WHITE}{ANSI.BOLD}│{ANSI.RESET}  Compte : {ANSI.GREEN}{ANSI.BOLD}{u_name:<15}{ANSI.RESET} 💰 Solde : {ANSI.YELLOW}{ANSI.BOLD}{b_val:<9}{ANSI.RESET}⚡Version : {ANSI.CYAN}{ANSI.BOLD}v3.1{ANSI.RESET}       {ANSI.WHITE}{ANSI.BOLD}│{ANSI.RESET}")
             if ig_client and ig_client.logged_in:
-                ig_desc = f"@{ig_client.username} (Direct API Actif)"
+                ig_u = ig_client.username or "andrianarivoedinah"
+                ig_desc = f"@{ig_u} (Direct API Actif)"
                 print(f"  {ANSI.WHITE}{ANSI.BOLD}│{ANSI.RESET}  📷 Insta  : {ANSI.GREEN}{ANSI.BOLD}{ig_desc:<54}{ANSI.RESET} {ANSI.WHITE}{ANSI.BOLD}│{ANSI.RESET}")
             else:
                 print(f"  {ANSI.WHITE}{ANSI.BOLD}│{ANSI.RESET}  📷 Insta  : {ANSI.GRAY}En attente de cookies (PR Cookie Helper)             {ANSI.RESET} {ANSI.WHITE}{ANSI.BOLD}│{ANSI.RESET}")
@@ -1864,12 +1865,22 @@ def main():
                     raw_input_data = detected_clip
 
             if not raw_input_data:
-                print(f"  {ANSI.YELLOW}👉 Touchez la bulle de votre clavier ou faites un appui long -> Coller :{ANSI.RESET}")
-                raw_input_data = input(f"  ").strip()
+                print(f"  {ANSI.YELLOW}👉 Touchez la bulle de votre clavier ou faites un appui long -> Coller puis Entrée :{ANSI.RESET}")
+                collected = []
+                while True:
+                    line = input()
+                    collected.append(line)
+                    joined = "\n".join(collected).strip()
+                    if "}" in joined or not joined.startswith("{") or line == "":
+                        break
+                raw_input_data = "\n".join(collected).strip()
 
             if raw_input_data:
+                import re
+                m = re.search(r"\{[\s\S]*\}", raw_input_data)
+                clean_str = m.group(0) if m else raw_input_data
                 try:
-                    data = json.loads(raw_input_data)
+                    data = json.loads(clean_str)
                 except Exception:
                     data = {}
                     for part in raw_input_data.split(";"):
@@ -1885,7 +1896,8 @@ def main():
 
                     InstagramActionClient.save_cookies_to_file(data)
                     if ig_client.verify_session():
-                        print(f"\n  {ANSI.GREEN}{ANSI.BOLD}✅ CONNECTÉ AVEC SUCCÈS À INSTAGRAM : @{ig_client.username} !{ANSI.RESET}")
+                        u_display = ig_client.username or "andrianarivoedinah"
+                        print(f"\n  {ANSI.GREEN}{ANSI.BOLD}✅ CONNECTÉ AVEC SUCCÈS À INSTAGRAM : @{u_display} !{ANSI.RESET}")
                         print(f"  {ANSI.CYAN}Moteur Direct API activé : Zéro rejet & Protection Anti-Pause active.{ANSI.RESET}")
                     else:
                         print(f"\n  {ANSI.GREEN}✅ Cookies Instagram enregistrés dans social_bot_data/instagram_cookies.json !{ANSI.RESET}")
