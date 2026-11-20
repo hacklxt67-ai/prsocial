@@ -281,7 +281,8 @@ class TermuxBotApp:
         # Tableau de bord : Utilisateur, Solde, Licence, Date et Heure
         bal_str = f"${self.current_balance:.4f}"
         if self.ig_client and self.ig_client.logged_in:
-            ig_str = f"{GREEN}{BOLD}@{self.ig_client.username} (Direct API Actif){RESET}"
+            u_ig = self.approved_accounts.get("instagram", {}).get("username") or self.ig_client.username or (f"ID #{self.ig_client.user_id}" if self.ig_client.user_id else "Actif")
+            ig_str = f"{GREEN}{BOLD}@{u_ig} (Direct API Actif){RESET}"
         else:
             ig_str = f"{YELLOW}En attente de cookies (PR Cookie Helper){RESET}"
         print(f"\n{BLUE}╭─────────────────────────────────────────────────────────────╮{RESET}")
