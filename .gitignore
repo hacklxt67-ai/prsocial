@@ -7,15 +7,19 @@
 *.spec
 
 # ==============================================================================
-# Dossiers décompilés volumineux (> 800 Mo)
+# Dossiers décompilés volumineux (> 800 Mo) & outils
 # ==============================================================================
 apk_mod/
 apk_mod_social_1.2.0/
 decompiled_project/
 decompiled_pr_social_1.2.0/
 decompiled_source/
-tools/jadx/
-tools/apktool/
+tools/
+apk_cookie_helper/
+pr_cookie_apk/
+build_helper_apk.py
+INSTALLER_PILOTE_FASTBOOT.bat
+*.keystore
 
 # ==============================================================================
 # Sécurité & Données privées (Tokens / Cookies)

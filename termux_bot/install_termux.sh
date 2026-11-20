@@ -17,8 +17,8 @@ echo "[1/5] Mise à jour des paquets Termux..."
 pkg update -y && pkg upgrade -y
 
 # 2. Installation des dépendances de base Termux
-echo "[2/5] Installation de proot-distro, git et python..."
-pkg install -y proot-distro git python tsu
+echo "[2/5] Installation de proot-distro, git, python et pillow..."
+pkg install -y proot-distro git python python-pillow tsu
 
 # 3. Installation de Debian via proot-distro
 echo "[3/5] Configuration du conteneur Debian Linux..."
