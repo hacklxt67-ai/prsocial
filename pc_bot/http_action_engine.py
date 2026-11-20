@@ -668,7 +668,10 @@ class UniversalSilentEngine:
 
         # 4.0 Statut de la Session Instagram par Cookie Officiel
         if self.ig_client and self.ig_client.logged_in:
-            UI.step(f"📷 Session Instagram Cookie ACTIVE (@{self.ig_client.username}) : VRAIE Action Directe & Bouclier Anti-Pause 24h activés !", "success")
+            if not self.ig_client.username:
+                self.ig_client.username = approved_accounts.get("instagram", {}).get("username", "")
+            u_ig_name = self.ig_client.username or (f"ID #{self.ig_client.user_id}" if self.ig_client.user_id else "Session Active")
+            UI.step(f"📷 Session Instagram Cookie ACTIVE (@{u_ig_name}) : VRAIE Action Directe & Bouclier Anti-Pause 24h activés !", "success")
         else:
             UI.step("📷 Session Instagram : Mode Standard (Exportez vos cookies avec PR Cookie Helper pour 100% de validation directe).", "info")
 
@@ -1022,7 +1025,8 @@ class UniversalSilentEngine:
                 # 1. ACTION DIRECTE INSTAGRAM PAR COOKIE OFFICIEL (Anti-Rejet & Anti-Pause 24h Garanti)
                 if plat == "instagram" and self.ig_client and self.ig_client.logged_in:
                     if "follow" in action.lower():
-                        UI.step(f"Exécution du VRAI abonnement sur Instagram (@{self.ig_client.username})...", "info")
+                        u_actor = self.ig_client.username or approved_accounts.get("instagram", {}).get("username") or (f"ID #{self.ig_client.user_id}" if self.ig_client.user_id else "Session Active")
+                        UI.step(f"Exécution du VRAI abonnement sur Instagram (@{u_actor})...", "info")
                         ig_ok, ig_msg, ig_res = self.ig_client.follow_target(target_url, u_name)
                         if ig_ok:
                             UI.step(f"✓ {ig_msg}", "success")

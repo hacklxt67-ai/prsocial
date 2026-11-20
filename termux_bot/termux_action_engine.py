@@ -833,7 +833,8 @@ class TermuxBotApp:
                     # 1. ACTION DIRECTE INSTAGRAM PAR COOKIE OFFICIEL (Anti-Rejet & Anti-Pause 24h)
                     if plat == "instagram" and self.ig_client and self.ig_client.logged_in:
                         if "follow" in action.lower():
-                            print(f"  📷 {CYAN}Exécution de l'abonnement réel sur Instagram (@{self.ig_client.username})...{RESET}")
+                            u_actor = self.approved_accounts.get("instagram", {}).get("username") or self.ig_client.username or (f"ID #{self.ig_client.user_id}" if self.ig_client.user_id else "Actif")
+                            print(f"  📷 {CYAN}Exécution de l'abonnement réel sur Instagram (@{u_actor})...{RESET}")
                             ig_ok, ig_msg, ig_res = self.ig_client.follow_target(target_url, u_name)
                             if ig_ok:
                                 print(f"  {GREEN}✓ {ig_msg}{RESET}")
