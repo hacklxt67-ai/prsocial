@@ -495,10 +495,21 @@ class RejectedTasksManager:
 
         is_validated = False
 
-        # 3. Bypass complet de l'API Check (sécurité anti-dissociation)
-        # Soumission directe et propre de la capture d'écran
+        # Nouveau système PR.Social : Confirmation automatique 'Confirmer' sans capture
+        api_check_active = bool(start_res.get("api_check_enabled", 0)) or (plat == "instagram" and "follow" in action.lower())
+        if api_check_active:
+            _log(f"⚡ Nouveau système PR.Social : Attente ({wait_sec}s) puis confirmation sans capture...", "info")
+            time.sleep(wait_sec)
+            chk_st, chk_res = self.api.api_check_task(task_id)
+            if chk_st == 200 and chk_res.get("ok"):
+                is_validated = True
+                code_msg = chk_res.get("code", "approved")
+                wait_m = chk_res.get("wait_min", 20)
+                _log(f"✓ Validé sans capture ! En file de vérification automatique PR.Social (~{wait_m} min)", "success")
+            else:
+                _log("Confirmation automatique non acceptée, repli sur preuve d'écran...", "warning")
 
-        # 4. Soumission de la preuve certifiée
+        # Soumission de la preuve certifiée si api-check n'est pas actif ou a échoué
         if not is_validated and os.path.exists(screenshot_path):
             _log(f"Attente réglementaire de sécurité ({wait_sec}s) avant upload...", "info")
             time.sleep(wait_sec)

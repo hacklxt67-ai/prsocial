@@ -256,10 +256,20 @@ class TermuxRejectedTasksManager:
 
         is_validated = False
 
-        # 3. Bypass complet de l'API Check (sécurité anti-dissociation)
-        # Soumission directe et propre de la capture d'écran
+        # Nouveau système PR.Social : Confirmation automatique 'Confirmer' sans capture
+        api_check_active = bool(start_res.get("api_check_enabled", 0)) or (plat == "instagram" and "follow" in action.lower())
+        if api_check_active:
+            print(f"  ⚡ {CYAN}Nouveau système PR.Social : Confirmation sans capture...{RESET}")
+            time.sleep(wait_sec + 1)
+            chk_st, chk_res = self.api.api_check_task(task_id)
+            if chk_st == 200 and chk_res.get("ok"):
+                is_validated = True
+                wait_m = chk_res.get("wait_min", 20)
+                print(f"  {GREEN}✓ Validé sans capture ! En file de vérification automatique PR.Social (~{wait_m} min){RESET}")
+            else:
+                print(f"  {YELLOW}⚠️ Confirmation automatique non acceptée, repli sur capture...{RESET}")
 
-        # 4. Soumission de la preuve certifiée
+        # Soumission de la preuve certifiée si api-check n'est pas actif ou a échoué
         if not is_validated:
             if ok_act and os.path.exists(shot_path):
                 print(f"  ⏳ Sécurité ({wait_sec}s) puis soumission de la nouvelle preuve...")

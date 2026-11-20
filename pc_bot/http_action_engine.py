@@ -1014,9 +1014,27 @@ class UniversalSilentEngine:
 
                 is_validated = False
 
-                # SÉCURITÉ ABSOLUE : Bypass complet de l'API Check (qui déclenche les rejets/sanctions)
-                # Passage direct en soumission de preuve visuelle sécurisée avec hash unique
-                if act_ok and shot_path and os.path.exists(shot_path):
+                # NOUVEAU SYSTÈME PR.SOCIAL : Vérification automatique 'Confirmer' sans capture (Instagram, etc.)
+                api_check_active = bool(start_res.get("api_check_enabled", 0)) or (plat == "instagram" and "follow" in action.lower())
+
+                if api_check_active:
+                    UI.step(f"Délai de sécurité ({wait_sec}s) puis confirmation sans capture...", "info")
+                    time.sleep(wait_sec)
+                    chk_st, chk_res = self.pr_api.api_check_task(task_id)
+                    if chk_st == 200 and chk_res.get("ok"):
+                        is_validated = True
+                        code_msg = chk_res.get("code", "approved")
+                        wait_m = chk_res.get("wait_min", 20)
+                        if code_msg == "queued":
+                            UI.step(f"✓ Validé sans capture ! En file de vérification automatique PR.Social (~{wait_m} min)", "success")
+                        else:
+                            UI.step("✓ Validé et confirmé instantanément par PR.Social !", "success")
+                    else:
+                        err_chk = chk_res.get("error", f"Status {chk_st}") if isinstance(chk_res, dict) else str(chk_res)
+                        UI.step(f"Confirmation automatique refusée ({err_chk}). Repli sur preuve d'écran...", "warning")
+
+                # Repli sur preuve visuelle sécurisée avec hash unique si api-check n'est pas actif ou a échoué
+                if not is_validated and act_ok and shot_path and os.path.exists(shot_path):
                     UI.step(f"Délai de sécurité humaine ({wait_sec}s) puis soumission de la preuve...", "info")
                     time.sleep(wait_sec)
 

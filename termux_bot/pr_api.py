@@ -119,12 +119,11 @@ class PrSocialAPI:
         return self.request("GET", "/profile/warnings")
 
     def api_check_task(self, task_id: int) -> Tuple[int, Dict[str, Any]]:
-        # SÉCURITÉ ABSOLUE : Désactivé pour échapper à l'inspection agressive qui dissocie les comptes
-        return 0, {"eligible": False, "bypass": True, "error": "API Check désactivé pour protection du compte"}
+        """Appelle l'endpoint de vérification automatique /api/tasks/{task_id}/api-check (bouton Confirmer de PR.Social)."""
+        return self.request("POST", f"/tasks/{task_id}/api-check", json_data={})
 
     def is_api_check_enabled(self) -> bool:
-        # Forcer à False pour toujours utiliser la soumission propre de capture d'écran
-        return False
+        return True
 
     def submit_screenshot(self, task_id: int, screenshot_path: str) -> Tuple[int, Dict[str, Any]]:
         if not os.path.exists(screenshot_path):

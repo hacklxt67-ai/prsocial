@@ -819,9 +819,27 @@ class TermuxBotApp:
 
                     is_valid = False
 
-                    # SÉCURITÉ ABSOLUE : Bypass complet de l'API Check (qui déclenche les rejets/sanctions)
-                    # Passage direct en soumission de preuve visuelle sécurisée avec hash unique
-                    if ok_act and os.path.exists(shot_path):
+                    # NOUVEAU SYSTÈME PR.SOCIAL : Vérification automatique 'Confirmer' sans capture (Instagram, etc.)
+                    api_check_active = bool(start_res.get("api_check_enabled", 0)) or (plat == "instagram" and "follow" in action.lower())
+
+                    if api_check_active:
+                        print(f"  ⚡ {CYAN}Nouveau système PR.Social : Confirmation sans capture...{RESET}")
+                        time.sleep(wait_sec + 1)
+                        chk_st, chk_res = self.api.api_check_task(task_id)
+                        if chk_st == 200 and chk_res.get("ok"):
+                            is_valid = True
+                            code_msg = chk_res.get("code", "approved")
+                            wait_m = chk_res.get("wait_min", 20)
+                            if code_msg == "queued":
+                                print(f"  {GREEN}✓ Validé sans capture ! En file de vérification automatique PR.Social (~{wait_m} min){RESET}")
+                            else:
+                                print(f"  {GREEN}✓ Validé et confirmé instantanément par PR.Social !{RESET}")
+                        else:
+                            err_chk = chk_res.get("error", f"Status {chk_st}") if isinstance(chk_res, dict) else str(chk_res)
+                            print(f"  {YELLOW}⚠️ Confirmation automatique refusée ({err_chk}). Repli sur capture d'écran...{RESET}")
+
+                    # Repli sur preuve visuelle sécurisée avec hash unique si api-check n'est pas actif ou a échoué
+                    if not is_valid and ok_act and os.path.exists(shot_path):
                         print(f"  ⏳ Délai de sécurité humaine ({wait_sec}s) puis soumission de la preuve vérifiée...")
                         time.sleep(wait_sec + 1)
                         s_st, s_res = self.api.submit_screenshot(task_id, shot_path)
@@ -834,7 +852,7 @@ class TermuxBotApp:
                             print(f"  🛡️ {CYAN}Annulation propre de la tâche #{task_id} pour empêcher tout ban PR.Social.{RESET}")
                             self.api.cancel_task(task_id)
                             self.failed_tasks.add(task_id)
-                    else:
+                    elif not is_valid:
                         print(f"  🛡️ {RED}{BOLD}SÉCURITÉ ANTI-BAN STRICTE: Action non validée ({msg_act}).{RESET}")
                         print(f"  🛡️ {CYAN}Annulation propre immédiate de #{task_id} pour préserver la réputation.{RESET}")
                         self.api.cancel_task(task_id)
