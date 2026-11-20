@@ -61,8 +61,43 @@ class InstagramActionClient:
         ]
         return [c for c in candidates if os.path.exists(c)]
 
+    @classmethod
+    def save_cookies_to_file(cls, cookies_data: dict) -> str:
+        """Sauvegarde les cookies dans social_bot_data/instagram_cookies.json et config.json."""
+        home = os.path.expanduser("~")
+        target_dir = os.path.join(home, "social_bot_data")
+        os.makedirs(target_dir, exist_ok=True)
+        target_file = os.path.join(target_dir, "instagram_cookies.json")
+        try:
+            with open(target_file, "w", encoding="utf-8") as f:
+                json.dump(cookies_data, f, indent=2)
+        except Exception:
+            pass
+
+        # Écrire aussi dans le dossier de travail courant
+        try:
+            local_dir = os.path.join(os.getcwd(), "social_bot_data")
+            os.makedirs(local_dir, exist_ok=True)
+            with open(os.path.join(local_dir, "instagram_cookies.json"), "w", encoding="utf-8") as f:
+                json.dump(cookies_data, f, indent=2)
+        except Exception:
+            pass
+
+        # Mettre à jour aussi dans config.json
+        for cfg_path in [os.path.join(os.getcwd(), "config.json"), os.path.join(target_dir, "config.json")]:
+            if os.path.exists(cfg_path):
+                try:
+                    with open(cfg_path, "r", encoding="utf-8") as f:
+                        c = json.load(f)
+                    c["instagram_cookies"] = cookies_data
+                    with open(cfg_path, "w", encoding="utf-8") as f:
+                        json.dump(c, f, indent=2)
+                except Exception:
+                    pass
+        return target_file
+
     def auto_load_cookies(self) -> bool:
-        """Charge automatiquement les cookies depuis les fichiers découverts."""
+        """Charge automatiquement les cookies depuis les fichiers découverts ou le presse-papiers."""
         found_files = self.find_cookie_files()
         for fpath in found_files:
             try:
@@ -74,7 +109,7 @@ class InstagramActionClient:
                         data = json.loads(content)
                     except json.JSONDecodeError:
                         # Peut-être un format "cookie header string"
-                        if "sessionid=" in content:
+                        if "sessionid=" in content or "ds_user_id=" in content:
                             self.parse_cookie_string(content)
                             if self.verify_session():
                                 return True
@@ -97,6 +132,27 @@ class InstagramActionClient:
                             return True
             except Exception:
                 continue
+
+        # Tentative de lecture automatique depuis le presse-papiers Termux
+        try:
+            import subprocess
+            res = subprocess.run(["termux-clipboard-get"], capture_output=True, text=True, timeout=1)
+            clip_text = res.stdout.strip()
+            if clip_text and ("sessionid" in clip_text or "ds_user_id" in clip_text):
+                try:
+                    data = json.loads(clip_text)
+                    if isinstance(data, dict):
+                        self.set_cookies(data)
+                        if self.verify_session():
+                            self.save_cookies_to_file(data)
+                            return True
+                except Exception:
+                    self.parse_cookie_string(clip_text)
+                    if self.verify_session():
+                        return True
+        except Exception:
+            pass
+
         return False
 
     def parse_cookie_string(self, raw_str: str):

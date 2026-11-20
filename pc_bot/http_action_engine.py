@@ -1668,13 +1668,14 @@ def main():
         print(f"  {ANSI.CYAN}{ANSI.BOLD}║{ANSI.RESET}  {ANSI.CYAN}{ANSI.BOLD}[ 2 ] 🌐 SURF WEBSITE{ANSI.RESET}{ANSI.WHITE}{ANSI.BOLD}        Auto-Surfeur(Sites Web)       {ANSI.RESET}         {ANSI.CYAN}{ANSI.BOLD}║{ANSI.RESET}")
         print(f"  {ANSI.CYAN}{ANSI.BOLD}║{ANSI.RESET}  {ANSI.YELLOW}{ANSI.BOLD}[ 3 ] 🔄 RÉCUPÉRER{ANSI.RESET}  {ANSI.WHITE}{ANSI.BOLD}Scanner & Réessayer Tâches Rejetées{ANSI.RESET}             {ANSI.CYAN}{ANSI.BOLD}║{ANSI.RESET}")
         print(f"  {ANSI.CYAN}{ANSI.BOLD}║{ANSI.RESET}  {ANSI.MAGENTA}{ANSI.BOLD}[ 4 ] 🔑 TOKEN{ANSI.RESET}      {ANSI.WHITE}{ANSI.BOLD}Changer / Vérifier Token PR.Social{ANSI.RESET}              {ANSI.CYAN}{ANSI.BOLD}║{ANSI.RESET}")
-        print(f"  {ANSI.CYAN}{ANSI.BOLD}║{ANSI.RESET}  {ANSI.BLUE}{ANSI.BOLD}[ 5 ] 🛠️ AUTO-FIX{ANSI.RESET}   {ANSI.WHITE}{ANSI.BOLD}Auto-Complétion Profils (Anti-Ban){ANSI.RESET}               {ANSI.CYAN}{ANSI.BOLD}║{ANSI.RESET}")
-        print(f"  {ANSI.CYAN}{ANSI.BOLD}║{ANSI.RESET}  {ANSI.RED}{ANSI.BOLD}[ 6 ] ❌ EXIT{ANSI.RESET}       {ANSI.WHITE}{ANSI.BOLD}Fermer{ANSI.RESET}                                          {ANSI.CYAN}{ANSI.BOLD}║{ANSI.RESET}")
+        print(f"  {ANSI.CYAN}{ANSI.BOLD}║{ANSI.RESET}  {ANSI.GREEN}{ANSI.BOLD}[ 5 ] 📷 COOKIE INSTA{ANSI.RESET}  {ANSI.WHITE}{ANSI.BOLD}Coller / Activer Cookie Instagram (APK){ANSI.RESET}        {ANSI.CYAN}{ANSI.BOLD}║{ANSI.RESET}")
+        print(f"  {ANSI.CYAN}{ANSI.BOLD}║{ANSI.RESET}  {ANSI.BLUE}{ANSI.BOLD}[ 6 ] 🛠️ AUTO-FIX{ANSI.RESET}   {ANSI.WHITE}{ANSI.BOLD}Auto-Complétion Profils (Anti-Ban){ANSI.RESET}               {ANSI.CYAN}{ANSI.BOLD}║{ANSI.RESET}")
+        print(f"  {ANSI.CYAN}{ANSI.BOLD}║{ANSI.RESET}  {ANSI.RED}{ANSI.BOLD}[ 7 ] ❌ EXIT{ANSI.RESET}       {ANSI.WHITE}{ANSI.BOLD}Fermer{ANSI.RESET}                                          {ANSI.CYAN}{ANSI.BOLD}║{ANSI.RESET}")
         print(f"  {ANSI.CYAN}{ANSI.BOLD}║{ANSI.RESET}                                                                      {ANSI.CYAN}{ANSI.BOLD}║{ANSI.RESET}")
         print(f"  {ANSI.CYAN}{ANSI.BOLD}╚══════════════════════════════════════════════════════════════════════╝{ANSI.RESET}\n")
 
         try:
-            choice = input(f"  {ANSI.CYAN}⚡ {ANSI.WHITE}{ANSI.BOLD}Votre sélection [1-6] :{ANSI.RESET} ").strip()
+            choice = input(f"  {ANSI.CYAN}⚡ {ANSI.WHITE}{ANSI.BOLD}Votre sélection [1-7] :{ANSI.RESET} ").strip()
         except (KeyboardInterrupt, EOFError):
             break
 
@@ -1839,7 +1840,62 @@ def main():
                 print(f"\n  {ANSI.GRAY}Annulé.{ANSI.RESET}")
             time.sleep(1.5)
 
-        elif choice == "5":
+        elif choice in ["5", "ig", "insta", "instagram"]:
+            UI.clear_screen()
+            UI.header("📷 CONFIGURATION DES COOKIES INSTAGRAM")
+            print(f"  {ANSI.WHITE}Vous avez exporté vos cookies avec {ANSI.GREEN}{ANSI.BOLD}PR Cookie Helper{ANSI.RESET}{ANSI.WHITE} ?{ANSI.RESET}")
+            print(f"  {ANSI.GRAY}(Vos cookies sont déjà dans votre presse-papiers ou prêts à être collés).{ANSI.RESET}\n")
+
+            # Vérifier si termux-clipboard-get est disponible
+            detected_clip = None
+            try:
+                import subprocess
+                res = subprocess.run(["termux-clipboard-get"], capture_output=True, text=True, timeout=1)
+                if res.returncode == 0 and res.stdout.strip():
+                    detected_clip = res.stdout.strip()
+            except Exception:
+                pass
+
+            raw_input_data = ""
+            if detected_clip and ("sessionid" in detected_clip or "ds_user_id" in detected_clip or "datr" in detected_clip):
+                print(f"  {ANSI.GREEN}{ANSI.BOLD}✨ Cookies Instagram détectés dans votre presse-papiers !{ANSI.RESET}")
+                use_c = input(f"  {ANSI.CYAN}Enregistrer ces cookies automatiquement ? (O/n) :{ANSI.RESET} ").strip().lower()
+                if use_c in ["", "o", "oui", "y", "yes"]:
+                    raw_input_data = detected_clip
+
+            if not raw_input_data:
+                print(f"  {ANSI.YELLOW}👉 Touchez la bulle de votre clavier ou faites un appui long -> Coller :{ANSI.RESET}")
+                raw_input_data = input(f"  ").strip()
+
+            if raw_input_data:
+                try:
+                    data = json.loads(raw_input_data)
+                except Exception:
+                    data = {}
+                    for part in raw_input_data.split(";"):
+                        if "=" in part:
+                            k, v = part.split("=", 1)
+                            data[k.strip()] = v.strip()
+
+                if data and ("sessionid" in data or "ds_user_id" in data):
+                    if not ig_client:
+                        ig_client = InstagramActionClient(data)
+                    else:
+                        ig_client.set_cookies(data)
+
+                    InstagramActionClient.save_cookies_to_file(data)
+                    if ig_client.verify_session():
+                        print(f"\n  {ANSI.GREEN}{ANSI.BOLD}✅ CONNECTÉ AVEC SUCCÈS À INSTAGRAM : @{ig_client.username} !{ANSI.RESET}")
+                        print(f"  {ANSI.CYAN}Moteur Direct API activé : Zéro rejet & Protection Anti-Pause active.{ANSI.RESET}")
+                    else:
+                        print(f"\n  {ANSI.GREEN}✅ Cookies Instagram enregistrés dans social_bot_data/instagram_cookies.json !{ANSI.RESET}")
+                else:
+                    print(f"\n  {ANSI.RED}❌ Format invalide. Assurez-vous d'avoir cliqué sur 'EXPORTER COOKIES INSTAGRAM' dans l'APK.{ANSI.RESET}")
+            else:
+                print(f"\n  {ANSI.GRAY}Annulé.{ANSI.RESET}")
+            input(f"\n  Appuyez sur {ANSI.BOLD}Entrée{ANSI.RESET} pour revenir au menu...")
+
+        elif choice == "6":
             if st != 200:
                 print(f"\n  {ANSI.RED}Veuillez d'abord configurer un Token valide (Option 4).{ANSI.RESET}")
                 time.sleep(2)
@@ -1887,7 +1943,7 @@ def main():
 
             input(f"\n  Appuyez sur {ANSI.BOLD}Entrée{ANSI.RESET} pour revenir au menu...")
 
-        elif choice in ["6", "exit", "quit", "q"]:
+        elif choice in ["7", "exit", "quit", "q"]:
             break
 
     os.system('cls' if os.name == 'nt' else 'clear')
