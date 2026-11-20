@@ -1001,20 +1001,9 @@ class UniversalSilentEngine:
                     comment_text = str(assigned).strip()
                     UI.step(f"Commentaire préparé : '{comment_text}'", "info")
 
-                UI.step(f"Navigation & exécution discrète de l'action [{action}]...", "info")
-                worker_user = approved_accounts.get(plat, {}).get("username")
-                act_ok, act_msg, shot_path = self.browser_bot.execute_task_action(
-                    platform=plat,
-                    action=action,
-                    target_url=target_url,
-                    task_id=task_id,
-                    comment_text=comment_text,
-                    worker_username=worker_user
-                )
-
                 is_validated = False
 
-                # NOUVEAU SYSTÈME PR.SOCIAL : Vérification automatique 'Confirmer' sans capture (Instagram, etc.)
+                # NOUVEAU SYSTÈME PR.SOCIAL : Vérification automatique 'Confirmer' sans capture (Instagram Follow, etc.)
                 api_check_active = bool(start_res.get("api_check_enabled", 0)) or (plat == "instagram" and "follow" in action.lower())
 
                 if api_check_active:
@@ -1034,38 +1023,50 @@ class UniversalSilentEngine:
                         UI.step(f"Confirmation automatique refusée ({err_chk}). Repli sur preuve d'écran...", "warning")
 
                 # Repli sur preuve visuelle sécurisée avec hash unique si api-check n'est pas actif ou a échoué
-                if not is_validated and act_ok and shot_path and os.path.exists(shot_path):
-                    UI.step(f"Délai de sécurité humaine ({wait_sec}s) puis soumission de la preuve...", "info")
-                    time.sleep(wait_sec)
+                if not is_validated:
+                    UI.step(f"Navigation & exécution discrète de l'action [{action}]...", "info")
+                    worker_user = approved_accounts.get(plat, {}).get("username")
+                    act_ok, act_msg, shot_path = self.browser_bot.execute_task_action(
+                        platform=plat,
+                        action=action,
+                        target_url=target_url,
+                        task_id=task_id,
+                        comment_text=comment_text,
+                        worker_username=worker_user
+                    )
 
-                    sub_st, sub_res = self.pr_api.submit_screenshot_file(task_id, shot_path)
-                    if sub_st == 200 and sub_res.get("ok"):
-                        status_val = sub_res.get("completion", {}).get("status", "pending_review")
-                        is_validated = True
-                        UI.step(f"Preuve d'écran acceptée par PR.Social (Statut : {status_val})", "success")
-                    else:
-                        err_detail = sub_res.get("error", f"Status {sub_st}") if isinstance(sub_res, dict) else f"Status {sub_st}"
-                        UI.step(f"Soumission refusée ({err_detail}). Annulation sécurisée...", "warning")
-                        self.failed_tasks[task_id] = time.time() + 1800  # Exclusion de 30 min pour cette tâche en échec
-                        self.pr_api.cancel_task(task_id)
+                    if act_ok and shot_path and os.path.exists(shot_path):
+                        UI.step(f"Délai de sécurité humaine ({wait_sec}s) puis soumission de la preuve...", "info")
+                        time.sleep(wait_sec)
 
-                        # Détection Circuit Breaker Cloudflare / Erreur Serveur 500
-                        if sub_st == 500 or "server error" in str(err_detail).lower():
-                            server_error_streak += 1
-                            if server_error_streak >= 2:
-                                UI.step("🛡️ Bouclier Cloudflare / Saturation Serveur PR.Social (500 Server error).", "warning")
-                                UI.step("   Temporisation de sécurité (30s) pour laisser le serveur se débloquer...", "info")
-                                time.sleep(30)
-                                server_error_streak = 0
+                        sub_st, sub_res = self.pr_api.submit_screenshot_file(task_id, shot_path)
+                        if sub_st == 200 and sub_res.get("ok"):
+                            status_val = sub_res.get("completion", {}).get("status", "pending_review")
+                            is_validated = True
+                            UI.step(f"Preuve d'écran acceptée par PR.Social (Statut : {status_val})", "success")
                         else:
-                            server_error_streak = 0
+                            err_detail = sub_res.get("error", f"Status {sub_st}") if isinstance(sub_res, dict) else f"Status {sub_st}"
+                            UI.step(f"Soumission refusée ({err_detail}). Annulation sécurisée...", "warning")
+                            self.failed_tasks[task_id] = time.time() + 1800  # Exclusion de 30 min pour cette tâche en échec
+                            self.pr_api.cancel_task(task_id)
+
+                            # Détection Circuit Breaker Cloudflare / Erreur Serveur 500
+                            if sub_st == 500 or "server error" in str(err_detail).lower():
+                                server_error_streak += 1
+                                if server_error_streak >= 2:
+                                    UI.step("🛡️ Bouclier Cloudflare / Saturation Serveur PR.Social (500 Server error).", "warning")
+                                    UI.step("   Temporisation de sécurité (30s) pour laisser le serveur se débloquer...", "info")
+                                    time.sleep(30)
+                                    server_error_streak = 0
+                            else:
+                                server_error_streak = 0
+                            continue
+                    else:
+                        UI.step(f"SÉCURITÉ ANTI-REJET : Action non confirmée ({act_msg}). Preuve écartée.", "warning")
+                        UI.step(f"Annulation immédiate de #{task_id} pour préserver la réputation.", "info")
+                        self.failed_tasks[task_id] = time.time() + 600
+                        self.pr_api.cancel_task(task_id)
                         continue
-                else:
-                    UI.step(f"SÉCURITÉ ANTI-REJET : Action non confirmée ({act_msg}). Preuve écartée.", "warning")
-                    UI.step(f"Annulation immédiate de #{task_id} pour préserver la réputation.", "info")
-                    self.failed_tasks[task_id] = time.time() + 600
-                    self.pr_api.cancel_task(task_id)
-                    continue
 
                 if is_validated:
                     server_error_streak = 0

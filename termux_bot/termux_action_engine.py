@@ -813,10 +813,6 @@ class TermuxBotApp:
                     print(f"  🌐 URL : {DIM}{target_url}{RESET}")
                     print(f"  🤖 Exécution en arrière-plan...")
                     worker_user = self.approved_accounts.get(plat, {}).get("username")
-                    ok_act, msg_act, shot_path = self.browser.execute_task_action(
-                        platform=plat, action=action, target_url=target_url, task_id=task_id, comment_text=comment_text, worker_username=worker_user
-                    )
-
                     is_valid = False
 
                     # NOUVEAU SYSTÈME PR.SOCIAL : Vérification automatique 'Confirmer' sans capture (Instagram, etc.)
@@ -839,24 +835,29 @@ class TermuxBotApp:
                             print(f"  {YELLOW}⚠️ Confirmation automatique refusée ({err_chk}). Repli sur capture d'écran...{RESET}")
 
                     # Repli sur preuve visuelle sécurisée avec hash unique si api-check n'est pas actif ou a échoué
-                    if not is_valid and ok_act and os.path.exists(shot_path):
-                        print(f"  ⏳ Délai de sécurité humaine ({wait_sec}s) puis soumission de la preuve vérifiée...")
-                        time.sleep(wait_sec + 1)
-                        s_st, s_res = self.api.submit_screenshot(task_id, shot_path)
-                        if s_st == 200 and s_res.get("ok"):
-                            is_valid = True
-                            print(f"  {GREEN}✓ Preuve enregistrée avec succès !{RESET}")
+                    if not is_valid:
+                        ok_act, msg_act, shot_path = self.browser.execute_task_action(
+                            platform=plat, action=action, target_url=target_url, task_id=task_id, comment_text=comment_text, worker_username=worker_user
+                        )
+
+                        if ok_act and shot_path and os.path.exists(shot_path):
+                            print(f"  ⏳ Délai de sécurité humaine ({wait_sec}s) puis soumission de la preuve vérifiée...")
+                            time.sleep(wait_sec + 1)
+                            s_st, s_res = self.api.submit_screenshot(task_id, shot_path)
+                            if s_st == 200 and s_res.get("ok"):
+                                is_valid = True
+                                print(f"  {GREEN}✓ Preuve enregistrée avec succès !{RESET}")
+                            else:
+                                print(f"  🛡️ {RED}{BOLD}SÉCURITÉ ANTI-BAN STRICTE: Capture non conforme écartée.{RESET}")
+                                print(f"  ⚠️ {YELLOW}Raison : {msg_act}{RESET}")
+                                print(f"  🛡️ {CYAN}Annulation propre de la tâche #{task_id} pour empêcher tout ban PR.Social.{RESET}")
+                                self.api.cancel_task(task_id)
+                                self.failed_tasks.add(task_id)
                         else:
-                            print(f"  🛡️ {RED}{BOLD}SÉCURITÉ ANTI-BAN STRICTE: Capture non conforme écartée.{RESET}")
-                            print(f"  ⚠️ {YELLOW}Raison : {msg_act}{RESET}")
-                            print(f"  🛡️ {CYAN}Annulation propre de la tâche #{task_id} pour empêcher tout ban PR.Social.{RESET}")
+                            print(f"  🛡️ {RED}{BOLD}SÉCURITÉ ANTI-BAN STRICTE: Action non validée ({msg_act}).{RESET}")
+                            print(f"  🛡️ {CYAN}Annulation propre immédiate de #{task_id} pour préserver la réputation.{RESET}")
                             self.api.cancel_task(task_id)
                             self.failed_tasks.add(task_id)
-                    elif not is_valid:
-                        print(f"  🛡️ {RED}{BOLD}SÉCURITÉ ANTI-BAN STRICTE: Action non validée ({msg_act}).{RESET}")
-                        print(f"  🛡️ {CYAN}Annulation propre immédiate de #{task_id} pour préserver la réputation.{RESET}")
-                        self.api.cancel_task(task_id)
-                        self.failed_tasks.add(task_id)
 
                     if is_valid:
                         _, fresh = self.api.get_me()
