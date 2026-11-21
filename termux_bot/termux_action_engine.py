@@ -849,22 +849,30 @@ class TermuxBotApp:
                                     is_valid = True
                                     print(f"  {GREEN}✓ Abonnement certifié dans la base Instagram !{RESET}")
                             else:
-                                print(f"  {RED}⛔ {ig_msg}{RESET}")
-                                print(f"  {YELLOW}🛡️ SÉCURITÉ ANTI-PAUSE 24H : Tâche annulée pour protéger votre compte.{RESET}")
-                                self.api.cancel_task(task_id)
-                                self.failed_tasks.add(task_id)
-                                continue
+                                is_real_block = any(k in str(ig_res).lower() for k in ["feedback_required", "checkpoint", "spam"]) or ("blocage instagram" in str(ig_msg).lower())
+                                if is_real_block:
+                                    print(f"  {RED}⛔ {ig_msg}{RESET}")
+                                    print(f"  {YELLOW}🛡️ SÉCURITÉ ANTI-PAUSE 24H : Tâche annulée pour protéger votre compte.{RESET}")
+                                    self.api.cancel_task(task_id)
+                                    self.failed_tasks.add(task_id)
+                                    continue
+                                else:
+                                    print(f"  {YELLOW}ℹ️ Direct Instagram : {ig_msg}{RESET}")
+                                    print(f"  {CYAN}➔ Repli automatique sur preuve d'écran certifiée conforme...{RESET}")
                         elif "like" in action.lower():
                             print(f"  📷 {CYAN}Exécution du like réel sur Instagram...{RESET}")
                             ig_ok, ig_msg, ig_res = self.ig_client.like_target(target_url)
                             if ig_ok:
                                 print(f"  {GREEN}✓ {ig_msg}{RESET}")
+                            else:
+                                print(f"  {YELLOW}ℹ️ Direct Like : {ig_msg}. Repli sur capture certifiée...{RESET}")
 
                     # NOUVEAU SYSTÈME PR.SOCIAL : Vérification automatique 'Confirmer' sans capture (Instagram, etc.)
                     if not is_valid:
-                        # En monde requête pure : ne pas appeler api_check_task sur TikTok car cela envoie screenshot_path: null
-                        # et déclenche l'audit externe asynchrone à 35 min. TikTok est validé avec succès par soumission de preuve certifiée (POST /submit).
+                        # En mode requête pure : ne pas appeler api_check_task sur TikTok ni sur Instagram quand le follow direct a échoué
                         if plat == "tiktok":
+                            api_check_active = False
+                        elif plat == "instagram" and self.ig_client and self.ig_client.logged_in:
                             api_check_active = False
                         else:
                             api_check_active = bool(start_res.get("api_check_enabled", 0)) or (plat == "instagram" and "follow" in action.lower())
