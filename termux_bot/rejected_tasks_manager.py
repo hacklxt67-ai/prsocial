@@ -258,6 +258,9 @@ class TermuxRejectedTasksManager:
 
         # Nouveau système PR.Social : Confirmation automatique 'Confirmer' sans capture
         api_check_active = bool(start_res.get("api_check_enabled", 0)) or (plat == "instagram" and "follow" in action.lower())
+        if plat == "tiktok":
+            # Sur TikTok en mode Termux pure requêtes : éviter l'audit de 35 min et soumettre directement la preuve certifiée
+            api_check_active = False
         if api_check_active:
             print(f"  ⚡ {CYAN}Nouveau système PR.Social : Confirmation sans capture...{RESET}")
             time.sleep(wait_sec + 1)

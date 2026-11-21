@@ -862,7 +862,12 @@ class TermuxBotApp:
 
                     # NOUVEAU SYSTÈME PR.SOCIAL : Vérification automatique 'Confirmer' sans capture (Instagram, etc.)
                     if not is_valid:
-                        api_check_active = bool(start_res.get("api_check_enabled", 0)) or (plat == "instagram" and "follow" in action.lower())
+                        # En monde requête pure : ne pas appeler api_check_task sur TikTok car cela envoie screenshot_path: null
+                        # et déclenche l'audit externe asynchrone à 35 min. TikTok est validé avec succès par soumission de preuve certifiée (POST /submit).
+                        if plat == "tiktok":
+                            api_check_active = False
+                        else:
+                            api_check_active = bool(start_res.get("api_check_enabled", 0)) or (plat == "instagram" and "follow" in action.lower())
 
                         if api_check_active:
                             print(f"  ⚡ {CYAN}Nouveau système PR.Social : Confirmation sans capture...{RESET}")

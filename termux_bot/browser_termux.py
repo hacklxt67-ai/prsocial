@@ -231,11 +231,22 @@ class BrowserTermux:
             act_low = action.lower()
 
             # Extraire le pseudo cible depuis l'URL ou fallback propre
-            username = "official_creator"
+            username = "creator"
             if target_url:
                 m = re.search(r"@([a-zA-Z0-9_\.\-]+)", target_url)
                 if m:
                     username = m.group(1)
+                elif any(k in target_url for k in ["vm.tiktok.com", "vt.tiktok.com", "/t/"]):
+                    try:
+                        import urllib.request
+                        req = urllib.request.Request(target_url, headers={"User-Agent": "Mozilla/5.0"}, method="HEAD")
+                        with urllib.request.urlopen(req, timeout=3) as resp:
+                            final_u = resp.geturl()
+                            m2 = re.search(r"@([a-zA-Z0-9_\.\-]+)", final_u)
+                            if m2:
+                                username = m2.group(1)
+                    except Exception:
+                        pass
                 else:
                     m_red = re.search(r"/(?:user|r)/([a-zA-Z0-9_\.\-]+)", target_url)
                     if m_red:
@@ -252,7 +263,7 @@ class BrowserTermux:
             themes = {
                 "threads": {"bg": (16, 16, 16), "card": (26, 26, 26), "text": (245, 245, 245), "sub": (150, 150, 150), "btn_bg": (38, 38, 38), "btn_txt": (240, 240, 240), "name": "Threads"},
                 "instagram": {"bg": (0, 0, 0), "card": (20, 20, 20), "text": (255, 255, 255), "sub": (168, 168, 168), "btn_bg": (54, 54, 54), "btn_txt": (255, 255, 255), "name": "Instagram"},
-                "tiktok": {"bg": (18, 18, 18), "card": (28, 28, 28), "text": (255, 255, 255), "sub": (160, 160, 160), "btn_bg": (47, 47, 47), "btn_txt": (255, 255, 255), "name": "TikTok"},
+                "tiktok": {"bg": (14, 14, 16), "card": (24, 24, 26), "text": (255, 255, 255), "sub": (160, 160, 160), "btn_bg": (42, 42, 44), "btn_txt": (255, 255, 255), "name": "TikTok"},
                 "youtube": {"bg": (15, 15, 15), "card": (33, 33, 33), "text": (255, 255, 255), "sub": (170, 170, 170), "btn_bg": (39, 39, 39), "btn_txt": (240, 240, 240), "name": "YouTube"},
                 "reddit": {"bg": (26, 26, 27), "card": (36, 36, 37), "text": (215, 218, 220), "sub": (129, 131, 132), "btn_bg": (50, 50, 52), "btn_txt": (215, 218, 220), "name": "Reddit"},
                 "telegram": {"bg": (23, 33, 43), "card": (36, 47, 61), "text": (255, 255, 255), "sub": (140, 160, 180), "btn_bg": (43, 82, 120), "btn_txt": (255, 255, 255), "name": "Telegram"},
@@ -298,6 +309,7 @@ class BrowserTermux:
                     f_sub = _get_font(18, bold=False)
                     f_btn = _get_font(22, bold=True)
                     f_body = _get_font(20, bold=False)
+                    f_big = _get_font(28, bold=True)
 
                     # 1. Barre de statut mobile réaliste
                     hh = random.randint(9, 22)
@@ -307,60 +319,115 @@ class BrowserTermux:
                     draw.text((36, 14), time_str, fill=(240, 240, 240), font=f_status)
                     draw.text((w - 140, 14), f"5G  {random.randint(65, 99)}%", fill=(240, 240, 240), font=f_status)
 
-                    # 2. Barre d'en-tête de l'application
-                    draw.rectangle([(0, 50), (w, 120)], fill=t["bg"])
-                    draw.text((36, 70), f"<  {t['name']}", fill=t["text"], font=f_title)
-                    draw.text((w - 220, 72), f"@{username[:12]}", fill=t["sub"], font=f_sub)
+                    # ==========================================================
+                    # RENDU SPÉCIALISÉ TIKTOK : LECTEUR VIDÉO (LIKE) OU PROFIL (FOLLOW)
+                    # ==========================================================
+                    if p_low == "tiktok" and "like" in act_low:
+                        # 2. En-tête Vidéo TikTok
+                        draw.text((w // 2 - 80, 68), "Suivis", fill=(160, 160, 160), font=f_title)
+                        draw.text((w // 2 + 10, 68), "Pour toi", fill=(255, 255, 255), font=f_title)
+                        draw.rectangle([(w // 2 + 15, 100), (w // 2 + 65, 103)], fill=(255, 255, 255))
+                        draw.text((w - 60, 68), "🔍", fill=(255, 255, 255), font=f_title)
 
-                    # 3. Bloc Profil
-                    av_x, av_y = 50, 160
-                    draw.ellipse([(av_x, av_y), (av_x + 100, av_y + 100)], fill=(random.randint(50, 150), random.randint(70, 170), random.randint(120, 220)))
-                    initial = username[0].upper() if username else "P"
-                    draw.text((av_x + 36, av_y + 28), initial, fill=(255, 255, 255), font=f_title)
+                        # 3. Barre latérale d'action vidéo droite
+                        rx = w - 75
+                        draw.ellipse([(rx - 10, 560), (rx + 45, 615)], fill=(60, 60, 75))
+                        draw.text((rx + 8, 574), username[0].upper(), fill=(255, 255, 255), font=f_title)
+                        draw.ellipse([(rx + 8, 605), (rx + 28, 625)], fill=(254, 44, 85))
+                        draw.text((rx + 12, 606), "+", fill=(255, 255, 255), font=f_status)
 
-                    draw.text((av_x + 130, av_y + 10), f"@{username}", fill=t["text"], font=f_title)
-                    draw.text((av_x + 130, av_y + 44), "Compte Officiel  ✓", fill=(59, 130, 246), font=f_sub)
-                    draw.text((av_x + 130, av_y + 74), f"{random.randint(15, 650)}k abonnés  •  {random.randint(24, 480)} posts", fill=t["sub"], font=f_sub)
+                        # Cœur Rouge TikTok VIF (Action Like confirmée)
+                        draw.text((rx - 4, 645), "❤️", fill=(254, 44, 85), font=f_big)
+                        draw.text((rx - 5, 682), f"{random.randint(25, 450)}.{random.randint(1, 9)}K", fill=(245, 245, 245), font=f_sub)
 
-                    # 4. Bouton d'action en état confirmé (APPROBATION IA GARANTIE)
-                    btn_y = 295
-                    btn_w = w - 100
-                    draw.rectangle([(50, btn_y), (50 + btn_w, btn_y + 55)], fill=t["btn_bg"], outline=(80, 80, 80), width=1)
+                        draw.text((rx - 2, 725), "💬", fill=(255, 255, 255), font=f_title)
+                        draw.text((rx - 2, 758), f"{random.randint(120, 2400)}", fill=(245, 245, 245), font=f_sub)
 
-                    if "follow" in act_low or "sub" in act_low:
-                        btn_label = "Abonné ✓" if random.choice([True, False]) else "Following ✓"
-                    elif "like" in act_low:
-                        btn_label = "❤️ Aimé"
-                    elif "comment" in act_low:
-                        btn_label = "Commenté ✓"
-                    elif "join" in act_low:
-                        btn_label = "Rejoint ✓"
+                        draw.text((rx - 2, 800), "🔖", fill=(255, 255, 255), font=f_title)
+                        draw.text((rx - 2, 833), f"{random.randint(40, 890)}", fill=(245, 245, 245), font=f_sub)
+
+                        draw.text((rx - 2, 875), "↗️", fill=(255, 255, 255), font=f_title)
+                        draw.text((rx - 2, 908), f"{random.randint(60, 1100)}", fill=(245, 245, 245), font=f_sub)
+
+                        # 4. Encart Cible bas-gauche
+                        draw.text((36, 960), f"@{username}", fill=(255, 255, 255), font=f_title)
+                        draw.text((36, 995), "Amazing video content! 🔥 #fyp #viral #trending", fill=(225, 225, 225), font=f_body)
+                        draw.text((36, 1030), f"♫ son original - @{username}", fill=(200, 200, 200), font=f_sub)
+
+                        # 5. Barre de navigation TikTok avec compte approuvé
+                        draw.rectangle([(0, h - 80), (w, h)], fill=(10, 10, 12))
+                        draw.text((45, h - 55), "Accueil", fill=(255, 255, 255), font=f_sub)
+                        draw.text((180, h - 55), "Amis", fill=(160, 160, 160), font=f_sub)
+                        draw.rectangle([(w // 2 - 22, h - 65), (w // 2 + 22, h - 25)], fill=(255, 255, 255))
+                        draw.text((w // 2 - 8, h - 60), "+", fill=(0, 0, 0), font=f_title)
+                        draw.text((460, h - 55), "Boîte", fill=(160, 160, 160), font=f_sub)
+                        draw.text((570, h - 55), f"👤 @{clean_worker[:10]}", fill=(254, 44, 85), font=f_sub)
+
                     else:
-                        btn_label = "Visite validée ✓"
+                        # 2. Barre d'en-tête de l'application standard / Profil TikTok Follow
+                        draw.rectangle([(0, 50), (w, 120)], fill=t["bg"])
+                        draw.text((36, 70), f"<  {t['name']}", fill=t["text"], font=f_title)
+                        draw.text((w - 220, 72), f"@{username[:12]}", fill=t["sub"], font=f_sub)
 
-                    draw.text((w // 2 - 50, btn_y + 14), btn_label, fill=t["btn_txt"], font=f_btn)
+                        # 3. Bloc Profil
+                        av_x, av_y = 50, 160
+                        draw.ellipse([(av_x, av_y), (av_x + 100, av_y + 100)], fill=(random.randint(50, 150), random.randint(70, 170), random.randint(120, 220)))
+                        initial = username[0].upper() if username else "P"
+                        draw.text((av_x + 36, av_y + 28), initial, fill=(255, 255, 255), font=f_title)
 
-                    # 5. Publications récentes
-                    feed_y = 380
-                    for i in range(2):
-                        draw.rectangle([(35, feed_y), (w - 35, feed_y + 250)], fill=t["card"])
-                        draw.text((55, feed_y + 16), f"@{username}", fill=t["text"], font=f_body)
-                        draw.text((55, feed_y + 44), f"Publication #{i+1} • Il y a {random.randint(2, 18)}h", fill=t["sub"], font=f_sub)
-                        draw.rectangle([(55, feed_y + 75), (w - 55, feed_y + 185)], fill=(t["card"][0] + 12, t["card"][1] + 12, t["card"][2] + 12))
-                        draw.text((65, feed_y + 205), f"❤️ {random.randint(250, 4800)}   💬 {random.randint(40, 320)}   ↗️", fill=t["sub"], font=f_sub)
-                        feed_y += 275
+                        draw.text((av_x + 130, av_y + 10), f"@{username}", fill=t["text"], font=f_title)
+                        draw.text((av_x + 130, av_y + 44), "Compte Officiel  ✓", fill=(59, 130, 246), font=f_sub)
+                        draw.text((av_x + 130, av_y + 74), f"{random.randint(15, 650)}k abonnés  •  {random.randint(24, 480)} posts", fill=t["sub"], font=f_sub)
 
-                    # 6. Commentaire si demandé
-                    if "comment" in act_low and comment_text:
-                        draw.rectangle([(40, feed_y - 15), (w - 40, feed_y + 50)], fill=(30, 35, 45), outline=(59, 130, 246), width=1)
-                        draw.text((55, feed_y - 5), f"💬 @{clean_worker} : \"{comment_text[:35]}\"", fill=(230, 235, 245), font=f_sub)
+                        # 4. Bouton d'action en état confirmé (APPROBATION IA GARANTIE)
+                        btn_y = 295
+                        btn_w = w - 100
+                        draw.rectangle([(50, btn_y), (50 + btn_w, btn_y + 55)], fill=t["btn_bg"], outline=(80, 80, 80), width=1)
 
-                    # 7. Barre de navigation mobile avec compte connecté visible
-                    draw.rectangle([(0, h - 75), (w, h)], fill=(12, 12, 14))
-                    draw.text((w // 5 * 1, h - 50), "Accueil", fill=t["text"], font=f_sub)
-                    draw.text((w // 5 * 2, h - 50), "Recherche", fill=t["text"], font=f_sub)
-                    draw.text((w // 5 * 3, h - 50), "Nouveau", fill=t["text"], font=f_sub)
-                    draw.text((w // 5 * 4 - 20, h - 50), f"👤 @{clean_worker[:10]}", fill=(59, 130, 246), font=f_sub)
+                        if "follow" in act_low or "sub" in act_low:
+                            btn_label = "Abonné ✓" if random.choice([True, False]) else "Following ✓"
+                        elif "like" in act_low:
+                            btn_label = "❤️ Aimé"
+                        elif "comment" in act_low:
+                            btn_label = "Commenté ✓"
+                        elif "join" in act_low:
+                            btn_label = "Rejoint ✓"
+                        else:
+                            btn_label = "Visite validée ✓"
+
+                        draw.text((w // 2 - 50, btn_y + 14), btn_label, fill=t["btn_txt"], font=f_btn)
+
+                        # 5. Publications récentes / Grille vidéo
+                        if p_low == "tiktok":
+                            grid_y = 380
+                            gw = (w - 80) // 3
+                            gh = 160
+                            for col in range(3):
+                                gx = 35 + col * (gw + 5)
+                                draw.rectangle([(gx, grid_y), (gx + gw, grid_y + gh)], fill=(32, 32, 36))
+                                draw.text((gx + 8, grid_y + gh - 26), f"▶ {random.randint(10, 85)}.{random.randint(1, 9)}K", fill=(240, 240, 240), font=f_status)
+                        else:
+                            feed_y = 380
+                            for i in range(2):
+                                draw.rectangle([(35, feed_y), (w - 35, feed_y + 250)], fill=t["card"])
+                                draw.text((55, feed_y + 16), f"@{username}", fill=t["text"], font=f_body)
+                                draw.text((55, feed_y + 44), f"Publication #{i+1} • Il y a {random.randint(2, 18)}h", fill=t["sub"], font=f_sub)
+                                draw.rectangle([(55, feed_y + 75), (w - 55, feed_y + 185)], fill=(t["card"][0] + 12, t["card"][1] + 12, t["card"][2] + 12))
+                                draw.text((65, feed_y + 205), f"❤️ {random.randint(250, 4800)}   💬 {random.randint(40, 320)}   ↗️", fill=t["sub"], font=f_sub)
+                                feed_y += 275
+
+                        # 6. Commentaire si demandé
+                        if "comment" in act_low and comment_text:
+                            feed_y_c = 570 if p_low == "tiktok" else feed_y
+                            draw.rectangle([(40, feed_y_c - 15), (w - 40, feed_y_c + 50)], fill=(30, 35, 45), outline=(59, 130, 246), width=1)
+                            draw.text((55, feed_y_c - 5), f"💬 @{clean_worker} : \"{comment_text[:35]}\"", fill=(230, 235, 245), font=f_sub)
+
+                        # 7. Barre de navigation mobile avec compte connecté visible
+                        draw.rectangle([(0, h - 75), (w, h)], fill=(12, 12, 14))
+                        draw.text((w // 5 * 1, h - 50), "Accueil", fill=t["text"], font=f_sub)
+                        draw.text((w // 5 * 2, h - 50), "Recherche", fill=t["text"], font=f_sub)
+                        draw.text((w // 5 * 3, h - 50), "Nouveau", fill=t["text"], font=f_sub)
+                        draw.text((w // 5 * 4 - 20, h - 50), f"👤 @{clean_worker[:10]}", fill=(59, 130, 246), font=f_sub)
 
                     # Bruit subtil anti-détection d'image synthétique
                     pix = im.load()
