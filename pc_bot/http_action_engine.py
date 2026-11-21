@@ -738,11 +738,23 @@ class UniversalSilentEngine:
 
         UI.step(f"Surveillance active sur {len(active_list)} plateformes sécurisées (Autoroute Anti-Ban) : {', '.join([p.upper() for p in active_list])}", "info")
 
-        # Régulateur de cadence intelligent : séparation stricte des réseaux à quotas horaires (TikTok, YouTube, Instagram)
-        # des réseaux normaux (Twitter/X, Threads, Snapchat, Reddit, Pinterest...) qui tournent à vitesse maximale
-        STRICT_PAUSE_PLATFORMS = {"tiktok", "youtube", "instagram"}
+        # Régulateur de cadence intelligent conforme aux quotas officiels PR.Social
+        STRICT_PAUSE_PLATFORMS = {"tiktok", "youtube"}
         platform_hourly_history: Dict[str, list] = {p: [] for p in STRICT_PAUSE_PLATFORMS}
         platform_cooldowns: Dict[str, float] = {}
+
+        # Limites officielles PR.Social Instagram par compte et par heure :
+        # • Abonnements : 50 (seuil sécurisé : 48)
+        # • J'aime : 100 (seuil sécurisé : 95)
+        # • Commentaires : 10 (seuil sécurisé : 9)
+        # • Partages : 10 (seuil sécurisé : 9)
+        IG_ACTION_LIMITS = {
+            "follow": 48,
+            "like": 95,
+            "comment": 9,
+            "share": 9
+        }
+        ig_hourly_actions: Dict[str, list] = {act: [] for act in IG_ACTION_LIMITS}
 
         session_earnings = 0.0
         success_count = 0
@@ -798,16 +810,18 @@ class UniversalSilentEngine:
 
                 now_ts = time.time()
 
-                # Gestion stricte du rythme humain pour TikTok, YouTube et Instagram (évite la pause orange de 30 min)
-                if plat in STRICT_PAUSE_PLATFORMS:
-                    # Nettoyage de la fenêtre glissante d'1 heure (3600s)
-                    platform_hourly_history[plat] = [ts for ts in platform_hourly_history[plat] if now_ts - ts < 3600]
-
-                    # Si cette plateforme est en cooldown (serveur ou régulation préventive), on la passe pour faire les autres réseaux
-                    if now_ts < platform_cooldowns.get(plat, 0):
+                # Gestion des quotas horaires par plateforme
+                if plat == "instagram":
+                    for act_k in ig_hourly_actions:
+                        ig_hourly_actions[act_k] = [ts for ts in ig_hourly_actions[act_k] if now_ts - ts < 3600]
+                    # Si toutes les actions Instagram sont temporairement à leur quota horaire maximal
+                    if all(len(ig_hourly_actions[act_k]) >= IG_ACTION_LIMITS[act_k] for act_k in ig_hourly_actions):
+                        oldest = min((ig_hourly_actions[act_k][0] for act_k in ig_hourly_actions if ig_hourly_actions[act_k]), default=now_ts)
+                        wait_sec = max(30, int(3600 - (now_ts - oldest)) + 15)
+                        platform_cooldowns["instagram"] = now_ts + wait_sec
                         continue
-
-                    # Soft-limit préventif (max 9 tâches en 1h pour ne JAMAIS dépasser la limite de 10)
+                elif plat in STRICT_PAUSE_PLATFORMS:
+                    platform_hourly_history[plat] = [ts for ts in platform_hourly_history[plat] if now_ts - ts < 3600]
                     if len(platform_hourly_history[plat]) >= 9:
                         oldest = platform_hourly_history[plat][0]
                         wait_sec = max(30, int(3600 - (now_ts - oldest)) + 15)
@@ -906,7 +920,15 @@ class UniversalSilentEngine:
                 if now_ts < platform_cooldowns.get(plat, 0):
                     continue
 
-                if plat in STRICT_PAUSE_PLATFORMS:
+                action = (t.get("action") or "FOLLOW").upper()
+                reward = float(t.get("worker_reward") or t.get("cost_per_task") or 0.0)
+
+                if plat == "instagram":
+                    act_k = "comment" if "comment" in action.lower() else ("like" if "like" in action.lower() else ("share" if "share" in action.lower() else "follow"))
+                    ig_hourly_actions[act_k] = [ts for ts in ig_hourly_actions[act_k] if now_ts - ts < 3600]
+                    if len(ig_hourly_actions[act_k]) >= IG_ACTION_LIMITS.get(act_k, 48):
+                        continue
+                elif plat in STRICT_PAUSE_PLATFORMS:
                     platform_hourly_history[plat] = [ts for ts in platform_hourly_history[plat] if now_ts - ts < 3600]
                     if len(platform_hourly_history[plat]) >= 9:
                         oldest = platform_hourly_history[plat][0]
@@ -920,9 +942,6 @@ class UniversalSilentEngine:
                         continue
                     else:
                         del self.failed_tasks[task_id]
-
-                action = (t.get("action") or "FOLLOW").upper()
-                reward = float(t.get("worker_reward") or t.get("cost_per_task") or 0.0)
 
                 feasible, _ = self.is_task_feasible(t)
                 if not feasible:
@@ -1140,8 +1159,11 @@ class UniversalSilentEngine:
                     new_bal = float(fresh_me.get("user", {}).get("balance", 0.0)) if fresh_me.get("user") else 0.0
                     UI.success(task_id, reward, session_earnings, new_bal)
 
-                    # Enregistrement horaire pour le pacing strict (TikTok, YouTube, Insta)
-                    if plat in STRICT_PAUSE_PLATFORMS:
+                    # Enregistrement horaire pour le pacing strict (Instagram, TikTok, YouTube)
+                    if plat == "instagram":
+                        act_k = "comment" if "comment" in action.lower() else ("like" if "like" in action.lower() else ("share" if "share" in action.lower() else "follow"))
+                        ig_hourly_actions[act_k].append(time.time())
+                    elif plat in STRICT_PAUSE_PLATFORMS:
                         platform_hourly_history[plat].append(time.time())
 
                     if max_tasks and success_count >= max_tasks:

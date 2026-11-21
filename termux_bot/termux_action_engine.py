@@ -599,9 +599,17 @@ class TermuxBotApp:
         tasks_since_lic_check = 0
         last_executed_platform: Optional[str] = None
         consecutive_busy_by_plat: Dict[str, int] = {}
-        STRICT_PAUSE_PLATFORMS = {"tiktok", "youtube", "instagram"}
+        # Quotas officiels PR.Social : Instagram différencié (50 follows, 100 likes, 10 comments, 10 shares / h)
+        STRICT_PAUSE_PLATFORMS = {"tiktok", "youtube"}
         platform_hourly_history: Dict[str, list] = {p: [] for p in STRICT_PAUSE_PLATFORMS}
         platform_cooldowns: Dict[str, float] = {}
+        IG_ACTION_LIMITS = {
+            "follow": 48,
+            "like": 95,
+            "comment": 9,
+            "share": 9
+        }
+        ig_hourly_actions: Dict[str, list] = {act: [] for act in IG_ACTION_LIMITS}
 
         try:
             while True:
@@ -632,7 +640,15 @@ class TermuxBotApp:
                     if now_ts < platform_cooldowns.get(plat, 0):
                         continue
 
-                    if plat in STRICT_PAUSE_PLATFORMS:
+                    if plat == "instagram":
+                        for act_k in ig_hourly_actions:
+                            ig_hourly_actions[act_k] = [ts for ts in ig_hourly_actions[act_k] if now_ts - ts < 3600]
+                        if all(len(ig_hourly_actions[act_k]) >= IG_ACTION_LIMITS[act_k] for act_k in ig_hourly_actions):
+                            oldest = min((ig_hourly_actions[act_k][0] for act_k in ig_hourly_actions if ig_hourly_actions[act_k]), default=now_ts)
+                            wait_sec = max(30, int(3600 - (now_ts - oldest)) + 15)
+                            platform_cooldowns["instagram"] = now_ts + wait_sec
+                            continue
+                    elif plat in STRICT_PAUSE_PLATFORMS:
                         platform_hourly_history[plat] = [ts for ts in platform_hourly_history[plat] if now_ts - ts < 3600]
                         if len(platform_hourly_history[plat]) >= 9:
                             oldest = platform_hourly_history[plat][0]
@@ -701,7 +717,15 @@ class TermuxBotApp:
                     if now_ts < platform_cooldowns.get(plat, 0):
                         continue
 
-                    if plat in STRICT_PAUSE_PLATFORMS:
+                    action = (t.get("action") or "FOLLOW").upper()
+                    reward = float(t.get("worker_reward") or t.get("cost_per_task") or 0.0)
+
+                    if plat == "instagram":
+                        act_k = "comment" if "comment" in action.lower() else ("like" if "like" in action.lower() else ("share" if "share" in action.lower() else "follow"))
+                        ig_hourly_actions[act_k] = [ts for ts in ig_hourly_actions[act_k] if now_ts - ts < 3600]
+                        if len(ig_hourly_actions[act_k]) >= IG_ACTION_LIMITS.get(act_k, 48):
+                            continue
+                    elif plat in STRICT_PAUSE_PLATFORMS:
                         platform_hourly_history[plat] = [ts for ts in platform_hourly_history[plat] if now_ts - ts < 3600]
                         if len(platform_hourly_history[plat]) >= 9:
                             oldest = platform_hourly_history[plat][0]
@@ -712,9 +736,6 @@ class TermuxBotApp:
                     task_id = t["id"]
                     if task_id in self.failed_tasks:
                         continue
-
-                    action = (t.get("action") or "FOLLOW").upper()
-                    reward = float(t.get("worker_reward") or t.get("cost_per_task") or 0.0)
 
                     # Démarrage auprès de PR.Social
                     st_start, res_start = self.api.start_task(task_id, social_account_id=acc_id)
@@ -923,7 +944,10 @@ class TermuxBotApp:
                         if fresh.get("user"):
                             self.current_balance = float(fresh["user"].get("balance", 0.0))
                         print(f"  {GREEN}{BOLD}🎉 Tâche #{task_id} validée ! Nouveau solde : ${self.current_balance:.4f}{RESET}")
-                        if plat in STRICT_PAUSE_PLATFORMS:
+                        if plat == "instagram":
+                            act_k = "comment" if "comment" in action.lower() else ("like" if "like" in action.lower() else ("share" if "share" in action.lower() else "follow"))
+                            ig_hourly_actions[act_k].append(time.time())
+                        elif plat in STRICT_PAUSE_PLATFORMS:
                             platform_hourly_history[plat].append(time.time())
 
                     tasks_completed_count += 1
