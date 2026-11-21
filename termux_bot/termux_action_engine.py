@@ -748,8 +748,9 @@ class TermuxBotApp:
 
                     # Résolution URL cible (Threads / Reddit / LinkedIn / Pinterest / etc.)
                     target_url = res_start.get("task", {}).get("target_url") or t.get("target_url") or ""
+                    target_username = (res_start.get("task", {}).get("target_username") or t.get("target_username") or "").strip().lstrip("@")
                     if not target_url:
-                        u_name = (res_start.get("task", {}).get("target_username") or t.get("target_username") or "").strip().lstrip("@")
+                        u_name = target_username
                         if u_name:
                             if plat == "threads": target_url = f"https://www.threads.net/@{u_name}"
                             elif plat == "reddit": target_url = f"https://www.reddit.com/user/{u_name}"
@@ -835,7 +836,7 @@ class TermuxBotApp:
                         if "follow" in action.lower():
                             u_actor = self.approved_accounts.get("instagram", {}).get("username") or self.ig_client.username or (f"ID #{self.ig_client.user_id}" if self.ig_client.user_id else "Actif")
                             print(f"  📷 {CYAN}Exécution de l'abonnement réel sur Instagram (@{u_actor})...{RESET}")
-                            ig_ok, ig_msg, ig_res = self.ig_client.follow_target(target_url, u_name)
+                            ig_ok, ig_msg, ig_res = self.ig_client.follow_target(target_url, target_username)
                             if ig_ok:
                                 print(f"  {GREEN}✓ {ig_msg}{RESET}")
                                 time.sleep(max(3, wait_sec))

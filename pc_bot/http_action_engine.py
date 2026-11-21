@@ -966,8 +966,9 @@ class UniversalSilentEngine:
                     continue
 
                 target_url = start_res.get("task", {}).get("target_url") or t.get("target_url") or ""
+                target_username = (start_res.get("task", {}).get("target_username") or t.get("target_username") or "").strip().lstrip("@")
                 if not target_url:
-                    u_name = (start_res.get("task", {}).get("target_username") or t.get("target_username") or "").strip().lstrip("@")
+                    u_name = target_username
                     if u_name:
                         if plat == "threads": target_url = f"https://www.threads.net/@{u_name}"
                         elif plat == "reddit": target_url = f"https://www.reddit.com/user/{u_name}"
@@ -1027,7 +1028,7 @@ class UniversalSilentEngine:
                     if "follow" in action.lower():
                         u_actor = self.ig_client.username or approved_accounts.get("instagram", {}).get("username") or (f"ID #{self.ig_client.user_id}" if self.ig_client.user_id else "Session Active")
                         UI.step(f"Exécution du VRAI abonnement sur Instagram (@{u_actor})...", "info")
-                        ig_ok, ig_msg, ig_res = self.ig_client.follow_target(target_url, u_name)
+                        ig_ok, ig_msg, ig_res = self.ig_client.follow_target(target_url, target_username)
                         if ig_ok:
                             UI.step(f"✓ {ig_msg}", "success")
                             time.sleep(max(3, wait_sec))
