@@ -11,14 +11,21 @@ from urllib.parse import urlparse
 import requests
 import base64
 import io
+import subprocess
 
 try:
     import cv2
     import numpy as np
     from PIL import Image
     HAS_CV2 = True
+    HAS_PIL = True
 except ImportError:
     HAS_CV2 = False
+    try:
+        from PIL import Image
+        HAS_PIL = True
+    except ImportError:
+        HAS_PIL = False
 
 # Forcer l'encodage UTF-8 et activer les couleurs ANSI sur Windows
 try:
@@ -1709,6 +1716,28 @@ LOGO_HTTP = f"""{ANSI.CYAN}{ANSI.BOLD}
   ██║     ██║  ██║      ███████║╚██████╔╝╚██████╗██║██║  ██║███████╗
   ╚═╝     ╚═╝  ╚═╝      ╚══════╝ ╚═════╝  ╚═════╝╚═╝╚═╝  ╚═╝╚══════╝{ANSI.RESET}"""
 
+def _visual_len(s: str) -> int:
+    plain = re.sub(r'\033\[[0-9;]*m', '', s)
+    w = 0
+    for ch in plain:
+        code = ord(ch)
+        if code == 0xFE0F:
+            continue
+        if (0x2300 <= code <= 0x23FF or
+            0x2600 <= code <= 0x27BF or
+            0x2B50 <= code <= 0x2B55 or
+            0x1F300 <= code <= 0x1F9FF):
+            w += 2
+        else:
+            w += 1
+    return w
+
+def _box_row(content: str, width: int = 64, border: str = "│", border_col: str = None) -> str:
+    b_col = border_col or f"{ANSI.WHITE}{ANSI.BOLD}"
+    v = _visual_len(content)
+    gap = max(0, width - v)
+    return f"  {b_col}{border}{ANSI.RESET}  {content}{' ' * gap}  {b_col}{border}{ANSI.RESET}"
+
 def main():
     if os.name == 'nt':
         os.system('color')
@@ -1839,28 +1868,6 @@ def main():
         st, me = client.get_me() if token else (0, {})
         menu_w = 72
 
-        def _visual_len(s: str) -> int:
-            plain = re.sub(r'\033\[[0-9;]*m', '', s)
-            w = 0
-            for ch in plain:
-                code = ord(ch)
-                if code == 0xFE0F:
-                    continue
-                if (0x2300 <= code <= 0x23FF or
-                    0x2600 <= code <= 0x27BF or
-                    0x2B50 <= code <= 0x2B55 or
-                    0x1F300 <= code <= 0x1F9FF):
-                    w += 2
-                else:
-                    w += 1
-            return w
-
-        def _box_row(content: str, width: int = 64, border: str = "│", border_col: str = None) -> str:
-            b_col = border_col or f"{ANSI.WHITE}{ANSI.BOLD}"
-            v = _visual_len(content)
-            gap = max(0, width - v)
-            return f"  {b_col}{border}{ANSI.RESET}  {content}{' ' * gap}  {b_col}{border}{ANSI.RESET}"
-
         if st == 200 and me.get("user"):
             u = me["user"]
             bal = float(u.get("balance", 0.0))
@@ -1898,9 +1905,7 @@ def main():
                 tg_disp = "Non associé (Option [2] pour lier)"
             print(_box_row(f"✈️  Telegr : {ANSI.CYAN}{ANSI.BOLD}{tg_disp}{ANSI.RESET}", border="│", border_col=f"{ANSI.WHITE}{ANSI.BOLD}"))
             print(f"  {ANSI.WHITE}{ANSI.BOLD}└{'─' * 68}┘{ANSI.RESET}\n")
-            try:
-                from PIL import Image
-            except ImportError:
+            if not HAS_PIL:
                 print(f"  {ANSI.RED}{ANSI.BOLD}⚠️  ATTENTION : Module Pillow (PIL) non détecté sur cet appareil !{ANSI.RESET}")
                 print(f"  {ANSI.YELLOW}👉 Sur Termux, exécutez : {ANSI.CYAN}{ANSI.BOLD}pkg install -y python-pillow{ANSI.RESET}{ANSI.YELLOW} pour des preuves validées à 100%.{ANSI.RESET}\n")
         else:
@@ -2202,7 +2207,6 @@ def main():
             # Vérifier si termux-clipboard-get est disponible
             detected_clip = None
             try:
-                import subprocess
                 res = subprocess.run(["termux-clipboard-get"], capture_output=True, text=True, timeout=1)
                 if res.returncode == 0 and res.stdout.strip():
                     detected_clip = res.stdout.strip()
@@ -2228,7 +2232,6 @@ def main():
                 raw_input_data = "\n".join(collected).strip()
 
             if raw_input_data:
-                import re
                 m = re.search(r"\{[\s\S]*\}", raw_input_data)
                 clean_str = m.group(0) if m else raw_input_data
                 try:
