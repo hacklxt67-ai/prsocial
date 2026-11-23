@@ -45,6 +45,15 @@ try:
 except ImportError:
     from pc_bot.browser_bot import BrowserBot
 
+try:
+    from telegram_worker_engine import TelegramWorkerEngine, TelegramAuthManager
+except ImportError:
+    try:
+        from pc_bot.telegram_worker_engine import TelegramWorkerEngine, TelegramAuthManager
+    except ImportError:
+        TelegramWorkerEngine = None
+        TelegramAuthManager = None
+
 BASE_API_URL = "https://pr.social/api"
 DEFAULT_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
 
@@ -219,6 +228,11 @@ class UI:
     }
 
     SPINNER = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
+    WIDTH = 72
+
+    @staticmethod
+    def strip_ansi(s: str) -> str:
+        return re.sub(r'\033\[[0-9;]*m', '', s)
 
     @staticmethod
     def now():
@@ -240,20 +254,47 @@ class UI:
         os.system('cls' if os.name == 'nt' else 'clear')
 
     @classmethod
-    def header(cls, title: str):
-        cls.clear_line()
-        print(f"\n  {cls.CYAN}{cls.BOLD}╔══════════════════════════════════════════════════════════════════════╗{cls.RESET}")
-        print(f"  {cls.CYAN}{cls.BOLD}║{cls.RESET}  {cls.WHITE}{cls.BOLD}{title.center(66)}{cls.RESET}  {cls.CYAN}{cls.BOLD}║{cls.RESET}")
-        print(f"  {cls.CYAN}{cls.BOLD}╚══════════════════════════════════════════════════════════════════════╝{cls.RESET}\n")
+    def make_box(cls, title: str, rows: list, border_color: str = None) -> str:
+        b_col = border_color or cls.CYAN
+        w = cls.WIDTH
+        t_clean = cls.strip_ansi(title)
+        dashes = max(2, w - 8 - len(t_clean))
+        lines = [f"  {b_col}╭── {title} {'─' * dashes}╮{cls.RESET}"]
+        inner_budget = w - 8
+        for left, right in rows:
+            l_c = cls.strip_ansi(left)
+            r_c = cls.strip_ansi(right)
+            gap = max(1, inner_budget - len(l_c) - len(r_c))
+            lines.append(f"  {b_col}│{cls.RESET}  {left}{' ' * gap}{right}  {b_col}│{cls.RESET}")
+        lines.append(f"  {b_col}╰{'─' * (w - 4)}╯{cls.RESET}")
+        return '\n'.join(lines)
 
     @classmethod
-    def user_card(cls, username: str, balance: float):
+    def header(cls, title: str, subtitle: str = ""):
         cls.clear_line()
-        u_str = f"@{username}"
-        b_str = f"${balance:.4f}"
-        print(f"  {cls.WHITE}{cls.BOLD}┌─ 👤 SESSION ACTIVE PR.SOCIAL ────────────────────────────────────────┐{cls.RESET}")
-        print(f"  {cls.WHITE}{cls.BOLD}│{cls.RESET}  Compte : {cls.GREEN}{cls.BOLD}{u_str:<20}{cls.RESET}  💰 Solde Réel : {cls.YELLOW}{cls.BOLD}{b_str:<12}{cls.RESET}  🟢 {cls.WHITE}{cls.BOLD}│{cls.RESET}")
-        print(f"  {cls.WHITE}{cls.BOLD}└──────────────────────────────────────────────────────────────────────┘{cls.RESET}\n")
+        w = cls.WIDTH
+        d_top = w - 4
+        print(f"\n  {cls.CYAN}{cls.BOLD}╔{'═' * d_top}╗{cls.RESET}")
+        t_clean = cls.strip_ansi(title)
+        sp_t = max(0, (w - 4 - len(t_clean)) // 2)
+        sp_tr = max(0, w - 4 - len(t_clean) - sp_t)
+        print(f"  {cls.CYAN}{cls.BOLD}║{cls.RESET}{' ' * sp_t}{cls.WHITE}{cls.BOLD}{title}{cls.RESET}{' ' * sp_tr}{cls.CYAN}{cls.BOLD}║{cls.RESET}")
+        if subtitle:
+            sub_c = cls.strip_ansi(subtitle)
+            sp_s = max(0, (w - 4 - len(sub_c)) // 2)
+            sp_sr = max(0, w - 4 - len(sub_c) - sp_s)
+            print(f"  {cls.CYAN}{cls.BOLD}║{cls.RESET}{' ' * sp_s}{cls.GRAY}{subtitle}{cls.RESET}{' ' * sp_sr}{cls.CYAN}{cls.BOLD}║{cls.RESET}")
+        print(f"  {cls.CYAN}{cls.BOLD}╚{'═' * d_top}╝{cls.RESET}\n")
+
+    @classmethod
+    def user_card(cls, username: str, balance: float, networks_count: int = 15):
+        cls.clear_line()
+        rows = [
+            (f"Compte : {cls.GREEN}{cls.BOLD}@{username}{cls.RESET}", f"Solde : {cls.YELLOW}{cls.BOLD}${balance:.4f}{cls.RESET}"),
+            (f"Réseaux : {cls.WHITE}{cls.BOLD}{networks_count} connectés{cls.RESET}", f"Sécurité : {cls.GREEN}Bouclier Anti-Ban Actif 🛡️{cls.RESET}")
+        ]
+        print(cls.make_box("👤 SESSION ACTIVE PR.SOCIAL", rows, border_color=cls.WHITE))
+        print()
 
     @classmethod
     def accounts_grid(cls, accounts: dict):
@@ -261,43 +302,57 @@ class UI:
             return
         cls.clear_line()
         total = len(accounts)
-        print(f"  {cls.WHITE}{cls.BOLD}┌── 📱 {total} RÉSEAUX APPROUVÉS CONNECTÉS (PRÊTS À L'EMPLOI) ───────┐{cls.RESET}")
+        w = cls.WIDTH
+        title = f"📱 {total} RÉSEAUX APPROUVÉS CONNECTÉS"
+        dashes = max(2, w - 8 - len(title))
+        lines = [f"  {cls.WHITE}{cls.BOLD}╭── {title} {'─' * dashes}╮{cls.RESET}"]
         items = list(accounts.items())
+        col_w = (w - 12) // 2
+
         for i in range(0, len(items), 2):
             p1, acc1 = items[i]
             c1 = cls.PLATFORM_COLORS.get(p1.lower(), cls.CYAN)
-            u1 = ("@" + acc1.get("username", "").lstrip("@"))[:20]
-            col1 = f"{c1}{cls.BOLD}[{p1.upper():<10}]{cls.RESET} {cls.WHITE}{u1:<20}{cls.RESET}"
+            u1 = ("@" + acc1.get("username", "").lstrip("@"))[:16]
+            tag1 = f"[{p1.upper()[:9]:<9}]"
+            pad1 = col_w - 11 - 1 - len(u1)
+            col1 = f"{c1}{cls.BOLD}{tag1}{cls.RESET} {cls.WHITE}{u1}{' ' * max(0, pad1)}{cls.RESET}"
 
-            col2 = " " * 33
             if i + 1 < len(items):
                 p2, acc2 = items[i+1]
                 c2 = cls.PLATFORM_COLORS.get(p2.lower(), cls.CYAN)
-                u2 = ("@" + acc2.get("username", "").lstrip("@"))[:20]
-                col2 = f"{c2}{cls.BOLD}[{p2.upper():<10}]{cls.RESET} {cls.WHITE}{u2:<20}{cls.RESET}"
+                u2 = ("@" + acc2.get("username", "").lstrip("@"))[:16]
+                tag2 = f"[{p2.upper()[:9]:<9}]"
+                pad2 = col_w - 11 - 1 - len(u2)
+                col2 = f"{c2}{cls.BOLD}{tag2}{cls.RESET} {cls.WHITE}{u2}{' ' * max(0, pad2)}{cls.RESET}"
+            else:
+                col2 = " " * col_w
 
-            print(f"  {cls.WHITE}{cls.BOLD}│{cls.RESET}  {col1} │ {col2} {cls.WHITE}{cls.BOLD}│{cls.RESET}")
-        print(f"  {cls.WHITE}{cls.BOLD}└──────────────────────────────────────────────────────────────────────┘{cls.RESET}\n")
+            lines.append(f"  {cls.WHITE}│{cls.RESET}  {col1} {cls.GRAY}│{cls.RESET}  {col2}  {cls.WHITE}│{cls.RESET}")
+
+        lines.append(f"  {cls.WHITE}{cls.BOLD}╰{'─' * (w - 4)}╯{cls.RESET}\n")
+        print('\n'.join(lines))
 
     @classmethod
     def task_card(cls, task_id: int, platform: str, action: str, reward: float, url: str):
         cls.clear_line()
-        short_url = (url[:52] + "...") if len(url) > 55 else url
-        print(f"\n  {cls.CYAN}{cls.BOLD}┌── 🌐 {platform.upper()} #{task_id} ──────────────────────────────────────┐{cls.RESET}")
-        print(f"  {cls.CYAN}│{cls.RESET}  Action : {cls.WHITE}{cls.BOLD}{action.upper():<12}{cls.RESET} Gain : {cls.GREEN}{cls.BOLD}+${reward:.4f}{cls.RESET}                    {cls.CYAN}│{cls.RESET}")
-        print(f"  {cls.CYAN}│{cls.RESET}  Cible  : {cls.GRAY}{short_url:<56}{cls.RESET} {cls.CYAN}│{cls.RESET}")
-        print(f"  {cls.CYAN}{cls.BOLD}└──────────────────────────────────────────────────────────────────────┘{cls.RESET}")
+        short_url = (url[:46] + "...") if len(url) > 49 else url
+        p_col = cls.PLATFORM_COLORS.get(platform.lower(), cls.CYAN)
+        plat_badge = f"{p_col}{cls.BOLD}[{platform.upper()}]{cls.RESET}"
+        title = f"🌐 {plat_badge} Tâche #{task_id}"
+        rows = [
+            (f"Action : {cls.WHITE}{cls.BOLD}{action.upper()}{cls.RESET}", f"Gain : {cls.GREEN}{cls.BOLD}+${reward:.4f}{cls.RESET}"),
+            (f"Cible  : {cls.GRAY}{short_url}{cls.RESET}", "")
+        ]
+        print(f"\n{cls.make_box(title, rows, border_color=cls.CYAN)}")
 
     @classmethod
     def step(cls, msg: str, level: str = "info"):
         cls.clear_line()
         ts = f"{cls.GRAY}[{cls.now()}]{cls.RESET}"
-        
-        # Éviter les doublons d'icônes/emojis
         m = msg.strip()
-        for prefix in ["✓", "🎉", "⚠️", "❌", "▶", "➔", "🎯", "🛡️", "⏳"]:
-            if m.startswith(prefix):
-                m = m[len(prefix):].strip()
+        for pfx in ["✓", "🎉", "⚠️", "❌", "▶", "➔", "🎯", "🛡️", "⏳", "ℹ️", "i"]:
+            if m.startswith(pfx):
+                m = m[len(pfx):].strip()
 
         if level == "success":
             icon = f"{cls.GREEN}{cls.BOLD}✓{cls.RESET}"
@@ -312,20 +367,21 @@ class UI:
             icon = f"{cls.CYAN}➔{cls.RESET}"
             text = f"{cls.WHITE}{m}{cls.RESET}"
 
-        print(f"    {ts} {icon} {text}")
+        print(f"  {ts} {icon} {text}")
 
     @classmethod
-    def live_status(cls, msg: str, icon: str = "⚠"):
+    def live_status(cls, msg: str, icon: str = "⠼"):
         cls.clear_line()
         ts = f"{cls.GRAY}[{cls.now()}]{cls.RESET}"
-        sys.stdout.write(f"    {ts} {cls.YELLOW}{cls.BOLD}{icon}{cls.RESET} {cls.WHITE}{msg}{cls.RESET}\r")
+        clean_msg = cls.strip_ansi(msg)[:60]
+        sys.stdout.write(f"\r  {ts} {cls.CYAN}{icon}{cls.RESET} {cls.GRAY}{clean_msg}{cls.RESET}\r")
         sys.stdout.flush()
 
     @classmethod
     def success(cls, task_id: int, reward: float, session_total: float, new_balance: float):
         cls.clear_line()
         ts = f"{cls.GRAY}[{cls.now()}]{cls.RESET}"
-        print(f"    {ts} {cls.GREEN}{cls.BOLD}✓ SUCCÈS #{task_id} : +${reward:.4f} | Session : +${session_total:.4f} | Solde : ${new_balance:.4f}{cls.RESET}")
+        print(f"  {ts} {cls.GREEN}{cls.BOLD}✓ SUCCÈS #{task_id} : +${reward:.4f}  │  Session : +${session_total:.4f}  │  Solde : ${new_balance:.4f}{cls.RESET}\n")
 
     @classmethod
     def safety_pause(cls, seconds: float):
@@ -333,7 +389,7 @@ class UI:
         for i in range(steps, 0, -1):
             rem = i / 10.0
             ts = f"{cls.GRAY}[{cls.now()}]{cls.RESET}"
-            msg = f"\r    {ts} {cls.CYAN}⏳ Pause de sécurité ({rem:.1f}s)...{cls.RESET}   "
+            msg = f"\r  {ts} {cls.CYAN}⏳ Rotation Turbo ({rem:.1f}s)...{cls.RESET}   "
             sys.stdout.write(msg)
             sys.stdout.flush()
             time.sleep(0.1)
@@ -455,6 +511,7 @@ class UI:
 # ==============================================================================
 class UniversalSilentEngine:
     def __init__(self, pr_token: str, cf_clearance: str = "", ig_cookies: str = "", yt_cookies: str = "", tt_cookies: str = "", config_paths: Optional[list] = None):
+        self.config_paths = config_paths or []
         self.pr_api = PrSocialClient(pr_token, cf_clearance)
         # BrowserBot configuré en mode 100% invisible (headless: True, pas de fenêtre visuelle)
         self.browser_bot = BrowserBot(headless=True)
@@ -526,7 +583,7 @@ class UniversalSilentEngine:
         return True
 
     def auto_unblock_active_tasks(self) -> int:
-        """Détecte et annule toute tâche bloquante en 'in_progress' sur PR.Social."""
+        """Détecte et libère toute tâche bloquante en 'in_progress' sur PR.Social sans toucher aux tâches récentes validées."""
         st, data = self.pr_api.get_in_progress_tasks()
         if st != 200:
             return 0
@@ -534,10 +591,13 @@ class UniversalSilentEngine:
         if not items:
             return 0
 
-        UI.step(f"Détection de {len(items)} tâche(s) bloquante(s). Déblocage...", "warning")
+        now_ts = time.time()
         cancelled = 0
         for it in items:
             t_id = it.get("order_id") or it.get("id")
+            # Ne jamais annuler une tâche récemment validée avec succès (<120s)
+            if t_id and t_id in getattr(self, "recently_validated_tasks", set()):
+                continue
             if t_id:
                 c_st, c_res = self.pr_api.cancel_task(t_id)
                 if c_st == 200 and c_res.get("ok"):
@@ -611,7 +671,7 @@ class UniversalSilentEngine:
 
     def run_all(self, platforms: Optional[List[str]] = None, max_tasks: Optional[int] = None):
         UI.clear_screen()
-        UI.header("⚡ ENGINEERING REVERSED SOCIAL BOT·v3.1 ⚡")
+        UI.header("PR.SOCIAL WORKER PRO", "Moteur Automatisé Multi-Réseaux Haute Performance")
 
         # 1. Vérification connexion
         status, me = self.pr_api.get_me()
@@ -621,7 +681,6 @@ class UniversalSilentEngine:
 
         user = me["user"]
         initial_balance = float(user.get("balance", 0))
-        UI.user_card(user.get("username", "Inconnu"), initial_balance)
 
         # 2. Bouclier de Sécurité : Vérification stricte & Échappatoire directe de l'API Warnings
         w_st, w_data = self.pr_api.get_warnings()
@@ -664,6 +723,7 @@ class UniversalSilentEngine:
                     if p not in approved_accounts:
                         approved_accounts[p] = acc
 
+        UI.user_card(user.get("username", "Inconnu"), initial_balance, len(approved_accounts))
         UI.accounts_grid(approved_accounts)
 
         # 4.0 Statut de la Session Instagram par Cookie Officiel
@@ -671,11 +731,9 @@ class UniversalSilentEngine:
             if not self.ig_client.username:
                 self.ig_client.username = approved_accounts.get("instagram", {}).get("username", "")
             u_ig_name = self.ig_client.username or (f"ID #{self.ig_client.user_id}" if self.ig_client.user_id else "Session Active")
-            UI.step(f"📷 Session Instagram Cookie ACTIVE (@{u_ig_name}) : VRAIE Action Directe & Bouclier Anti-Pause 24h activés !", "success")
-        else:
-            UI.step("📷 Session Instagram : Mode Standard (Exportez vos cookies avec PR Cookie Helper pour 100% de validation directe).", "info")
+            UI.step(f"Session Instagram Cookie Active (@{u_ig_name}) · Bouclier Anti-Pause activé", "success")
 
-        # 4.1 Détection automatique des comptes renouvelés (Levée automatique sous surveillance prudente)
+        # 4.1 Détection automatique des comptes renouvelés
         renewed_platforms = set()
         for p, acc in approved_accounts.items():
             p_sub = str(acc.get("submitted_at") or acc.get("verified_at") or "")
@@ -686,18 +744,7 @@ class UniversalSilentEngine:
                     renewed_platforms.add(p)
                     if p in quarantined_platforms:
                         quarantined_platforms.remove(p)
-                    UI.step(f"✨ COMPTE RENOUVELÉ APPROUVÉ [{p.upper()}] : @{acc.get('username')} lié après l'avertissement ({p_sub[:10]} > {latest_warn[:10]}).", "success")
-                    UI.step(f"   ↳ Quarantaine levée automatiquement en MODE PRUDENCE (Délais humains sécurisés).", "info")
-
-        # 4.5. Sentinelle de Qualité : Vérification consultative (sans bloquer les comptes approuvés PR.Social)
-        try:
-            import re
-            for p, acc in approved_accounts.items():
-                u = acc.get("username", "")
-                if re.search(r'\d{5,}', u):
-                    UI.step(f"⚠️ AVERTISSEMENT PROFIL [{p.upper()}] : Le pseudo @{u} a plus de 4 chiffres consécutifs.", "warning")
-        except Exception:
-            pass
+                    UI.step(f"Compte [{p.upper()}] approuvé & renouvelé (@{acc.get('username')}) · Quarantaine levée", "success")
 
         # Matrice Prioritaire Haute Vitesse de l'IA Visuelle :
         # Classement strict pour exécuter les tâches à validation instantanée (<30s) en priorité absolue
@@ -722,8 +769,15 @@ class UniversalSilentEngine:
         }
         ALL_SUPPORTED_PLATFORMS = sorted(list(FAST_AI_PRIORITY.keys()), key=lambda k: FAST_AI_PRIORITY[k])
 
-        # Si aucune sélection manuelle, on prend toutes les plateformes approuvées par PR.Social
-        target_platforms = platforms or list(approved_accounts.keys()) or ALL_SUPPORTED_PLATFORMS
+        # Sélection ciblée ou globale des plateformes
+        if platforms == ["instagram"] or platforms == "instagram":
+            target_platforms = ["instagram"]
+        elif platforms == ["non_instagram"] or platforms == "non_instagram":
+            target_platforms = [p for p in approved_accounts.keys() if p.lower() != "instagram"] or [p for p in ALL_SUPPORTED_PLATFORMS if p != "instagram"]
+        elif isinstance(platforms, list) and platforms:
+            target_platforms = platforms
+        else:
+            target_platforms = list(approved_accounts.keys()) or ALL_SUPPORTED_PLATFORMS
 
         # Tolérance zéro : Uniquement les plateformes ayant un compte explicitement approuvé ET hors quarantaine
         active_list = [p for p in target_platforms if p in approved_accounts and p not in quarantined_platforms]
@@ -742,6 +796,8 @@ class UniversalSilentEngine:
         STRICT_PAUSE_PLATFORMS = {"tiktok", "youtube"}
         platform_hourly_history: Dict[str, list] = {p: [] for p in STRICT_PAUSE_PLATFORMS}
         platform_cooldowns: Dict[str, float] = {}
+        action_cooldowns: Dict[Tuple[str, str], float] = {}
+        self.recently_validated_tasks: set = set()
 
         # Limites officielles PR.Social Instagram par compte et par heure :
         # • Abonnements : 50 (seuil sécurisé : 48)
@@ -774,12 +830,16 @@ class UniversalSilentEngine:
             st_g, data_g = self.pr_api.request("GET", "/tasks/available", params={"sort": "new", "limit": 50})
             global_fresh_by_platform: Dict[str, list] = {}
             if st_g == 200 and isinstance(data_g, dict):
-                # Récupération en temps réel des exhausted_pairs du serveur pour TikTok/YouTube/Instagram
+                # Récupération en temps réel des exhausted_pairs du serveur pour chaque couple (plateforme, action)
                 for ep in (data_g.get("exhausted_pairs") or []):
                     if isinstance(ep, dict) and "platform" in ep:
                         ep_plat = ep["platform"].lower()
+                        ep_act = (ep.get("action") or "").lower()
                         ep_retry = int(ep.get("retry_after_min") or 1)
-                        platform_cooldowns[ep_plat] = max(platform_cooldowns.get(ep_plat, 0), now_ts + (ep_retry * 60))
+                        if ep_act:
+                            action_cooldowns[(ep_plat, ep_act)] = max(action_cooldowns.get((ep_plat, ep_act), 0), now_ts + (ep_retry * 60))
+                        else:
+                            platform_cooldowns[ep_plat] = max(platform_cooldowns.get(ep_plat, 0), now_ts + (ep_retry * 60))
 
                 if isinstance(data_g.get("platformCounts"), list):
                     for pc in data_g["platformCounts"]:
@@ -841,14 +901,16 @@ class UniversalSilentEngine:
                         st_p, data_p = self.pr_api.get_available_tasks(plat, sort=sort_mode, limit=50, page=pg)
                         if st_p == 200 and isinstance(data_p, dict):
                             data = data_p
-                            # Détection des limites horaires serveur (exhausted_pairs)
+                            # Détection des limites horaires serveur ciblées par action
                             exhausted = data_p.get("exhausted_pairs") or []
                             if isinstance(exhausted, list):
                                 for ep in exhausted:
                                     if isinstance(ep, dict) and ep.get("platform", "").lower() == plat.lower():
-                                        exhausted_actions.add(ep.get("action", "").lower())
-                                        retry_min = int(ep.get("retry_after_min") or 10)
-                                        platform_cooldowns[plat] = time.time() + (retry_min * 60)
+                                        act_e = (ep.get("action") or "").lower()
+                                        if act_e:
+                                            exhausted_actions.add(act_e)
+                                            retry_min = int(ep.get("retry_after_min") or 10)
+                                            action_cooldowns[(plat, act_e)] = time.time() + (retry_min * 60)
 
                             p_tasks = data_p.get("tasks", []) or []
                             if not p_tasks:
@@ -916,8 +978,10 @@ class UniversalSilentEngine:
                 acc_id = approved_accounts.get(plat, {}).get("id")
                 now_ts = time.time()
 
-                # Vérification en direct du cooldown et des quotas horaires de la plateforme
+                # Vérification en direct du cooldown et des quotas horaires de la plateforme & action
                 if now_ts < platform_cooldowns.get(plat, 0):
+                    continue
+                if now_ts < action_cooldowns.get((plat, (t.get("action") or "").lower()), 0):
                     continue
 
                 action = (t.get("action") or "FOLLOW").upper()
@@ -958,12 +1022,10 @@ class UniversalSilentEngine:
                                any(k in err_msg.lower() for k in ["все места", "places", "not found", "inactive", "уже выполн"]))
 
                     if is_busy:
-                        self.failed_tasks[task_id] = time.time() + 60
-                        consecutive_busy_by_plat[plat] = consecutive_busy_by_plat.get(plat, 0) + 1
-                        if consecutive_busy_by_plat[plat] >= 8:
-                            platform_cooldowns[plat] = time.time() + 60
+                        self.failed_tasks[task_id] = time.time() + 30
+                        UI.live_status(f"Créneau complet sur #{task_id} [{plat.upper()}] · Recherche de nouvelles places...", "⠼")
                     else:
-                        self.failed_tasks[task_id] = time.time() + 300
+                        self.failed_tasks[task_id] = time.time() + 180
 
                     if "active task" in err_msg.lower() or "task_in_progress" in err_msg.lower():
                         self.auto_unblock_active_tasks()
@@ -1013,9 +1075,10 @@ class UniversalSilentEngine:
                 print()  # Efface la ligne du radar
                 UI.task_card(task_id, plat, action, reward, target_url)
 
-                wait_sec = int(start_res.get("submit_after_sec") or 5)
+                t_start_action = time.time()
+                wait_sec = int(start_res.get("submit_after_sec") or 3)
                 if plat in renewed_platforms:
-                    wait_sec = max(wait_sec, 6)
+                    wait_sec = max(wait_sec, 4)
                 api_check_enabled = start_res.get("api_check_enabled", 0)
 
                 comment_text = None
@@ -1041,6 +1104,19 @@ class UniversalSilentEngine:
                     UI.step(f"Commentaire préparé : '{comment_text}'", "info")
 
                 is_validated = False
+
+                # 0. EXÉCUTION INSTANTANÉE PR WORKER TELEGRAM (0s Délai & Auto-Validation)
+                if plat == "telegram" and TelegramWorkerEngine:
+                    tw_engine = TelegramWorkerEngine(self.pr_api, self.browser_bot, worker_user)
+                    ok_tw, rew_tw, msg_tw = tw_engine.execute_single_task(t)
+                    if ok_tw:
+                        success_count += 1
+                        total_earned += rew_tw
+                        UI.balance_card(initial_balance + total_earned, total_earned)
+                        continue
+                    else:
+                        self.failed_tasks[task_id] = time.time() + 600
+                        continue
 
                 # 1. ACTION DIRECTE INSTAGRAM PAR COOKIE OFFICIEL (Anti-Rejet & Anti-Pause 24h Garanti)
                 if plat == "instagram" and self.ig_client and self.ig_client.logged_in:
@@ -1089,20 +1165,20 @@ class UniversalSilentEngine:
                     else:
                         api_check_active = bool(start_res.get("api_check_enabled", 0)) or (plat == "instagram" and "follow" in action.lower())
                     if api_check_active:
-                        UI.step(f"Délai de sécurité ({wait_sec}s) puis confirmation sans capture...", "info")
-                        time.sleep(wait_sec)
+                        rem_api = max(0.0, wait_sec - (time.time() - t_start_action))
+                        if rem_api > 0:
+                            time.sleep(rem_api)
                         chk_st, chk_res = self.pr_api.api_check_task(task_id)
-                        if chk_st == 200 and chk_res.get("ok"):
+                        code_msg = (chk_res.get("code") or "").lower() if isinstance(chk_res, dict) else ""
+                        is_found = isinstance(chk_res, dict) and chk_res.get("found") is True
+                        # Contrôle STRICT : Seule une confirmation réelle avec found=True ou code approved valide la tâche sans preuve
+                        if chk_st == 200 and isinstance(chk_res, dict) and chk_res.get("ok") and (code_msg in ["approved", "completed", "success"] or (is_found and code_msg != "rechecking")):
                             is_validated = True
-                            code_msg = chk_res.get("code", "approved")
-                            wait_m = chk_res.get("wait_min", 20)
-                            if code_msg == "queued":
-                                UI.step(f"✓ Validé sans capture ! En file de vérification automatique PR.Social (~{wait_m} min)", "success")
-                            else:
-                                UI.step("✓ Validé et confirmé instantanément par PR.Social !", "success")
+                            UI.step("✓ Validé et confirmé instantanément par PR.Social !", "success")
                         else:
-                            err_chk = chk_res.get("error", f"Status {chk_st}") if isinstance(chk_res, dict) else str(chk_res)
-                            UI.step(f"Confirmation automatique refusée ({err_chk}). Repli sur preuve d'écran...", "warning")
+                            is_validated = False
+                            reason_desc = code_msg or ("non détecté en direct" if not is_found else "en attente de revérification")
+                            UI.step(f"ℹ️ Confirmation directe en attente ({reason_desc}). Repli strict sur capture certifiée...", "info")
 
                 # Repli sur preuve visuelle sécurisée avec hash unique si api-check n'est pas actif ou a échoué
                 if not is_validated:
@@ -1118,8 +1194,9 @@ class UniversalSilentEngine:
                     )
 
                     if act_ok and shot_path and os.path.exists(shot_path):
-                        UI.step(f"Délai de sécurité humaine ({wait_sec}s) puis soumission de la preuve...", "info")
-                        time.sleep(wait_sec)
+                        rem_sub = max(0.0, wait_sec - (time.time() - t_start_action))
+                        if rem_sub > 0:
+                            time.sleep(rem_sub)
 
                         sub_st, sub_res = self.pr_api.submit_screenshot_file(task_id, shot_path)
                         if sub_st == 200 and sub_res.get("ok"):
@@ -1154,6 +1231,7 @@ class UniversalSilentEngine:
                     server_error_streak = 0
                     success_count += 1
                     session_earnings += reward
+                    self.recently_validated_tasks.add(task_id)
                     self.failed_tasks[task_id] = time.time() + 86400
                     _, fresh_me = self.pr_api.get_me()
                     new_bal = float(fresh_me.get("user", {}).get("balance", 0.0)) if fresh_me.get("user") else 0.0
@@ -1171,19 +1249,17 @@ class UniversalSilentEngine:
                         self.stop_requested = True
                         break
 
-                # Différenciation de vitesse et cadence intelligente :
+                # Différenciation de vitesse et cadence intelligente Turbo :
                 if last_executed_platform is not None and plat != last_executed_platform:
-                    # Changement de réseau social : le réseau précédent se repose naturellement.
-                    # Rotation ultra-rapide pour enchaîner le réseau suivant immédiatement !
-                    delay = random.uniform(1.0, 1.8)
+                    # Changement de réseau social : rotation ultra-rapide instantanée !
+                    delay = random.uniform(0.3, 0.6)
                 elif plat in STRICT_PAUSE_PLATFORMS:
-                    # Même réseau restreint exécuté consécutivement : cadence humaine obligatoire (profil expérimenté)
-                    delay = random.uniform(3.0, 4.5)
+                    delay = random.uniform(1.2, 2.0)
                 elif plat in renewed_platforms:
-                    delay = random.uniform(2.5, 4.0)
-                else:
-                    # Réseau normal consécutif (Twitter, Threads, etc.) : vitesse maximale
                     delay = random.uniform(1.0, 1.8)
+                else:
+                    # Vitesse maximale
+                    delay = random.uniform(0.3, 0.7)
 
                 last_executed_platform = plat
                 UI.safety_pause(delay)
@@ -1194,9 +1270,9 @@ class UniversalSilentEngine:
             if tasks_found == 0:
                 radar_total = sum(platform_counts.values()) if platform_counts else 0
                 active_has_tasks = sum(platform_counts.get(p, 0) for p in active_list)
-                pause_sec = 1 if active_has_tasks > 0 else (2 if radar_total > 0 else 3)
+                pause_sec = 1.0
 
-                total_ticks = int(pause_sec * 5)
+                total_ticks = 5
                 for tick in range(total_ticks, 0, -1):
                     if self.stop_requested:
                         break
@@ -1363,6 +1439,54 @@ class UniversalSilentEngine:
 
         UI.clear_line()
         return False, None, None
+
+    def run_telegram_worker(self, max_tasks: Optional[int] = None, max_scans: Optional[int] = None):
+        """Moteur PR Worker Telegram Haute Vitesse (0s délai, tri prioritaire APK)."""
+        UI.clear_screen()
+        status, me = self.pr_api.get_me()
+        if status != 200 or not me.get("user"):
+            UI.step(f"Échec authentification PR.Social : {me.get('error', 'Token expiré')}", "error")
+            return
+
+        user = me["user"]
+        initial_balance = float(user.get("balance", 0))
+        UI.user_card(user.get("username", "Inconnu"), initial_balance)
+
+        # Récupération du compte Telegram actif (Priorité config.json > Autoearn > Profil)
+        tg_user = ""
+        cfg = {}
+        for p in self.config_paths:
+            if p and os.path.exists(p):
+                try:
+                    with open(p, "r", encoding="utf-8") as f:
+                        cfg = json.load(f)
+                    break
+                except Exception:
+                    pass
+
+        if TelegramAuthManager:
+            tg_user, _ = TelegramAuthManager.get_active_account(self.pr_api, cfg)
+        else:
+            st_s, s_data = self.pr_api.get_socials()
+            if st_s == 200 and isinstance(s_data, dict):
+                accs = list(s_data.get("accounts", []))
+                for p_item in s_data.get("platforms", []):
+                    accs.extend(p_item.get("accounts", []))
+                for a in accs:
+                    if str(a.get("platform", "")).lower() == "telegram" and a.get("status") == "approved":
+                        tg_user = str(a.get("username", "")).strip().lstrip("@")
+                        break
+
+        if not TelegramWorkerEngine:
+            UI.step("Module TelegramWorkerEngine non disponible", "error")
+            return
+
+        worker = TelegramWorkerEngine(
+            api_client=self.pr_api,
+            browser_bot=self.browser_bot,
+            telegram_username=tg_user
+        )
+        worker.run_radar_loop(max_tasks=max_tasks, max_scans=max_scans)
 
     def run_surf_tasks(self, max_tasks: Optional[int] = None):
         """Moteur 100% dédié au Surf Réel de PR.Social (https://pr.social/surf/view?z=180)."""
@@ -1648,6 +1772,39 @@ def main():
             InstagramActionClient = None
     ig_client = InstagramActionClient() if InstagramActionClient else None
 
+    # Support d'exécution directe PR Worker Telegram (ex: --tg-worker)
+    if "--telegram-worker" in sys.argv or "--tg-worker" in sys.argv:
+        max_t = None
+        max_scans = None
+        for i, arg in enumerate(sys.argv):
+            if arg in ["--tasks", "--limit"] and i + 1 < len(sys.argv):
+                try:
+                    max_t = int(sys.argv[i + 1])
+                except Exception:
+                    pass
+            if arg in ["--scans", "-s"] and i + 1 < len(sys.argv):
+                try:
+                    max_scans = int(sys.argv[i + 1])
+                except Exception:
+                    pass
+        print(f"\n  {ANSI.CYAN}{ANSI.BOLD}⚡ DÉMARRAGE DIRECT PR WORKER TELEGRAM ({max_t if max_t else 'Illimité'} TÂCHES)...{ANSI.RESET}")
+        engine = UniversalSilentEngine(
+            pr_token=token,
+            cf_clearance=cf,
+            ig_cookies=ig_cookies,
+            yt_cookies=yt_cookies,
+            tt_cookies=tt_cookies,
+            config_paths=candidates
+        )
+        try:
+            engine.run_telegram_worker(max_tasks=max_t, max_scans=max_scans)
+        except KeyboardInterrupt:
+            print(f"\n  {ANSI.YELLOW}Arrêt demandé par l'utilisateur...{ANSI.RESET}")
+            engine.stop_requested = True
+        finally:
+            engine.browser_bot.stop_driver()
+        return
+
     # Support d'exécution directe en ligne de commande (ex: --tasks 30)
     if "--tasks" in sys.argv or "--run" in sys.argv:
         max_t = None
@@ -1680,13 +1837,39 @@ def main():
         print(LOGO_HTTP)
 
         st, me = client.get_me() if token else (0, {})
+        menu_w = 72
+
+        def _visual_len(s: str) -> int:
+            plain = re.sub(r'\033\[[0-9;]*m', '', s)
+            w = 0
+            for ch in plain:
+                code = ord(ch)
+                if code == 0xFE0F:
+                    continue
+                if (0x2300 <= code <= 0x23FF or
+                    0x2600 <= code <= 0x27BF or
+                    0x2B50 <= code <= 0x2B55 or
+                    0x1F300 <= code <= 0x1F9FF):
+                    w += 2
+                else:
+                    w += 1
+            return w
+
+        def _box_row(content: str, width: int = 64, border: str = "│", border_col: str = None) -> str:
+            b_col = border_col or f"{ANSI.WHITE}{ANSI.BOLD}"
+            v = _visual_len(content)
+            gap = max(0, width - v)
+            return f"  {b_col}{border}{ANSI.RESET}  {content}{' ' * gap}  {b_col}{border}{ANSI.RESET}"
+
         if st == 200 and me.get("user"):
             u = me["user"]
             bal = float(u.get("balance", 0.0))
             u_name = f"@{u.get('username')}"
             b_val = f"${bal:.4f}"
-            print(f"  {ANSI.WHITE}{ANSI.BOLD}┌─ 👤 SESSION ACTIVE PR.SOCIAL ────────────────────────────────────────┐{ANSI.RESET}")
-            print(f"  {ANSI.WHITE}{ANSI.BOLD}│{ANSI.RESET}  Compte : {ANSI.GREEN}{ANSI.BOLD}{u_name:<15}{ANSI.RESET} 💰 Solde : {ANSI.YELLOW}{ANSI.BOLD}{b_val:<9}{ANSI.RESET}⚡Version : {ANSI.CYAN}{ANSI.BOLD}v3.1{ANSI.RESET}       {ANSI.WHITE}{ANSI.BOLD}│{ANSI.RESET}")
+            t_session = "👤 SESSION ACTIVE PR.SOCIAL"
+            d_session = max(2, 64 - _visual_len(t_session))
+            print(f"  {ANSI.WHITE}{ANSI.BOLD}┌── {t_session} {'─' * d_session}┐{ANSI.RESET}")
+            print(_box_row(f"Compte : {ANSI.GREEN}{ANSI.BOLD}{u_name:<14}{ANSI.RESET} 💰 Solde : {ANSI.YELLOW}{ANSI.BOLD}{b_val:<9}{ANSI.RESET} ⚡Version : {ANSI.CYAN}{ANSI.BOLD}v3.2{ANSI.RESET}", border="│", border_col=f"{ANSI.WHITE}{ANSI.BOLD}"))
             if ig_client and ig_client.logged_in and not ig_client.username:
                 try:
                     st_s, s_data = client.get_socials()
@@ -1704,65 +1887,201 @@ def main():
             if ig_client and ig_client.logged_in:
                 ig_u = f"@{ig_client.username}" if ig_client.username else (f"ID #{ig_client.user_id}" if ig_client.user_id else "Session Active")
                 ig_desc = f"{ig_u} (Direct API Actif)"
-                print(f"  {ANSI.WHITE}{ANSI.BOLD}│{ANSI.RESET}  📷 Insta  : {ANSI.GREEN}{ANSI.BOLD}{ig_desc:<54}{ANSI.RESET} {ANSI.WHITE}{ANSI.BOLD}│{ANSI.RESET}")
+                print(_box_row(f"📷 Insta  : {ANSI.GREEN}{ANSI.BOLD}{ig_desc}{ANSI.RESET}", border="│", border_col=f"{ANSI.WHITE}{ANSI.BOLD}"))
             else:
-                print(f"  {ANSI.WHITE}{ANSI.BOLD}│{ANSI.RESET}  📷 Insta  : {ANSI.GRAY}En attente de cookies (PR Cookie Helper)             {ANSI.RESET} {ANSI.WHITE}{ANSI.BOLD}│{ANSI.RESET}")
-            print(f"  {ANSI.WHITE}{ANSI.BOLD}└──────────────────────────────────────────────────────────────────────┘{ANSI.RESET}\n")
+                print(_box_row(f"📷 Insta  : {ANSI.GRAY}En attente de cookies (PR Cookie Helper){ANSI.RESET}", border="│", border_col=f"{ANSI.WHITE}{ANSI.BOLD}"))
+            
+            tg_u_info, tg_src_info = TelegramAuthManager.get_active_account(client, cfg) if TelegramAuthManager else ("", "")
+            if tg_u_info:
+                tg_disp = f"@{tg_u_info} ({tg_src_info})"
+            else:
+                tg_disp = "Non associé (Option [2] pour lier)"
+            print(_box_row(f"✈️  Telegr : {ANSI.CYAN}{ANSI.BOLD}{tg_disp}{ANSI.RESET}", border="│", border_col=f"{ANSI.WHITE}{ANSI.BOLD}"))
+            print(f"  {ANSI.WHITE}{ANSI.BOLD}└{'─' * 68}┘{ANSI.RESET}\n")
             try:
                 from PIL import Image
             except ImportError:
                 print(f"  {ANSI.RED}{ANSI.BOLD}⚠️  ATTENTION : Module Pillow (PIL) non détecté sur cet appareil !{ANSI.RESET}")
                 print(f"  {ANSI.YELLOW}👉 Sur Termux, exécutez : {ANSI.CYAN}{ANSI.BOLD}pkg install -y python-pillow{ANSI.RESET}{ANSI.YELLOW} pour des preuves validées à 100%.{ANSI.RESET}\n")
         else:
-            print(f"  {ANSI.RED}{ANSI.BOLD}┌─ ⚠️  NON CONNECTÉ (Token absent ou expiré) ──────────────────────────┐{ANSI.RESET}")
-            print(f"  {ANSI.RED}{ANSI.BOLD}│{ANSI.RESET}  Veuillez configurer un Token PR.Social valide avec l'option [ 3 ]   {ANSI.RED}{ANSI.BOLD}│{ANSI.RESET}")
-            print(f"  {ANSI.RED}{ANSI.BOLD}└──────────────────────────────────────────────────────────────────────┘{ANSI.RESET}\n")
+            t_err = "⚠️ NON CONNECTÉ (Token absent ou expiré)"
+            d_err = max(2, 64 - _visual_len(t_err))
+            print(f"  {ANSI.RED}{ANSI.BOLD}┌── {t_err} {'─' * d_err}┐{ANSI.RESET}")
+            print(_box_row(f"Veuillez configurer un Token PR.Social valide avec l'option [ 3 ]", border="│", border_col=f"{ANSI.RED}{ANSI.BOLD}"))
+            print(f"  {ANSI.RED}{ANSI.BOLD}└{'─' * 68}┘{ANSI.RESET}\n")
 
-        print(f"  {ANSI.CYAN}{ANSI.BOLD}╔══ ⚡MENU PRINCIPAL · MODE SILENCIEUX (v3.1) ═════════════════════════╗{ANSI.RESET}")
-        print(f"  {ANSI.CYAN}{ANSI.BOLD}║{ANSI.RESET}                                                                      {ANSI.CYAN}{ANSI.BOLD}║{ANSI.RESET}")
-        print(f"  {ANSI.CYAN}{ANSI.BOLD}║{ANSI.RESET}  {ANSI.GREEN}{ANSI.BOLD}[ 1 ] 🚀 START{ANSI.RESET}      {ANSI.WHITE}{ANSI.BOLD}Lancer (Tâches Réseaux Sociaux)        {ANSI.RESET}         {ANSI.CYAN}{ANSI.BOLD}║{ANSI.RESET}")
-        print(f"  {ANSI.CYAN}{ANSI.BOLD}║{ANSI.RESET}  {ANSI.CYAN}{ANSI.BOLD}[ 2 ] 🌐 SURF WEBSITE{ANSI.RESET}{ANSI.WHITE}{ANSI.BOLD}        Auto-Surfeur(Sites Web)       {ANSI.RESET}         {ANSI.CYAN}{ANSI.BOLD}║{ANSI.RESET}")
-        print(f"  {ANSI.CYAN}{ANSI.BOLD}║{ANSI.RESET}  {ANSI.YELLOW}{ANSI.BOLD}[ 3 ] 🔄 RÉCUPÉRER{ANSI.RESET}  {ANSI.WHITE}{ANSI.BOLD}Scanner & Réessayer Tâches Rejetées{ANSI.RESET}             {ANSI.CYAN}{ANSI.BOLD}║{ANSI.RESET}")
-        print(f"  {ANSI.CYAN}{ANSI.BOLD}║{ANSI.RESET}  {ANSI.MAGENTA}{ANSI.BOLD}[ 4 ] 🔑 TOKEN{ANSI.RESET}      {ANSI.WHITE}{ANSI.BOLD}Changer / Vérifier Token PR.Social{ANSI.RESET}              {ANSI.CYAN}{ANSI.BOLD}║{ANSI.RESET}")
-        print(f"  {ANSI.CYAN}{ANSI.BOLD}║{ANSI.RESET}  {ANSI.GREEN}{ANSI.BOLD}[ 5 ] 📷 COOKIE INSTA{ANSI.RESET}  {ANSI.WHITE}{ANSI.BOLD}Coller / Activer Cookie Instagram (APK){ANSI.RESET}        {ANSI.CYAN}{ANSI.BOLD}║{ANSI.RESET}")
-        print(f"  {ANSI.CYAN}{ANSI.BOLD}║{ANSI.RESET}  {ANSI.BLUE}{ANSI.BOLD}[ 6 ] 🛠️ AUTO-FIX{ANSI.RESET}   {ANSI.WHITE}{ANSI.BOLD}Auto-Complétion Profils (Anti-Ban){ANSI.RESET}               {ANSI.CYAN}{ANSI.BOLD}║{ANSI.RESET}")
-        print(f"  {ANSI.CYAN}{ANSI.BOLD}║{ANSI.RESET}  {ANSI.RED}{ANSI.BOLD}[ 7 ] ❌ EXIT{ANSI.RESET}       {ANSI.WHITE}{ANSI.BOLD}Fermer{ANSI.RESET}                                          {ANSI.CYAN}{ANSI.BOLD}║{ANSI.RESET}")
-        print(f"  {ANSI.CYAN}{ANSI.BOLD}║{ANSI.RESET}                                                                      {ANSI.CYAN}{ANSI.BOLD}║{ANSI.RESET}")
-        print(f"  {ANSI.CYAN}{ANSI.BOLD}╚══════════════════════════════════════════════════════════════════════╝{ANSI.RESET}\n")
+        t_menu = "⚡MENU PRINCIPAL · MODE SILENCIEUX (v3.2)"
+        d_menu = max(2, 64 - _visual_len(t_menu))
+        print(f"  {ANSI.CYAN}{ANSI.BOLD}╔══ {t_menu} {'═' * d_menu}╗{ANSI.RESET}")
+        print(f"  {ANSI.CYAN}{ANSI.BOLD}║{' ' * 68}║{ANSI.RESET}")
+
+        main_items = [
+            f"{ANSI.GREEN}{ANSI.BOLD}[ 1 ] 🚀 START{ANSI.RESET}        {ANSI.WHITE}{ANSI.BOLD}Lancer (Tâches Réseaux Sociaux){ANSI.RESET}",
+            f"{ANSI.YELLOW}{ANSI.BOLD}[ 2 ] ⚡ TG WORKER{ANSI.RESET}    {ANSI.WHITE}{ANSI.BOLD}PR Worker Telegram (Lancer / Lier Compte){ANSI.RESET}",
+            f"{ANSI.MAGENTA}{ANSI.BOLD}[ 3 ] 🔑 TOKEN{ANSI.RESET}        {ANSI.WHITE}{ANSI.BOLD}Changer / Vérifier Token PR.Social{ANSI.RESET}",
+            f"{ANSI.CYAN}{ANSI.BOLD}[ 4 ] 🌐 SURF WEBSITE{ANSI.RESET}  {ANSI.WHITE}{ANSI.BOLD}Auto-Surfeur (Sites Web){ANSI.RESET}",
+            f"{ANSI.YELLOW}{ANSI.BOLD}[ 5 ] 🔄 RÉCUPÉRER{ANSI.RESET}    {ANSI.WHITE}{ANSI.BOLD}Scanner & Réessayer Tâches Rejetées{ANSI.RESET}",
+            f"{ANSI.GREEN}{ANSI.BOLD}[ 6 ] 📷 COOKIE INSTA{ANSI.RESET} {ANSI.WHITE}{ANSI.BOLD}Coller / Activer Cookie Instagram (APK){ANSI.RESET}",
+            f"{ANSI.BLUE}{ANSI.BOLD}[ 7 ] 🛠️  AUTO-FIX{ANSI.RESET}     {ANSI.WHITE}{ANSI.BOLD}Auto-Complétion Profils (Anti-Ban){ANSI.RESET}",
+            f"{ANSI.RED}{ANSI.BOLD}[ 8 ] ❌ EXIT{ANSI.RESET}         {ANSI.WHITE}{ANSI.BOLD}Fermer{ANSI.RESET}"
+        ]
+
+        for it in main_items:
+            print(_box_row(it, border="║", border_col=f"{ANSI.CYAN}{ANSI.BOLD}"))
+
+        print(f"  {ANSI.CYAN}{ANSI.BOLD}║{' ' * 68}║{ANSI.RESET}")
+        print(f"  {ANSI.CYAN}{ANSI.BOLD}╚{'═' * 68}╝{ANSI.RESET}\n")
 
         try:
-            choice = input(f"  {ANSI.CYAN}⚡ {ANSI.WHITE}{ANSI.BOLD}Votre sélection [1-7] :{ANSI.RESET} ").strip()
+            choice = input(f"  {ANSI.CYAN}⚡ {ANSI.WHITE}{ANSI.BOLD}Votre sélection [1-8] :{ANSI.RESET} ").strip()
         except (KeyboardInterrupt, EOFError):
             break
 
-        if choice == "1":
+        if choice in ["1", "start"]:
             if st != 200:
-                print(f"\n  {ANSI.RED}Veuillez d'abord configurer un Token valide (Option 4).{ANSI.RESET}")
+                print(f"\n  {ANSI.RED}Veuillez d'abord configurer un Token valide (Option 3).{ANSI.RESET}")
                 time.sleep(2)
                 continue
 
-            UI.clear_screen()
-            print(f"\n  {ANSI.CYAN}{ANSI.BOLD}⚡ DÉMARRAGE...{ANSI.RESET}")
-            engine = UniversalSilentEngine(
-                pr_token=token,
-                cf_clearance=cf,
-                ig_cookies=ig_cookies,
-                yt_cookies=yt_cookies,
-                tt_cookies=tt_cookies,
-                config_paths=candidates
-            )
-            try:
-                engine.run_all()
-            except KeyboardInterrupt:
-                print(f"\n  {ANSI.YELLOW}Arrêt demandé par l'utilisateur...{ANSI.RESET}")
-                engine.stop_requested = True
-            finally:
-                engine.browser_bot.stop_driver()
-            input(f"\n  Appuyez sur {ANSI.BOLD}Entrée{ANSI.RESET} pour revenir au menu...")
+            while True:
+                UI.clear_screen()
+                t_sub1 = "🚀 LANCEMENT DU BOT · CHOIX DU MODE (v3.2)"
+                d_sub1 = max(2, 64 - _visual_len(t_sub1))
+                print(f"\n  {ANSI.CYAN}{ANSI.BOLD}╔══ {t_sub1} {'═' * d_sub1}╗{ANSI.RESET}")
+                print(f"  {ANSI.CYAN}{ANSI.BOLD}║{' ' * 68}║{ANSI.RESET}")
 
-        elif choice in ["2", "surf", "web"]:
+                start_sub_items = [
+                    f"{ANSI.MAGENTA}{ANSI.BOLD}[ 1 ] 📷 INSTAGRAM SEUL{ANSI.RESET}      {ANSI.WHITE}{ANSI.BOLD}Mode Indépendant (Actions directes Cookie){ANSI.RESET}",
+                    f"{ANSI.GREEN}{ANSI.BOLD}[ 2 ] 🌐 TOUS RÉSEAUX SOCIAUX{ANSI.RESET} {ANSI.WHITE}{ANSI.BOLD}Tous réseaux SAUF Instagram (Turbo Multi){ANSI.RESET}",
+                    f"{ANSI.CYAN}{ANSI.BOLD}[ 3 ] ⚡ MIX TOTAL{ANSI.RESET}            {ANSI.WHITE}{ANSI.BOLD}Tous les réseaux + Instagram inclus{ANSI.RESET}",
+                    f"{ANSI.RED}{ANSI.BOLD}[ 4 ] 🔙 RETOUR{ANSI.RESET}                {ANSI.WHITE}{ANSI.BOLD}Revenir au Menu Principal{ANSI.RESET}"
+                ]
+                for it in start_sub_items:
+                    print(_box_row(it, border="║", border_col=f"{ANSI.CYAN}{ANSI.BOLD}"))
+
+                print(f"  {ANSI.CYAN}{ANSI.BOLD}║{' ' * 68}║{ANSI.RESET}")
+                print(f"  {ANSI.CYAN}{ANSI.BOLD}╚{'═' * 68}╝{ANSI.RESET}\n")
+
+                try:
+                    start_sub = input(f"  {ANSI.CYAN}⚡ {ANSI.WHITE}{ANSI.BOLD}Votre sélection [1-4] :{ANSI.RESET} ").strip().lower()
+                except (KeyboardInterrupt, EOFError):
+                    break
+
+                if start_sub in ["1", "insta", "instagram"]:
+                    mode_label = "INSTAGRAM SEUL (INDÉPENDANT)"
+                    target_mode = ["instagram"]
+                elif start_sub in ["2", "all", "tous", "social"]:
+                    mode_label = "TOUS RÉSEAUX SOCIAUX (SANS INSTAGRAM)"
+                    target_mode = "non_instagram"
+                elif start_sub in ["3", "mix"]:
+                    mode_label = "MIX TOTAL (TOUS RÉSEAUX + INSTAGRAM)"
+                    target_mode = None
+                elif start_sub in ["4", "q", "retour", "exit"]:
+                    break
+                else:
+                    continue
+
+                UI.clear_screen()
+                print(f"\n  {ANSI.CYAN}{ANSI.BOLD}⚡ DÉMARRAGE DU MODE : {mode_label}...{ANSI.RESET}")
+                engine = UniversalSilentEngine(
+                    pr_token=token,
+                    cf_clearance=cf,
+                    ig_cookies=ig_cookies,
+                    yt_cookies=yt_cookies,
+                    tt_cookies=tt_cookies,
+                    config_paths=candidates
+                )
+                try:
+                    engine.run_all(platforms=target_mode)
+                except KeyboardInterrupt:
+                    print(f"\n  {ANSI.YELLOW}Arrêt demandé par l'utilisateur...{ANSI.RESET}")
+                    engine.stop_requested = True
+                finally:
+                    engine.browser_bot.stop_driver()
+                input(f"\n  Appuyez sur {ANSI.BOLD}Entrée{ANSI.RESET} pour revenir au sous-menu...")
+
+        elif choice in ["2", "tg", "telegram"]:
             if st != 200:
-                print(f"\n  {ANSI.RED}Veuillez d'abord configurer un Token valide (Option 4).{ANSI.RESET}")
+                print(f"\n  {ANSI.RED}Veuillez d'abord configurer un Token valide (Option 3).{ANSI.RESET}")
+                time.sleep(2)
+                continue
+
+            while True:
+                UI.clear_screen()
+                t_sub2 = "⚡ PR WORKER TELEGRAM · GESTION & EXÉCUTION (v3.2)"
+                d_sub2 = max(2, 64 - _visual_len(t_sub2))
+                print(f"\n  {ANSI.CYAN}{ANSI.BOLD}╔══ {t_sub2} {'═' * d_sub2}╗{ANSI.RESET}")
+                print(f"  {ANSI.CYAN}{ANSI.BOLD}║{' ' * 68}║{ANSI.RESET}")
+
+                tg_sub_items = [
+                    f"{ANSI.GREEN}{ANSI.BOLD}[ 1 ] 🚀 LANCER LE WORKER{ANSI.RESET}   {ANSI.WHITE}{ANSI.BOLD}Exécution Tâches Telegram (Mode Rapide 0s){ANSI.RESET}",
+                    f"{ANSI.BLUE}{ANSI.BOLD}[ 2 ] ✈️  COMPTE TELEGRAM{ANSI.RESET}    {ANSI.WHITE}{ANSI.BOLD}Associer Compte Telegram (Login / Pseudo){ANSI.RESET}",
+                    f"{ANSI.RED}{ANSI.BOLD}[ 3 ] 🔙 RETOUR{ANSI.RESET}            {ANSI.WHITE}{ANSI.BOLD}Revenir au Menu Principal{ANSI.RESET}"
+                ]
+                for it in tg_sub_items:
+                    print(_box_row(it, border="║", border_col=f"{ANSI.CYAN}{ANSI.BOLD}"))
+
+                print(f"  {ANSI.CYAN}{ANSI.BOLD}║{' ' * 68}║{ANSI.RESET}")
+                print(f"  {ANSI.CYAN}{ANSI.BOLD}╚{'═' * 68}╝{ANSI.RESET}\n")
+
+                try:
+                    tg_sub = input(f"  {ANSI.CYAN}⚡ {ANSI.WHITE}{ANSI.BOLD}Votre sélection Telegram [1-3] :{ANSI.RESET} ").strip()
+                except (KeyboardInterrupt, EOFError):
+                    break
+
+                if tg_sub == "1":
+                    UI.clear_screen()
+                    print(f"\n  {ANSI.CYAN}{ANSI.BOLD}⚡ DÉMARRAGE DU PR WORKER TELEGRAM RAPIDE...{ANSI.RESET}")
+                    engine = UniversalSilentEngine(
+                        pr_token=token,
+                        cf_clearance=cf,
+                        ig_cookies=ig_cookies,
+                        yt_cookies=yt_cookies,
+                        tt_cookies=tt_cookies,
+                        config_paths=candidates
+                    )
+                    try:
+                        engine.run_telegram_worker()
+                    except KeyboardInterrupt:
+                        print(f"\n  {ANSI.YELLOW}Arrêt demandé par l'utilisateur...{ANSI.RESET}")
+                        engine.stop_requested = True
+                    finally:
+                        engine.browser_bot.stop_driver()
+                    input(f"\n  Appuyez sur {ANSI.BOLD}Entrée{ANSI.RESET} pour revenir au sous-menu...")
+                elif tg_sub == "2":
+                    if TelegramAuthManager:
+                        TelegramAuthManager.show_interactive_menu(client, candidates, cfg)
+                    else:
+                        print(f"\n  {ANSI.RED}Module TelegramAuthManager non disponible.{ANSI.RESET}")
+                        time.sleep(2)
+                elif tg_sub in ["3", "q", "retour", "exit"]:
+                    break
+
+        elif choice in ["3", "token"]:
+            UI.clear_screen()
+            UI.header("🔑 CONFIGURATION DU TOKEN PR.SOCIAL")
+            new_t = input(f"  Collez votre nouveau Token : ").strip()
+            if new_t:
+                if new_t.startswith("token="):
+                    new_t = new_t[6:]
+                token = new_t.strip()
+                cfg["token"] = token
+                try:
+                    for cf_path in set([config_file, candidates[0]]):
+                        if os.path.dirname(cf_path): os.makedirs(os.path.dirname(cf_path), exist_ok=True)
+                        with open(cf_path, "w", encoding="utf-8") as f:
+                            json.dump(cfg, f, indent=2)
+                except Exception:
+                    pass
+                client.update_token(token, cf)
+                print(f"\n  {ANSI.GREEN}✓ Token mis à jour avec succès !{ANSI.RESET}")
+            else:
+                print(f"\n  {ANSI.GRAY}Annulé.{ANSI.RESET}")
+            time.sleep(1.5)
+
+        elif choice in ["4", "surf", "web"]:
+            if st != 200:
+                print(f"\n  {ANSI.RED}Veuillez d'abord configurer un Token valide (Option 6).{ANSI.RESET}")
                 time.sleep(2)
                 continue
 
@@ -1785,9 +2104,9 @@ def main():
                 engine.browser_bot.stop_driver()
             input(f"\n  Appuyez sur {ANSI.BOLD}Entrée{ANSI.RESET} pour revenir au menu...")
 
-        elif choice == "3":
+        elif choice in ["5", "recup"]:
             if st != 200:
-                print(f"\n  {ANSI.RED}Veuillez d'abord configurer un Token valide (Option 4).{ANSI.RESET}")
+                print(f"\n  {ANSI.RED}Veuillez d'abord configurer un Token valide (Option 6).{ANSI.RESET}")
                 time.sleep(2)
                 continue
 
@@ -1874,29 +2193,7 @@ def main():
                 print(f"\n  {ANSI.RED}Erreur : {e}{ANSI.RESET}")
                 input(f"  Appuyez sur {ANSI.BOLD}Entrée{ANSI.RESET} pour continuer...")
 
-        elif choice == "4":
-            UI.clear_screen()
-            UI.header("🔑 CONFIGURATION DU TOKEN PR.SOCIAL")
-            new_t = input(f"  Collez votre nouveau Token : ").strip()
-            if new_t:
-                if new_t.startswith("token="):
-                    new_t = new_t[6:]
-                token = new_t.strip()
-                cfg["token"] = token
-                try:
-                    for cf_path in set([config_file, candidates[0]]):
-                        if os.path.dirname(cf_path): os.makedirs(os.path.dirname(cf_path), exist_ok=True)
-                        with open(cf_path, "w", encoding="utf-8") as f:
-                            json.dump(cfg, f, indent=2)
-                except Exception:
-                    pass
-                client.update_token(token, cf)
-                print(f"\n  {ANSI.GREEN}✓ Token mis à jour avec succès !{ANSI.RESET}")
-            else:
-                print(f"\n  {ANSI.GRAY}Annulé.{ANSI.RESET}")
-            time.sleep(1.5)
-
-        elif choice in ["5", "ig", "insta", "instagram"]:
+        elif choice in ["6", "7", "ig", "insta", "instagram"]:
             UI.clear_screen()
             UI.header("📷 CONFIGURATION DES COOKIES INSTAGRAM")
             print(f"  {ANSI.WHITE}Vous avez exporté vos cookies avec {ANSI.GREEN}{ANSI.BOLD}PR Cookie Helper{ANSI.RESET}{ANSI.WHITE} ?{ANSI.RESET}")
@@ -1975,9 +2272,9 @@ def main():
                 print(f"\n  {ANSI.GRAY}Annulé.{ANSI.RESET}")
             input(f"\n  Appuyez sur {ANSI.BOLD}Entrée{ANSI.RESET} pour revenir au menu...")
 
-        elif choice == "6":
+        elif choice in ["7", "8", "autofix", "fix"]:
             if st != 200:
-                print(f"\n  {ANSI.RED}Veuillez d'abord configurer un Token valide (Option 4).{ANSI.RESET}")
+                print(f"\n  {ANSI.RED}Veuillez d'abord configurer un Token valide (Option 3).{ANSI.RESET}")
                 time.sleep(2)
                 continue
 
@@ -2023,7 +2320,7 @@ def main():
 
             input(f"\n  Appuyez sur {ANSI.BOLD}Entrée{ANSI.RESET} pour revenir au menu...")
 
-        elif choice in ["7", "exit", "quit", "q"]:
+        elif choice in ["8", "9", "exit", "quit", "q"]:
             break
 
     os.system('cls' if os.name == 'nt' else 'clear')

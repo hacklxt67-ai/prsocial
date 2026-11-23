@@ -1,71 +1,69 @@
-# 🚀 PR.Social Bot - Automatisation PC & Android Termux
+# 🚀 PR.Social Bot v3.2 - Automatisation Windows & Android Termux
 
-Solution complète d'automatisation intelligente pour **PR.Social**, compatible avec les ordinateurs **Windows** et les smartphones **Android (Termux)**.
+Solution complète d'automatisation intelligente et silencieuse pour **PR.Social**, 100% compatible avec les ordinateurs **Windows** et les smartphones **Android (Termux)**.
 
 ---
 
-## 📱 1. Guide Rapide Android (Termux)
+## 💻 1. Guide d'Installation & Démarrage sur Windows (Débutant)
 
-Faites tourner le bot 24h/24 directement sur votre téléphone Android sans laisser votre PC allumé.
+### Étape 1 : Prérequis
+- Installez **Python 3.10+** depuis le site officiel [python.org](https://www.python.org/downloads/).
+- ⚠️ **Important :** Lors de l'installation, cochez bien la case **"Add Python to PATH"**.
 
-### ⚡ A. Installation Complète en 1 Ligne (Pour Débutant)
+### Étape 2 : Installation en 1 Clic
+1. Téléchargez ou clonez le projet dans un dossier sur votre PC.
+2. Double-cliquez sur le fichier :
+   ```cmd
+   INSTALLER_WINDOWS.bat
+   ```
+   *Ce script vérifie Python, installe automatiquement `requests` et `Pillow`, et prépare votre fichier de configuration.*
+
+### Étape 3 : Lancement du Bot
+Double-cliquez simplement sur :
+```cmd
+LANCER_BOT_WINDOWS.bat
+```
+Ou dans un terminal :
+```cmd
+python run_bot.py
+```
+
+---
+
+## 📱 2. Guide d'Installation sur Android (Termux)
+
+Faites tourner le bot 24h/24 directement sur votre smartphone sans laisser votre PC allumé.
+
+### ⚡ Installation Complète en 1 Ligne (Pour Débutant)
 Ouvrez l'application **Termux** et collez cette commande unique :
 
 ```bash
-pkg update -y && pkg install -y git python && git clone https://github.com/hacklxt67-ai/prsocial.git && cd prsocial && pip install requests pillow && python pc_bot/http_action_engine.py
+pkg update -y && pkg install -y git python python-pillow && git clone https://github.com/hacklxt67-ai/prsocial.git && cd prsocial && pip install -r requirements.txt && python run_bot.py
 ```
 
-Cette commande installe automatiquement :
-- Python et Git sur Termux.
-- Les dépendances nécessaires (`requests`, `Pillow`).
-- Télécharge le projet et lance directement le bot interactif.
-
----
-
-### 🔄 B. Mise à Jour Rapide & Exécution (Pour Utilisateur Déjà Installé)
-Si vous avez déjà le bot sur votre téléphone, collez cette commande pour récupérer toutes les dernières mises à jour (Instagram, anti-quarantaine, etc.) et le lancer :
+### 🔄 Mise à Jour Rapide & Relance (Pour Utilisateur Déjà Installé)
+Si vous avez déjà cloné le projet sur Termux, tapez simplement :
 
 ```bash
-cd ~/prsocial && git fetch origin main && git reset --hard origin/main && python pc_bot/http_action_engine.py
+cd ~/prsocial && git pull && python run_bot.py
 ```
 
----
-
-### 🎮 C. Commandes de Lancement
-
-Depuis Termux, vous disposez de deux commandes directes :
-
-#### 1. Menu Principal Complet
+### 🎮 Lancement Quotidien sur Termux
+Depuis le dossier `prsocial`, lancez :
 ```bash
-./lancer_bot.sh
+./lancer_termux.sh
 ```
-Ce menu interactif propose :
-- **`[1]` Start Tout** : Démarre l'exécution continue de toutes les tâches courantes avec déblocage auto des tâches orphelines.
-- **`[2]` Récupérer & Réessayer les Tâches Rejetées** : Analyse vos tâches rejetées, filtre les motifs et les réexécute en Mode Strict.
-- **`[3]` Comptes Liés** : Affiche vos profils approuvés sur PR.Social.
-- **`[4]` Changer de Cookie / Déconnexion** : Réinitialise la session pour changer de compte.
-- **`[5]` Quitter Bot**
-
-#### 2. Récupération Directe 1-Clic des Tâches Rejetées
-Pour relancer directement la récupération des rejets sans passer par le bot classique :
+Ou :
 ```bash
-./recuperer_rejets.sh
+python run_bot.py
 ```
 
 ---
 
-### 🔄 C. Forcer la Mise à Jour sur Termux
-Copiez et collez cette commande dans **Termux** pour synchroniser instantanément le bot avec les dernières nouveautés de GitHub :
+## 🔋 3. Tourner 24h/24 Écran Éteint sur Téléphone (Termux)
 
-```bash
-cd ~/prsocial && git fetch origin && git reset --hard origin/main && cd termux_bot && bash install_termux.sh
-```
-
----
-
-### 🔋 D. Laisser Tourner le Bot 24h/24 Écran Éteint
 Pour empêcher Android de mettre Termux en veille :
-1. Dans Termux, tapez :
+1. Dans Termux, activez le maintien en éveil :
    ```bash
    termux-wake-lock
    ```
@@ -74,69 +72,38 @@ Pour empêcher Android de mettre Termux en veille :
 
 ---
 
-## ☁️ 2. Hébergement 24h/24 Gratuit sur GitHub Actions
+## 📋 4. Fonctionnalités & Menu v3.2
 
-Vous pouvez faire tourner le bot **100% en arrière-plan sans laisser aucun appareil allumé** grâce à GitHub Actions.
-
-### 🔑 Configuration en 2 minutes :
-1. Sur la page de votre dépôt GitHub, cliquez sur **Settings** (en haut à droite).
-2. Dans le menu de gauche, allez dans **Secrets and variables** > **Actions**.
-3. Cliquez sur le bouton vert **New repository secret**.
-4. Définissez :
-   - **Name** : `PR_TOKEN`
-   - **Secret** : Collez votre Cookie ou Token de session PR.Social.
-5. *(Optionnel)* Créez un second secret `PR_CF_CLEARANCE` si votre compte utilise la protection Cloudflare.
-
-### 🚀 Fonctionnement :
-- **Automatique 24h/24** : GitHub Actions lance automatiquement le bot toutes les 25 minutes pour récupérer vos gains.
-- **Lancement Manuel 1-Clic** : Allez dans l'onglet **Actions** sur GitHub > cliquez sur **PR.Social 24/7 Automation Bot** > **Run workflow**.
-
----
-
-## 💻 3. Guide Rapide PC (Windows)
-
-### ⚡ Installation Rapide des Dépendances
-Double-cliquez sur :
 ```text
-INSTALLER_DEPENDANCES_PC.cmd
+  ╔══ ⚡MENU PRINCIPAL · MODE SILENCIEUX (v3.2) ═══════════════════════╗
+  ║                                                                    ║
+  ║  [ 1 ] 🚀 START        Lancer (Tâches Réseaux Sociaux)             ║
+  ║  [ 2 ] ⚡ TG WORKER    PR Worker Telegram (Lancer / Lier Compte)   ║
+  ║  [ 3 ] 🔑 TOKEN        Changer / Vérifier Token PR.Social          ║
+  ║  [ 4 ] 🌐 SURF WEBSITE  Auto-Surfeur (Sites Web)                   ║
+  ║  [ 5 ] 🔄 RÉCUPÉRER    Scanner & Réessayer Tâches Rejetées         ║
+  ║  [ 6 ] 📷 COOKIE INSTA Coller / Activer Cookie Instagram (APK)     ║
+  ║  [ 7 ] 🛠️  AUTO-FIX     Auto-Complétion Profils (Anti-Ban)         ║
+  ║  [ 8 ] ❌ EXIT         Fermer                                      ║
+  ║                                                                    ║
+  ╚════════════════════════════════════════════════════════════════════╝
 ```
-Ce script vérifie Python, installe les bibliothèques (`selenium`, `customtkinter`, `requests`, `Pillow`) et vérifie Google Chrome.
 
-### 🎮 Lancement sur PC
-- **Interface Graphique Moderne (GUI)** : double-cliquez sur `LANCER_PR_SOCIAL_PC.bat`
-- **Menu Terminal Interactif** : double-cliquez sur `LANCER_MENU_TERMINAL.bat`
-- **Récupération des Tâches Rejetées** : double-cliquez sur `RECUPERER_REJETS.bat`
-- **Mode 100% Silencieux / Arrière-Plan** : double-cliquez sur `LANCER_BOT_PUR_HTTP.bat`
+- **Option [ 1 ] START (Sous-menu ciblé) :**
+  - `[ 1 ] 📷 Instagram Seul` : Actions directes et indépendantes via Cookie Instagram.
+  - `[ 2 ] 🌐 Tous Réseaux Sociaux` : Traite tous les réseaux (YouTube, Twitter/X, TikTok, Threads, Reddit, etc.) **sauf** Instagram.
+  - `[ 3 ] ⚡ Mix Total` : Traite tous les réseaux y compris Instagram.
+- **Option [ 2 ] TG WORKER :**
+  - `[ 1 ] 🚀 Lancer le Worker` : Exécution ultra-rapide des tâches Telegram (0s de délai).
+  - `[ 2 ] ✈️ Associer Compte Telegram` : Lier votre compte Telegram facilement.
+- **Vérification Stricte Anti-Rejet :**
+  - Preuves certifiées d'écran WebP optimisées avec horodatage et hash anti-doublon.
+  - Protection automatique contre l'annulation des tâches en cours de vérification.
+  - Bouclier anti-quarantaine et détection des pauses de sécurité.
 
 ---
 
-## 🛡️ Fonctionnalités & Sécurité Anti-Ban
+## 🔒 5. Sécurité des Identifiants
 
-- **Moteur de Récupération Strict des Tâches Rejetées** : Diagnostic précis (screenshot dupliqué, compte non lié, etc.) et réexécution sécurisée.
-- **Preuve Visuelle HD à Hash Unique** : Modification perceptuelle invisible pour éviter tout rejet pour "capture dupliquée".
-- **Rotation Dynamique des User-Agents & Client Hints (Sec-CH-UA)** : Empreintes de navigateur réalistes alternées périodiquement.
-- **Déblocage Automatique des Tâches Orphelines** : Annulation proactive des tâches bloquantes pour ne jamais geler le bot.
-- **Interleaving Intelligent** : Alternance dynamique des actions (Follow, Like, Comment) et radar de présence de tâches sur le serveur.
-- **Multi-Réseaux Pris en Charge** : Threads, Reddit, Pinterest, SoundCloud, Bluesky, TikTok, Instagram, YouTube, Facebook, LinkedIn, Twitter, Telegram, Spotify, Snapchat, Discord, GitHub.
-
----
-
-## 🌐 4. Serveur de Licences & Administration Web (SaaS)
-
-Pour commercialiser l'accès au bot (2 USD / 7 jours via MVola & USDT) :
-
-### 🚀 Lancement Rapide du Serveur
-Double-cliquez sur :
-```text
-LANCER_SERVEUR_LICENCE.bat
-```
-- **Dashboard Web Administrateur** : `http://127.0.0.1:8000`
-- **Documentation API Interactive (Swagger)** : `http://127.0.0.1:8000/docs`
-- **Identifiants Admin par défaut** : `admin` / `Admin1234!`
-
-### ✨ Fonctionnalités Administrateur
-- **Génération de Clés 1-Clic** : Créez des clés de licence hebdomadaires (format `PR-XXXX-XXXX-XXXX`).
-- **Verrouillage Matériel (Device ID)** : Chaque licence est automatiquement liée au smartphone de l'acheteur.
-- **Validation des Paiements MVola & USDT** : Validez les références de transaction en un clic pour générer ou prolonger l'accès du client.
-- **Prolongation Intelligente (+7 jours)** : Ajout automatique de 7 jours à la date d'expiration pour les renouvellements anticipés.
-
+- Vos cookies et jetons d'accès restent stockés localement dans votre fichier `config.json` sur votre appareil.
+- Le fichier `config.json` est automatiquement ignoré par `.gitignore` pour éviter toute fuite accidentelle sur GitHub.

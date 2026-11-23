@@ -1,0 +1,14 @@
+{
+  "token": "VOTRE_TOKEN_PR_SOCIAL_ICI",
+  "cf_clearance": "",
+  "instagram_cookies": {
+    "sessionid": "",
+    "csrftoken": "",
+    "ds_user_id": ""
+  },
+  "youtube_cookies": "",
+  "tiktok_cookies": "",
+  "delay_min": 1,
+  "delay_max": 2,
+  "license_key": ""
+}

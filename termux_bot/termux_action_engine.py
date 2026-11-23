@@ -43,6 +43,19 @@ try:
 except ImportError:
     from termux_bot.license_client import TermuxLicenseClient
 
+try:
+    from telegram_worker_engine import TelegramWorkerEngine, TelegramAuthManager
+except ImportError:
+    try:
+        from pc_bot.telegram_worker_engine import TelegramWorkerEngine, TelegramAuthManager
+    except ImportError:
+        try:
+            sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            from telegram_worker_engine import TelegramWorkerEngine, TelegramAuthManager
+        except ImportError:
+            TelegramWorkerEngine = None
+            TelegramAuthManager = None
+
 # Couleurs ANSI
 RESET = "\033[0m"
 BOLD = "\033[1m"
@@ -147,6 +160,8 @@ class TermuxBotApp:
         self.current_balance = 0.0
         self.approved_accounts = {}
         self.failed_tasks = set()
+        self.recently_validated_tasks = set()
+        self.submitted_tasks = {}
         self.rejected_manager = TermuxRejectedTasksManager(self.api, self.browser)
         self.license_client = TermuxLicenseClient()
         self.is_licensed = False
@@ -169,7 +184,7 @@ class TermuxBotApp:
   ██╔═══╝ ██╔══██╗╚════╝╚════██║██║   ██║██║     ██║██╔══██║██║     
   ██║     ██║  ██║      ███████║╚██████╔╝╚██████╗██║██║  ██║███████╗
   ╚═╝     ╚═╝  ╚═╝      ╚══════╝ ╚═════╝  ╚═════╝╚═╝╚═╝  ╚═╝╚══════╝
-           {MAGENTA}⚡ ANDROID TERMUX EDITION • v3.1 ⚡{RESET}""")
+           {MAGENTA}⚡ ANDROID TERMUX EDITION • v3.2 ⚡{RESET}""")
 
     def verify_login(self) -> bool:
         if not self.token:
@@ -196,14 +211,36 @@ class TermuxBotApp:
         return False
 
     def auto_unblock_tasks(self) -> int:
-        """Détecte et annule immédiatement toute tâche orpheline bloquante."""
+        """Détecte et annule immédiatement toute tâche orpheline bloquante sans toucher aux tâches soumises ou validées."""
         st, data = self.api.get_active_tasks()
         if st != 200:
             return 0
         items = data.get("items", [])
         cancelled = 0
+        now_ts = time.time()
+        val_set = getattr(self, "recently_validated_tasks", set())
+        sub_dict = getattr(self, "submitted_tasks", {})
+
         for it in items:
             tid = it.get("order_id") or it.get("id")
+            # 1. Ne JAMAIS annuler une tâche ayant déjà une capture transmise
+            if it.get("screenshot_path") or it.get("status") in ["pending_review", "checking", "approved"]:
+                continue
+
+            # 2. Ne JAMAIS annuler une tâche récemment validée ou soumise (< 300s)
+            if tid and (tid in val_set or str(tid) in val_set):
+                continue
+            try:
+                if tid and int(tid) in val_set:
+                    continue
+            except Exception:
+                pass
+
+            sub_t = sub_dict.get(tid) or sub_dict.get(str(tid))
+            if sub_t and (now_ts - sub_t < 300):
+                continue
+
+            # 3. Libération uniquement de la vraie tâche orpheline non soumise
             if tid:
                 c_st, c_res = self.api.cancel_task(tid)
                 if c_st == 200 and c_res.get("ok"):
@@ -285,42 +322,70 @@ class TermuxBotApp:
             ig_str = f"{GREEN}{BOLD}@{u_ig} (Direct API Actif){RESET}"
         else:
             ig_str = f"{YELLOW}En attente de cookies (PR Cookie Helper){RESET}"
+            
+        tg_u, tg_src = TelegramAuthManager.get_active_account(self.api, self.config) if TelegramAuthManager else ("", "")
+        if tg_u:
+            tg_str = f"{GREEN}{BOLD}@{tg_u}{RESET} ({tg_src})"
+        else:
+            tg_str = f"{YELLOW}Non configuré (Option [4]){RESET}"
+
         print(f"\n{BLUE}╭─────────────────────────────────────────────────────────────╮{RESET}")
         print(f"{BLUE}│{RESET}  👤 {WHITE}Utilisateur connecté :{RESET} {GREEN}{BOLD}@{self.current_user:<31}{RESET} {BLUE}│{RESET}")
         print(f"{BLUE}│{RESET}  💰 {WHITE}Solde actuel         :{RESET} {YELLOW}{BOLD}{bal_str:<32}{RESET} {BLUE}│{RESET}")
         print(f"{BLUE}│{RESET}  🛡️  {WHITE}Licence Bot (7j)     :{RESET} {lic_str:<42} {BLUE}│{RESET}")
         print(f"{BLUE}│{RESET}  📷 {WHITE}Instagram Cookie     :{RESET} {ig_str:<42} {BLUE}│{RESET}")
+        print(f"{BLUE}│{RESET}  ✈️ {WHITE}Telegram Associé     :{RESET} {tg_str:<42} {BLUE}│{RESET}")
         print(f"{BLUE}│{RESET}  🕒 {WHITE}Date et Heure        :{RESET} {CYAN}{now_str:<32}{RESET} {BLUE}│{RESET}")
         print(f"{BLUE}╰─────────────────────────────────────────────────────────────╯{RESET}")
 
-        # Menu à 6 choix clairs
+        # Menu à 9 choix clairs
         print(f"\n{CYAN}┌─────────────────────────────────────────────────────────────┐{RESET}")
         print(f"{CYAN}│{RESET}  {GREEN}{BOLD}[1]{RESET} 🚀 {WHITE}{BOLD}Start Tout (Auto-Bot + Déblocage Auto Tâches){RESET}       {CYAN}│{RESET}")
         print(f"{CYAN}│{RESET}  {MAGENTA}{BOLD}[2]{RESET} 🔄 {WHITE}{BOLD}Récupérer & Réessayer les Tâches Rejetées{RESET}         {CYAN}│{RESET}")
-        print(f"{CYAN}│{RESET}  {CYAN}{BOLD}[3]{RESET} 🔗 {WHITE}Comptes Liés{RESET}                                          {CYAN}│{RESET}")
-        print(f"{CYAN}│{RESET}  {YELLOW}{BOLD}[4]{RESET} 🔑 {WHITE}Changer de Cookie / Déconnexion{RESET}                       {CYAN}│{RESET}")
-        print(f"{CYAN}│{RESET}  {BLUE}{BOLD}[5]{RESET} 🛡️ {WHITE}{BOLD}Gestion Licence & Paiements (MVola & USDT){RESET}      {CYAN}│{RESET}")
-        print(f"{CYAN}│{RESET}  {MAGENTA}{BOLD}[6]{RESET} 🛠️ {WHITE}{BOLD}Auto-Complétion & Réparation Profils (Anti-Ban){RESET}{CYAN}│{RESET}")
-        print(f"{CYAN}│{RESET}  {RED}{BOLD}[7]{RESET} 🚪 {WHITE}Quitter Bot{RESET}                                           {CYAN}│{RESET}")
+        print(f"{CYAN}│{RESET}  {YELLOW}{BOLD}[3]{RESET} ⚡ {WHITE}{BOLD}PR Worker Telegram (Mode Rapide APK - Radar 0s){RESET}  {CYAN}│{RESET}")
+        print(f"{CYAN}│{RESET}  {BLUE}{BOLD}[4]{RESET} ✈️ {WHITE}{BOLD}Associer / Configurer Compte Telegram (Login/Pseudo){RESET}{CYAN}│{RESET}")
+        print(f"{CYAN}│{RESET}  {CYAN}{BOLD}[5]{RESET} 🔗 {WHITE}Comptes Liés{RESET}                                          {CYAN}│{RESET}")
+        print(f"{CYAN}│{RESET}  {YELLOW}{BOLD}[6]{RESET} 🔑 {WHITE}Changer de Cookie / Déconnexion{RESET}                       {CYAN}│{RESET}")
+        print(f"{CYAN}│{RESET}  {BLUE}{BOLD}[7]{RESET} 🛡️ {WHITE}{BOLD}Gestion Licence & Paiements (MVola & USDT){RESET}      {CYAN}│{RESET}")
+        print(f"{CYAN}│{RESET}  {MAGENTA}{BOLD}[8]{RESET} 🛠️ {WHITE}{BOLD}Auto-Complétion & Réparation Profils (Anti-Ban){RESET}{CYAN}│{RESET}")
+        print(f"{CYAN}│{RESET}  {RED}{BOLD}[9]{RESET} 🚪 {WHITE}Quitter Bot{RESET}                                           {CYAN}│{RESET}")
         print(f"{CYAN}└─────────────────────────────────────────────────────────────┘{RESET}")
 
-        choice = input(f"\n{BOLD}Votre choix [1-7] : {RESET}").strip()
+        choice = input(f"\n{BOLD}Votre choix [1-9] : {RESET}").strip()
 
-        # Protection stricte par licence pour les fonctions [1] et [2]
-        if choice in ["1", "2"] and not self.is_licensed:
+        # Protection stricte par licence pour les fonctions [1], [2] et [3]
+        if choice in ["1", "2", "3"] and not self.is_licensed:
             print(f"\n{RED}{BOLD}⛔ ACCÈS BLOQUÉ : LICENCE HEBDOMADAIRE REQUISE (2 USD / 7 JOURS){RESET}")
             print(f"{YELLOW}Cette fonctionnalité est réservée aux utilisateurs disposant d'une licence active.{RESET}")
-            print(f"{CYAN}Allez dans le menu [5] pour activer une clé ou payer via MVola / USDT.{RESET}")
+            print(f"{CYAN}Allez dans le menu [7] pour activer une clé ou payer via MVola / USDT.{RESET}")
             time.sleep(3.0)
             return
 
         if choice == "1":
-            self.start_all_tasks()
+            print(f"\n{CYAN}┌── 🚀 CHOIX DU MODE D'EXÉCUTION ─────────────────────────────┐{RESET}")
+            print(f"{CYAN}│{RESET}  {MAGENTA}{BOLD}[1]{RESET} 📷 {WHITE}Instagram Seul (Mode Indépendant Direct Cookie){RESET}     {CYAN}│{RESET}")
+            print(f"{CYAN}│{RESET}  {GREEN}{BOLD}[2]{RESET} 🌐 {WHITE}Tous les Réseaux Sociaux (SAUF Instagram){RESET}          {CYAN}│{RESET}")
+            print(f"{CYAN}│{RESET}  {CYAN}{BOLD}[3]{RESET} ⚡ {WHITE}Mix Total (Tous les Réseaux + Instagram){RESET}          {CYAN}│{RESET}")
+            print(f"{CYAN}│{RESET}  {RED}{BOLD}[4]{RESET} 🔙 {WHITE}Retour Menu Principal{RESET}                                {CYAN}│{RESET}")
+            print(f"{CYAN}└─────────────────────────────────────────────────────────────┘{RESET}")
+            sub_1 = input(f"{BOLD}Votre sélection [1-4] : {RESET}").strip().lower()
+            if sub_1 in ["1", "insta", "instagram"]:
+                self.start_all_tasks(platforms=["instagram"])
+            elif sub_1 in ["2", "all", "tous"]:
+                self.start_all_tasks(platforms="non_instagram")
+            elif sub_1 in ["3", "mix"]:
+                self.start_all_tasks(platforms=None)
+            else:
+                return
         elif choice == "2":
             self.recover_rejected_tasks()
         elif choice == "3":
-            self.show_linked_accounts()
+            self.start_telegram_worker()
         elif choice == "4":
+            self.manage_telegram_account()
+        elif choice == "5":
+            self.show_linked_accounts()
+        elif choice == "6":
             print(f"\n{YELLOW}Déconnexion en cours...{RESET}")
             clear_saved_session()
             self.token = ""
@@ -331,14 +396,52 @@ class TermuxBotApp:
             self.api.update_credentials("", "")
             print(f"{GREEN}✓ Déconnecté. La session précédente a été réinitialisée.{RESET}")
             time.sleep(1.5)
-        elif choice == "5":
-            self.show_license_menu()
-        elif choice == "6":
-            self.auto_complete_profiles()
         elif choice == "7":
+            self.show_license_menu()
+        elif choice == "8":
+            self.auto_complete_profiles()
+        elif choice == "9":
             print(f"\n{CYAN}Arrêt du bot. À bientôt ! 👋{RESET}\n")
             self.browser.stop_driver()
             sys.exit(0)
+
+    def start_telegram_worker(self):
+        clear_screen()
+        self.print_logo()
+        
+        tg_user = ""
+        if TelegramAuthManager:
+            tg_user, _ = TelegramAuthManager.get_active_account(self.api, self.config)
+        else:
+            tg_acc = self.approved_accounts.get("telegram", {})
+            tg_user = tg_acc.get("username", "")
+
+        if not TelegramWorkerEngine:
+            print(f"\n{RED}Module TelegramWorkerEngine introuvable.{RESET}")
+            time.sleep(2)
+            return
+
+        print(f"\n{GREEN}{BOLD}🚀 LANCEMENT DE L'ENGINE PR WORKER TELEGRAM RAPIDE...{RESET}")
+        worker = TelegramWorkerEngine(
+            api_client=self.api,
+            browser_bot=self.browser,
+            telegram_username=tg_user
+        )
+        worker.run_radar_loop()
+
+    def manage_telegram_account(self):
+        clear_screen()
+        self.print_logo()
+        if TelegramAuthManager:
+            TelegramAuthManager.show_interactive_menu(
+                api_client=self.api,
+                config_paths=[CONFIG_PATH_LOCAL, CONFIG_PATH_HOME],
+                config_dict=self.config
+            )
+            self.config = load_config()
+        else:
+            print(f"\n{RED}Module TelegramAuthManager introuvable.{RESET}")
+            time.sleep(2)
 
     def auto_complete_profiles(self):
         clear_screen()
@@ -512,7 +615,7 @@ class TermuxBotApp:
         return interleaved
 
     # ==========================================================================
-    def start_all_tasks(self):
+    def start_all_tasks(self, platforms: Optional[List[str]] = None):
         clear_screen()
         self.print_logo()
         print(f"\n{GREEN}{BOLD}🚀 DÉMARRAGE DU BOT AUTOMATIQUE (CTRL+C POUR REVENIR AU MENU){RESET}\n")
@@ -579,7 +682,15 @@ class TermuxBotApp:
             "linkedin": 25,
         }
         all_plat_sorted = sorted(list(FAST_AI_PRIORITY.keys()), key=lambda k: FAST_AI_PRIORITY[k])
-        target_platforms = list(self.approved_accounts.keys()) or all_plat_sorted
+        if platforms == ["instagram"] or platforms == "instagram":
+            target_platforms = ["instagram"]
+        elif platforms == ["non_instagram"] or platforms == "non_instagram":
+            target_platforms = [p for p in self.approved_accounts.keys() if p.lower() != "instagram"] or [p for p in all_plat_sorted if p != "instagram"]
+        elif isinstance(platforms, list) and platforms:
+            target_platforms = platforms
+        else:
+            target_platforms = list(self.approved_accounts.keys()) or all_plat_sorted
+
         # Tolérance zéro : Uniquement les plateformes ayant un compte explicitement approuvé
         active_list = [p for p in target_platforms if p in self.approved_accounts and p not in quarantined_platforms]
         # Tri prioritaire IA Visuelle Haute Vitesse (<30s)
@@ -603,6 +714,8 @@ class TermuxBotApp:
         STRICT_PAUSE_PLATFORMS = {"tiktok", "youtube"}
         platform_hourly_history: Dict[str, list] = {p: [] for p in STRICT_PAUSE_PLATFORMS}
         platform_cooldowns: Dict[str, float] = {}
+        action_cooldowns: Dict[Tuple[str, str], float] = {}
+        self.recently_validated_tasks: set = set()
         IG_ACTION_LIMITS = {
             "follow": 48,
             "like": 95,
@@ -639,6 +752,8 @@ class TermuxBotApp:
                     # Vérification cooldown et limite horaire stricte
                     if now_ts < platform_cooldowns.get(plat, 0):
                         continue
+                    if now_ts < action_cooldowns.get((plat, (t.get("action") or "").lower()), 0):
+                        continue
 
                     if plat == "instagram":
                         for act_k in ig_hourly_actions:
@@ -666,9 +781,11 @@ class TermuxBotApp:
                                 if isinstance(exhausted, list):
                                     for ep in exhausted:
                                         if isinstance(ep, dict) and ep.get("platform", "").lower() == plat.lower():
-                                            exhausted_actions.add(ep.get("action", "").lower())
-                                            retry_min = int(ep.get("retry_after_min") or 10)
-                                            platform_cooldowns[plat] = time.time() + (retry_min * 60)
+                                            act_e = (ep.get("action") or "").lower()
+                                            if act_e:
+                                                exhausted_actions.add(act_e)
+                                                retry_min = int(ep.get("retry_after_min") or 10)
+                                                action_cooldowns[(plat, act_e)] = time.time() + (retry_min * 60)
 
                                 p_tasks = data_p.get("tasks", [])
                                 if not p_tasks:
@@ -716,6 +833,8 @@ class TermuxBotApp:
 
                     if now_ts < platform_cooldowns.get(plat, 0):
                         continue
+                    if now_ts < action_cooldowns.get((plat, (t.get("action") or "").lower()), 0):
+                        continue
 
                     action = (t.get("action") or "FOLLOW").upper()
                     reward = float(t.get("worker_reward") or t.get("cost_per_task") or 0.0)
@@ -741,7 +860,13 @@ class TermuxBotApp:
                     st_start, res_start = self.api.start_task(task_id, social_account_id=acc_id)
                     if st_start != 200 or not res_start.get("ok"):
                         err_msg = str(res_start.get("error", "Erreur"))
-                        print(f"  {RED}✖ Échec démarrage (#{task_id} [{plat.upper()}]): {err_msg}{RESET}")
+                        is_busy = any(k in err_msg.lower() for k in ["все места", "places", "not found", "inactive", "уже выполн", "slots_taken"])
+                        if is_busy:
+                            sys.stdout.write(f"\r  {CYAN}⠼ Créneau #{task_id} [{plat.upper()}] complet · Radar actif...{RESET}\r")
+                            sys.stdout.flush()
+                        else:
+                            print(f"  {RED}✖ Échec démarrage (#{task_id} [{plat.upper()}]): {err_msg}{RESET}")
+
                         if "wait" in err_msg.lower() and ("second" in err_msg.lower() or "s before" in err_msg.lower()):
                             time.sleep(2.5)
                         elif "active task" in err_msg.lower() or "task_in_progress" in err_msg.lower():
@@ -749,9 +874,6 @@ class TermuxBotApp:
                             self.auto_unblock_tasks()
                             time.sleep(1)
                         self.failed_tasks.add(task_id)
-                        consecutive_busy_by_plat[plat] = consecutive_busy_by_plat.get(plat, 0) + 1
-                        if consecutive_busy_by_plat[plat] >= 8:
-                            platform_cooldowns[plat] = time.time() + 60
                         continue
 
                     consecutive_busy_by_plat[plat] = 0
@@ -795,9 +917,10 @@ class TermuxBotApp:
                         self.failed_tasks.add(task_id)
                         continue
 
-                    wait_sec = int(res_start.get("submit_after_sec") or 5)
+                    t_start_action = time.time()
+                    wait_sec = int(res_start.get("submit_after_sec") or 3)
                     if plat in renewed_platforms:
-                        wait_sec = max(wait_sec, 6)
+                        wait_sec = max(wait_sec, 4)
                     api_check = res_start.get("api_check_enabled", 0)
 
                     # Préparation rigoureuse du commentaire si l'action est un commentaire
@@ -852,6 +975,18 @@ class TermuxBotApp:
                     worker_user = self.approved_accounts.get(plat, {}).get("username")
                     is_valid = False
 
+                    # 0. EXÉCUTION INSTANTANÉE PR WORKER TELEGRAM (0s Délai & Auto-Validation)
+                    if plat == "telegram" and TelegramWorkerEngine:
+                        tw_engine = TelegramWorkerEngine(self.api, self.browser, worker_user)
+                        ok_tw, rew_tw, msg_tw = tw_engine.execute_single_task(t)
+                        if ok_tw:
+                            self.success_count += 1
+                            self.total_earned += rew_tw
+                            continue
+                        else:
+                            self.failed_tasks.add(task_id)
+                            continue
+
                     # 1. ACTION DIRECTE INSTAGRAM PAR COOKIE OFFICIEL (Anti-Rejet & Anti-Pause 24h)
                     if plat == "instagram" and self.ig_client and self.ig_client.logged_in:
                         if "follow" in action.lower():
@@ -888,45 +1023,46 @@ class TermuxBotApp:
                             else:
                                 print(f"  {YELLOW}ℹ️ Direct Like : {ig_msg}. Repli sur capture certifiée...{RESET}")
 
-                    # NOUVEAU SYSTÈME PR.SOCIAL : Vérification automatique 'Confirmer' sans capture (Instagram, etc.)
+                    # VÉRIFICATION STRICTE & PREUVE GARANTIE :
+                    # Seules les actions Telegram (APK worker) ou Instagram (avec direct API follow/like validé)
+                    # peuvent se passer d'upload de capture.
+                    # Pour tous les autres réseaux (Twitter/X, YouTube, TikTok, Threads, Reddit, LinkedIn, SoundCloud, etc.),
+                    # la capture certifiée est OBLIGATOIRE pour obtenir le paiement de PR.Social !
                     if not is_valid:
-                        # En mode requête pure : ne pas appeler api_check_task sur TikTok ni sur Instagram quand le follow direct a échoué
-                        if plat == "tiktok":
-                            api_check_active = False
-                        elif plat == "instagram" and self.ig_client and self.ig_client.logged_in:
-                            api_check_active = False
-                        else:
-                            api_check_active = bool(start_res.get("api_check_enabled", 0)) or (plat == "instagram" and "follow" in action.lower())
-
+                        api_check_active = (plat == "telegram" and bool(start_res.get("api_check_enabled", 0)))
                         if api_check_active:
-                            print(f"  ⚡ {CYAN}Nouveau système PR.Social : Confirmation sans capture...{RESET}")
-                            time.sleep(wait_sec + 1)
+                            rem_api = max(0.0, wait_sec - (time.time() - t_start_action))
+                            if rem_api > 0:
+                                time.sleep(rem_api)
                             chk_st, chk_res = self.api.api_check_task(task_id)
-                            if chk_st == 200 and chk_res.get("ok"):
+                            code_msg = (chk_res.get("code") or "").lower() if isinstance(chk_res, dict) else ""
+                            is_found = isinstance(chk_res, dict) and chk_res.get("found") is True
+                            if chk_st == 200 and isinstance(chk_res, dict) and chk_res.get("ok") and (code_msg in ["approved", "completed"] or (is_found and code_msg != "rechecking")):
                                 is_valid = True
-                                code_msg = chk_res.get("code", "approved")
-                                wait_m = chk_res.get("wait_min", 20)
-                                if code_msg == "queued":
-                                    print(f"  {GREEN}✓ Validé sans capture ! En file de vérification automatique PR.Social (~{wait_m} min){RESET}")
-                                else:
-                                    print(f"  {GREEN}✓ Validé et confirmé instantanément par PR.Social !{RESET}")
+                                print(f"  {GREEN}✓ Validé et confirmé instantanément par PR.Social !{RESET}")
                             else:
-                                err_chk = chk_res.get("error", f"Status {chk_st}") if isinstance(chk_res, dict) else str(chk_res)
-                                print(f"  {YELLOW}⚠️ Confirmation automatique refusée ({err_chk}). Repli sur capture d'écran...{RESET}")
+                                is_valid = False
+                                reason_desc = code_msg or ("non détecté en direct" if not is_found else "en attente de revérification")
+                                print(f"  {CYAN}ℹ️ Confirmation Telegram en attente ({reason_desc}). Repli strict sur capture certifiée...{RESET}")
 
-                    # Repli sur preuve visuelle sécurisée avec hash unique si api-check n'est pas actif ou a échoué
+                    # Repli sur preuve visuelle sécurisée avec hash unique
                     if not is_valid:
                         ok_act, msg_act, shot_path = self.browser.execute_task_action(
                             platform=plat, action=action, target_url=target_url, task_id=task_id, comment_text=comment_text, worker_username=worker_user
                         )
 
                         if ok_act and shot_path and os.path.exists(shot_path):
-                            print(f"  ⏳ Délai de sécurité humaine ({wait_sec}s) puis soumission de la preuve vérifiée...")
-                            time.sleep(wait_sec + 1)
+                            rem_sub = max(0.0, wait_sec - (time.time() - t_start_action))
+                            if rem_sub > 0:
+                                time.sleep(rem_sub)
                             s_st, s_res = self.api.submit_screenshot(task_id, shot_path)
                             if s_st == 200 and s_res.get("ok"):
                                 is_valid = True
-                                print(f"  {GREEN}✓ Preuve enregistrée avec succès !{RESET}")
+                                status_val = s_res.get("completion", {}).get("status", "pending_review")
+                                if status_val == "approved":
+                                    print(f"  {GREEN}✓ Validé et payé immédiatement par PR.Social !{RESET}")
+                                else:
+                                    print(f"  {GREEN}✓ Preuve enregistrée avec succès ! (En cours de validation - +${reward:.4f}){RESET}")
                             else:
                                 print(f"  🛡️ {RED}{BOLD}SÉCURITÉ ANTI-BAN STRICTE: Capture non conforme écartée.{RESET}")
                                 print(f"  ⚠️ {YELLOW}Raison : {msg_act}{RESET}")
@@ -940,10 +1076,20 @@ class TermuxBotApp:
                             self.failed_tasks.add(task_id)
 
                     if is_valid:
+                        self.recently_validated_tasks.add(task_id)
+                        self.recently_validated_tasks.add(str(task_id))
+                        try:
+                            self.recently_validated_tasks.add(int(task_id))
+                        except Exception:
+                            pass
+                        if not hasattr(self, "submitted_tasks"):
+                            self.submitted_tasks = {}
+                        self.submitted_tasks[task_id] = time.time()
+                        self.submitted_tasks[str(task_id)] = time.time()
                         _, fresh = self.api.get_me()
                         if fresh.get("user"):
                             self.current_balance = float(fresh["user"].get("balance", 0.0))
-                        print(f"  {GREEN}{BOLD}🎉 Tâche #{task_id} validée ! Nouveau solde : ${self.current_balance:.4f}{RESET}")
+                        print(f"  {GREEN}{BOLD}🎉 Tâche #{task_id} traitée avec succès ! Solde actuel : ${self.current_balance:.4f}{RESET}")
                         if plat == "instagram":
                             act_k = "comment" if "comment" in action.lower() else ("like" if "like" in action.lower() else ("share" if "share" in action.lower() else "follow"))
                             ig_hourly_actions[act_k].append(time.time())
@@ -956,21 +1102,22 @@ class TermuxBotApp:
                         self.browser.user_agent = new_ua
                         print(f"  🛡️ {CYAN}Protection Anti-Ban : Empreinte User-Agent renouvelée avec succès.{RESET}")
 
-                    # Pause intelligente : ultra-rapide si on alterne de réseau
+                    # Pause intelligente Turbo :
                     if last_executed_platform is not None and plat != last_executed_platform:
-                        pause = random.uniform(1.8, 3.0)
+                        pause = random.uniform(0.3, 0.6)
                     elif plat in STRICT_PAUSE_PLATFORMS:
-                        pause = random.uniform(5.0, 8.0)
+                        pause = random.uniform(1.2, 2.0)
                     else:
-                        pause = random.uniform(2.0, 3.5)
+                        pause = random.uniform(0.3, 0.7)
 
                     last_executed_platform = plat
-                    print(f"  ⏸️ Pause intelligente ({plat.upper()}) : {pause:.1f}s...")
+                    print(f"  ⚡ Vitesse Turbo ({plat.upper()}) : {pause:.1f}s...")
                     time.sleep(pause)
 
                 if tasks_found == 0:
-                    print(f"\n{DIM}⏳ Aucune nouvelle tâche. Prochain scan dans 15s...{RESET}")
-                    time.sleep(15)
+                    sys.stdout.write(f"\r{DIM}⏳ Veille radar active (1.2s)...{RESET}   ")
+                    sys.stdout.flush()
+                    time.sleep(1.2)
 
         except KeyboardInterrupt:
             print(f"\n{YELLOW}Arrêt demandé. Retour au menu...{RESET}")
