@@ -218,7 +218,7 @@ def dashboard_init(user: Dict[str, Any] = Depends(_require_user)):
     completed = query_one("SELECT COUNT(*) as c, COALESCE(SUM(reward_amount),0) as s FROM task_executions WHERE worker_id=? AND status='verified'", (user["id"],))
     pending = query_one("SELECT COUNT(*) as c FROM task_executions WHERE worker_id=? AND status='claimed'", (user["id"],))
     recent = query_all("""
-        SELECT te.id, te.status, te.reward_amount as reward, te.created_at, c.platform, c.action_type as action, c.title as label
+        SELECT te.id, te.status, te.reward_amount as reward, te.claimed_at as created_at, c.platform, c.action_type as action, c.title as label
         FROM task_executions te
         JOIN campaigns c ON te.campaign_id = c.id
         WHERE te.worker_id = ?
