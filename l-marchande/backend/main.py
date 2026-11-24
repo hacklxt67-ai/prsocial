@@ -406,7 +406,7 @@ def admin_unban_user(user_id: int, admin: Dict[str, Any] = Depends(get_admin_use
 app.include_router(pr_router)
 
 if os.path.exists(FRONTEND_DIR):
-    for sub in ("cab", "css", "js", "assets"):
+    for sub in ("cab", "css", "js", "i18n", "assets"):
         sub_dir = os.path.join(FRONTEND_DIR, sub)
         if os.path.isdir(sub_dir):
             app.mount(f"/{sub}", StaticFiles(directory=sub_dir), name=sub)

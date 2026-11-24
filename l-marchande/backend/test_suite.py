@@ -129,6 +129,8 @@ def run_strict_tests():
     assert client.get("/tasks").status_code == 200
     assert client.get("/cab/signin.618d6e73c6e1.js").status_code == 200
     assert client.get("/css/main.css").status_code == 200
+    assert client.get("/i18n/fr.json").status_code == 200
+    assert client.get("/i18n/en.json").status_code == 200
     assert client.get("/api/cabinet/frame").status_code == 200
     assert client.get("/api/cabinet/door").status_code == 200
     assert client.get("/api/cabinet/live").status_code == 200
