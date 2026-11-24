@@ -1,0 +1,798 @@
+<!DOCTYPE html>
+<html lang="fr" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>L-MARCHANDE · Plateforme d'Engagement & Monétisation Réseaux Sociaux</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        darkbg: '#0A0E1A',
+                        cardbg: '#131929',
+                        cardborder: '#1E293B',
+                        neoncyan: '#06B6D4',
+                        neongreen: '#10B981',
+                        neonpurple: '#8B5CF6',
+                        neonamber: '#F59E0B'
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Google Fonts Inter & Plus Jakarta Sans -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: #080B13;
+            color: #F3F4F6;
+        }
+        .mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .glass-panel {
+            background: rgba(19, 25, 41, 0.75);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .glow-cyan {
+            box-shadow: 0 0 25px -5px rgba(6, 182, 212, 0.35);
+        }
+        .glow-green {
+            box-shadow: 0 0 25px -5px rgba(16, 185, 129, 0.35);
+        }
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0A0E1A;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #1E293B;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #334155;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col antialiased selection:bg-cyan-500 selection:text-white">
+
+    <!-- TOP HEADER -->
+    <header class="sticky top-0 z-40 w-full glass-panel border-b border-cardborder px-4 lg:px-8 py-3.5 flex items-center justify-between">
+        <div class="flex items-center space-x-4">
+            <!-- Brand Logo -->
+            <div class="flex items-center space-x-3 cursor-pointer" onclick="navigate('tasks')">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-600 to-emerald-400 flex items-center justify-center font-bold text-xl text-white shadow-lg shadow-cyan-500/20">
+                    LM
+                </div>
+                <div>
+                    <div class="flex items-center space-x-2">
+                        <span class="text-xl font-extrabold tracking-wider bg-gradient-to-r from-white via-gray-200 to-cyan-300 bg-clip-text text-transparent">L-MARCHANDE</span>
+                        <span class="px-2 py-0.5 text-[10px] font-bold rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">v1.0 ENTERPRISE</span>
+                    </div>
+                    <p class="text-[11px] text-gray-400 hidden sm:block">Plateforme d'Engagement & Monétisation Réseaux Sociaux</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Live Platform Stats Ticker (Center) -->
+        <div class="hidden xl:flex items-center space-x-6 text-xs text-gray-300 bg-slate-900/60 px-4 py-1.5 rounded-full border border-slate-800">
+            <div class="flex items-center space-x-2">
+                <span class="relative flex h-2 w-2">
+                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                </span>
+                <span class="text-gray-400">Actifs :</span>
+                <span id="ticker-workers" class="font-bold text-emerald-400 mono">2,480+</span>
+            </div>
+            <div class="h-3 w-[1px] bg-slate-700"></div>
+            <div>
+                <span class="text-gray-400">Tâches validées :</span>
+                <span id="ticker-tasks" class="font-bold text-cyan-400 mono">148,500+</span>
+            </div>
+            <div class="h-3 w-[1px] bg-slate-700"></div>
+            <div>
+                <span class="text-gray-400">Distribué :</span>
+                <span id="ticker-paid" class="font-bold text-amber-400 mono">$85,400+</span>
+            </div>
+        </div>
+
+        <!-- User Controls / Auth Bar -->
+        <div class="flex items-center space-x-3">
+            <div id="auth-guest-controls" class="flex items-center space-x-2">
+                <button onclick="openAuthModal('login')" class="px-4 py-2 text-xs font-semibold text-gray-200 hover:text-white rounded-lg hover:bg-slate-800/80 transition">
+                    Connexion
+                </button>
+                <button onclick="openAuthModal('register')" class="px-4 py-2 text-xs font-bold text-slate-950 bg-gradient-to-r from-cyan-400 to-emerald-400 hover:opacity-95 rounded-lg shadow-md shadow-cyan-500/20 transition">
+                    Créer un Compte
+                </button>
+            </div>
+
+            <div id="auth-user-controls" class="hidden flex items-center space-x-3">
+                <!-- Solde Actuel -->
+                <div class="flex items-center space-x-2 bg-slate-900/90 border border-slate-700/80 px-3.5 py-1.5 rounded-xl">
+                    <span class="text-xs text-gray-400">Solde :</span>
+                    <span id="user-balance-badge" class="font-bold text-emerald-400 text-sm mono">$0.0000</span>
+                    <button onclick="openWalletModal('deposit')" class="ml-1 text-gray-400 hover:text-cyan-400 transition" title="Recharger">
+                        <i data-lucide="plus-circle" class="w-4 h-4"></i>
+                    </button>
+                </div>
+
+                <!-- Score Sentinel -->
+                <div class="hidden md:flex items-center space-x-1.5 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1.5 rounded-xl text-xs text-emerald-400" title="Score de Confiance Anti-Fraude">
+                    <i data-lucide="shield-check" class="w-3.5 h-3.5"></i>
+                    <span id="user-trust-score" class="font-bold">100%</span>
+                </div>
+
+                <!-- Profil Dropdown Button -->
+                <div class="relative">
+                    <button onclick="toggleUserDropdown()" class="flex items-center space-x-2.5 p-1.5 rounded-xl hover:bg-slate-800 transition">
+                        <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-cyan-500 to-purple-600 flex items-center justify-center text-white font-bold text-xs uppercase" id="user-avatar-initials">
+                            U
+                        </div>
+                        <span id="user-username-display" class="font-semibold text-xs text-gray-200 hidden sm:block">Utilisateur</span>
+                        <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-gray-400"></i>
+                    </button>
+
+                    <!-- Dropdown Content -->
+                    <div id="user-dropdown-menu" class="hidden absolute right-0 mt-2 w-48 glass-panel rounded-xl shadow-2xl py-2 z-50 border border-slate-700">
+                        <div class="px-4 py-2 border-b border-slate-800">
+                            <p class="text-[11px] text-gray-400">Connecté en tant que</p>
+                            <p id="dropdown-email" class="text-xs font-bold text-white truncate">user@l-marchande.io</p>
+                        </div>
+                        <a href="javascript:void(0)" onclick="navigate('wallet')" class="flex items-center px-4 py-2 text-xs text-gray-300 hover:bg-slate-800/80 hover:text-cyan-400">
+                            <i data-lucide="wallet" class="w-4 h-4 mr-2"></i> Portefeuille & Retraits
+                        </a>
+                        <a href="javascript:void(0)" onclick="navigate('socials')" class="flex items-center px-4 py-2 text-xs text-gray-300 hover:bg-slate-800/80 hover:text-cyan-400">
+                            <i data-lucide="share-2" class="w-4 h-4 mr-2"></i> Comptes Sociaux
+                        </a>
+                        <a href="javascript:void(0)" onclick="navigate('referrals')" class="flex items-center px-4 py-2 text-xs text-gray-300 hover:bg-slate-800/80 hover:text-cyan-400">
+                            <i data-lucide="users" class="w-4 h-4 mr-2"></i> Parrainage (10%)
+                        </a>
+                        <div class="border-t border-slate-800 my-1"></div>
+                        <a href="javascript:void(0)" onclick="logout()" class="flex items-center px-4 py-2 text-xs text-rose-400 hover:bg-rose-500/10">
+                            <i data-lucide="log-out" class="w-4 h-4 mr-2"></i> Déconnexion
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- MAIN APP CONTAINER WITH SIDEBAR -->
+    <div class="flex-1 flex max-w-[1600px] w-full mx-auto">
+
+        <!-- SIDEBAR NAVIGATION -->
+        <aside class="w-64 glass-panel border-r border-cardborder flex flex-col justify-between hidden md:flex p-4">
+            <div class="space-y-6">
+                <!-- Section Workers -->
+                <div>
+                    <p class="text-[11px] font-bold text-gray-400 uppercase tracking-wider px-3 mb-2">Espace Missions</p>
+                    <nav class="space-y-1">
+                        <button onclick="navigate('tasks')" id="nav-btn-tasks" class="w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl text-xs font-semibold bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 transition">
+                            <i data-lucide="zap" class="w-4 h-4"></i>
+                            <span>Missions Réseaux</span>
+                        </button>
+                        <button onclick="navigate('dashboard')" id="nav-btn-dashboard" class="w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-gray-400 hover:text-gray-200 hover:bg-slate-800/50 transition">
+                            <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
+                            <span>Tableau de Bord</span>
+                        </button>
+                        <button onclick="navigate('socials')" id="nav-btn-socials" class="w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-gray-400 hover:text-gray-200 hover:bg-slate-800/50 transition">
+                            <i data-lucide="link-2" class="w-4 h-4"></i>
+                            <span>Mes Réseaux Sociaux</span>
+                        </button>
+                    </nav>
+                </div>
+
+                <!-- Section Annonceurs -->
+                <div>
+                    <p class="text-[11px] font-bold text-gray-400 uppercase tracking-wider px-3 mb-2">Espace Annonceur</p>
+                    <nav class="space-y-1">
+                        <button onclick="navigate('campaigns')" id="nav-btn-campaigns" class="w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-gray-400 hover:text-gray-200 hover:bg-slate-800/50 transition">
+                            <i data-lucide="megaphone" class="w-4 h-4"></i>
+                            <span>Mes Campagnes</span>
+                        </button>
+                        <button onclick="openCreateCampaignModal()" class="w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl text-xs font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 hover:bg-emerald-500/20 transition">
+                            <i data-lucide="plus-circle" class="w-4 h-4"></i>
+                            <span>Créer une Campagne</span>
+                        </button>
+                    </nav>
+                </div>
+
+                <!-- Section Finance & Affiliation -->
+                <div>
+                    <p class="text-[11px] font-bold text-gray-400 uppercase tracking-wider px-3 mb-2">Finance & Revenus</p>
+                    <nav class="space-y-1">
+                        <button onclick="navigate('wallet')" id="nav-btn-wallet" class="w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-gray-400 hover:text-gray-200 hover:bg-slate-800/50 transition">
+                            <i data-lucide="wallet-cards" class="w-4 h-4"></i>
+                            <span>Portefeuille & Retraits</span>
+                        </button>
+                        <button onclick="navigate('referrals')" id="nav-btn-referrals" class="w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-gray-400 hover:text-gray-200 hover:bg-slate-800/50 transition">
+                            <i data-lucide="users" class="w-4 h-4"></i>
+                            <span>Affiliation (10% à vie)</span>
+                        </button>
+                    </nav>
+                </div>
+
+                <!-- Section Administration (Visible Admin) -->
+                <div id="admin-sidebar-section" class="hidden">
+                    <p class="text-[11px] font-bold text-purple-400 uppercase tracking-wider px-3 mb-2">Administration</p>
+                    <button onclick="navigate('admin')" id="nav-btn-admin" class="w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl text-xs font-bold text-purple-300 bg-purple-500/10 border border-purple-500/20 hover:bg-purple-500/20 transition">
+                        <i data-lucide="shield-alert" class="w-4 h-4"></i>
+                        <span>Sentinel & Modération</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Bottom Quick Info Card -->
+            <div class="p-3.5 rounded-2xl bg-gradient-to-b from-slate-900 to-slate-950 border border-slate-800">
+                <div class="flex items-center space-x-2 text-cyan-400 text-xs font-bold mb-1">
+                    <i data-lucide="award" class="w-4 h-4"></i>
+                    <span>Bouclier Sentinel</span>
+                </div>
+                <p class="text-[11px] text-gray-400 leading-relaxed">Paiements garantis et vérifications instantanées avec protection anti-fraude intégrée.</p>
+            </div>
+        </aside>
+
+        <!-- MAIN CONTENT AREA -->
+        <main class="flex-1 p-4 lg:p-8 overflow-y-auto">
+
+            <!-- ======================================================= -->
+            <!-- 1. VIEW: MISSIONS RÉSEAUX SOCIAUX -->
+            <!-- ======================================================= -->
+            <section id="view-tasks" class="space-y-6">
+                <!-- Banner Welcome -->
+                <div class="relative overflow-hidden rounded-3xl p-6 sm:p-8 bg-gradient-to-r from-cyan-950/60 via-slate-900/90 to-purple-950/40 border border-cyan-500/20 shadow-xl">
+                    <div class="relative z-10 max-w-2xl">
+                        <div class="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-xs font-semibold mb-3">
+                            <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+                            <span>Vérification Automatisée 1-Clic</span>
+                        </div>
+                        <h1 class="text-2xl sm:text-3xl font-extrabold text-white tracking-tight leading-snug">
+                            Gagnez de l'argent réel en complétant des micro-missions sociales.
+                        </h1>
+                        <p class="text-xs sm:text-sm text-gray-300 mt-2">
+                            Suivez des comptes vérifiés, rejoignez des canaux Telegram, aimez des publications et surfez sur des sites partenaires. Les fonds sont crédités instantanément.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Filter Pills -->
+                <div class="flex flex-wrap items-center gap-2 pb-2 border-b border-cardborder">
+                    <button onclick="filterTasks('all')" class="platform-filter-btn px-4 py-2 rounded-xl text-xs font-bold bg-cyan-500 text-slate-950 transition" data-platform="all">
+                        🌐 Tous les réseaux
+                    </button>
+                    <button onclick="filterTasks('instagram')" class="platform-filter-btn px-4 py-2 rounded-xl text-xs font-semibold bg-slate-900 border border-slate-800 text-gray-300 hover:text-white transition" data-platform="instagram">
+                        📷 Instagram
+                    </button>
+                    <button onclick="filterTasks('telegram')" class="platform-filter-btn px-4 py-2 rounded-xl text-xs font-semibold bg-slate-900 border border-slate-800 text-gray-300 hover:text-white transition" data-platform="telegram">
+                        ✈️ Telegram
+                    </button>
+                    <button onclick="filterTasks('youtube')" class="platform-filter-btn px-4 py-2 rounded-xl text-xs font-semibold bg-slate-900 border border-slate-800 text-gray-300 hover:text-white transition" data-platform="youtube">
+                        ▶️ YouTube
+                    </button>
+                    <button onclick="filterTasks('tiktok')" class="platform-filter-btn px-4 py-2 rounded-xl text-xs font-semibold bg-slate-900 border border-slate-800 text-gray-300 hover:text-white transition" data-platform="tiktok">
+                        🎵 TikTok
+                    </button>
+                    <button onclick="filterTasks('twitter')" class="platform-filter-btn px-4 py-2 rounded-xl text-xs font-semibold bg-slate-900 border border-slate-800 text-gray-300 hover:text-white transition" data-platform="twitter">
+                        ✖️ Twitter / X
+                    </button>
+                    <button onclick="filterTasks('website')" class="platform-filter-btn px-4 py-2 rounded-xl text-xs font-semibold bg-slate-900 border border-slate-800 text-gray-300 hover:text-white transition" data-platform="website">
+                        🌐 Surf Web
+                    </button>
+                </div>
+
+                <!-- Active Tasks / In Progress Alert Bar -->
+                <div id="active-tasks-banner" class="hidden p-4 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex flex-col sm:flex-row items-center justify-between gap-3">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-10 h-10 rounded-xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center font-bold">
+                            <i data-lucide="clock" class="w-5 h-5"></i>
+                        </div>
+                        <div>
+                            <p class="text-xs font-bold text-white">Mission en cours d'exécution</p>
+                            <p id="active-task-desc" class="text-xs text-gray-300">Veuillez finaliser votre action pour toucher votre récompense.</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <button onclick="resumeCurrentTask()" class="px-4 py-2 text-xs font-bold text-slate-950 bg-cyan-400 hover:bg-cyan-300 rounded-xl transition">
+                            Vérifier & Encaisser
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Task Cards Grid -->
+                <div id="tasks-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <!-- Les cartes sont injectées dynamiquement par app.js -->
+                </div>
+            </section>
+
+            <!-- ======================================================= -->
+            <!-- 2. VIEW: TABLEAU DE BORD (DASHBOARD) -->
+            <!-- ======================================================= -->
+            <section id="view-dashboard" class="hidden space-y-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="text-2xl font-bold text-white">Tableau de Bord & Analytique</h2>
+                        <p class="text-xs text-gray-400 mt-1">Surveillez vos revenus en temps réel et votre réputation.</p>
+                    </div>
+                </div>
+
+                <!-- Metrics Grid -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div class="glass-panel p-5 rounded-2xl border border-cardborder">
+                        <p class="text-xs font-semibold text-gray-400">Solde Disponible</p>
+                        <h3 id="dash-balance" class="text-2xl font-extrabold text-emerald-400 mt-2 mono">$0.0000</h3>
+                        <p class="text-[11px] text-gray-500 mt-1">Prêt pour retrait instantané</p>
+                    </div>
+                    <div class="glass-panel p-5 rounded-2xl border border-cardborder">
+                        <p class="text-xs font-semibold text-gray-400">Missions Validées</p>
+                        <h3 id="dash-completed-count" class="text-2xl font-extrabold text-cyan-400 mt-2 mono">0</h3>
+                        <p class="text-[11px] text-gray-500 mt-1">100% approuvées par le Sentinel</p>
+                    </div>
+                    <div class="glass-panel p-5 rounded-2xl border border-cardborder">
+                        <p class="text-xs font-semibold text-gray-400">Commissions Parrainage</p>
+                        <h3 id="dash-referral-earnings" class="text-2xl font-extrabold text-amber-400 mt-2 mono">$0.0000</h3>
+                        <p class="text-[11px] text-gray-500 mt-1">Gains passifs 10%</p>
+                    </div>
+                    <div class="glass-panel p-5 rounded-2xl border border-cardborder">
+                        <p class="text-xs font-semibold text-gray-400">Score de Confiance</p>
+                        <h3 id="dash-trust-score" class="text-2xl font-extrabold text-purple-400 mt-2 mono">100%</h3>
+                        <p class="text-[11px] text-gray-500 mt-1">Statut Haute Priorité</p>
+                    </div>
+                </div>
+
+                <!-- Chart Container -->
+                <div class="glass-panel p-6 rounded-3xl border border-cardborder">
+                    <div class="flex items-center justify-between mb-4">
+                        <h4 class="text-sm font-bold text-white">Trajectoire des Gains (7 derniers jours)</h4>
+                        <span class="text-xs font-bold text-cyan-400 bg-cyan-500/10 px-3 py-1 rounded-full border border-cyan-500/20">Micro-transactions Actives</span>
+                    </div>
+                    <div class="h-64 w-full">
+                        <canvas id="earningsChart"></canvas>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ======================================================= -->
+            <!-- 3. VIEW: GESTION DES CAMPAGNES (ANNONCEURS) -->
+            <!-- ======================================================= -->
+            <section id="view-campaigns" class="hidden space-y-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="text-2xl font-bold text-white">Espace Annonceur & Campagnes</h2>
+                        <p class="text-xs text-gray-400 mt-1">Développez la notoriété de vos profils sociaux avec de vraies interactions humaines.</p>
+                    </div>
+                    <button onclick="openCreateCampaignModal()" class="px-4 py-2.5 text-xs font-bold text-slate-950 bg-gradient-to-r from-cyan-400 to-emerald-400 hover:opacity-95 rounded-xl shadow-lg shadow-cyan-500/20 transition flex items-center space-x-2">
+                        <i data-lucide="plus" class="w-4 h-4"></i>
+                        <span>Nouvelle Campagne</span>
+                    </button>
+                </div>
+
+                <!-- Campaigns List Table -->
+                <div class="glass-panel rounded-3xl border border-cardborder overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="border-b border-slate-800 text-[11px] font-bold text-gray-400 uppercase bg-slate-950/50">
+                                    <th class="p-4">Campagne</th>
+                                    <th class="p-4">Plateforme</th>
+                                    <th class="p-4">Progression</th>
+                                    <th class="p-4">Rémunération</th>
+                                    <th class="p-4">Budget Restant</th>
+                                    <th class="p-4">Statut</th>
+                                </tr>
+                            </thead>
+                            <tbody id="campaigns-table-body" class="divide-y divide-slate-800 text-xs">
+                                <!-- Données chargées par app.js -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ======================================================= -->
+            <!-- 4. VIEW: MES RÉSEAUX SOCIAUX -->
+            <!-- ======================================================= -->
+            <section id="view-socials" class="hidden space-y-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="text-2xl font-bold text-white">Réseaux Sociaux Associés</h2>
+                        <p class="text-xs text-gray-400 mt-1">Associez vos profils pour débloquer les missions correspondantes.</p>
+                    </div>
+                    <button onclick="openAddSocialModal()" class="px-4 py-2.5 text-xs font-bold text-white bg-slate-800 hover:bg-slate-700 rounded-xl transition flex items-center space-x-2 border border-slate-700">
+                        <i data-lucide="plus" class="w-4 h-4 text-cyan-400"></i>
+                        <span>Lier un Réseau</span>
+                    </button>
+                </div>
+
+                <div id="socials-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <!-- Rempli par app.js -->
+                </div>
+            </section>
+
+            <!-- ======================================================= -->
+            <!-- 5. VIEW: PORTEFEUILLE & RETRAITS -->
+            <!-- ======================================================= -->
+            <section id="view-wallet" class="hidden space-y-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="text-2xl font-bold text-white">Portefeuille & Grand Livre</h2>
+                        <p class="text-xs text-gray-400 mt-1">Dépôts, retraits et historique complet des paiements.</p>
+                    </div>
+                    <div class="flex items-center space-x-3">
+                        <button onclick="openWalletModal('deposit')" class="px-4 py-2 text-xs font-bold text-slate-950 bg-emerald-400 hover:bg-emerald-300 rounded-xl transition">
+                            Recharger (Dépôt)
+                        </button>
+                        <button onclick="openWalletModal('withdraw')" class="px-4 py-2 text-xs font-bold text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl transition">
+                            Demander un Retrait
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Solde Card -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="glass-panel p-6 rounded-3xl border border-cardborder">
+                        <span class="text-xs text-gray-400">Solde Retirable</span>
+                        <h3 id="wallet-balance-big" class="text-3xl font-extrabold text-emerald-400 mt-2 mono">$0.0000</h3>
+                        <p class="text-[11px] text-gray-500 mt-1">Minimum de retrait : $0.50</p>
+                    </div>
+                    <div class="glass-panel p-6 rounded-3xl border border-cardborder">
+                        <span class="text-xs text-gray-400">Moyens de Retrait Supportés</span>
+                        <p class="text-xs text-gray-200 font-bold mt-2">Crypto USDT (TRC20), Payeer, Mobile Money (Orange, Wave, M-Pesa)</p>
+                        <p class="text-[11px] text-gray-500 mt-1">Délai moyen de paiement : 1 à 2 heures</p>
+                    </div>
+                    <div class="glass-panel p-6 rounded-3xl border border-cardborder">
+                        <span class="text-xs text-gray-400">Frais de Réseau</span>
+                        <h3 class="text-2xl font-extrabold text-cyan-400 mt-2 mono">0.00%</h3>
+                        <p class="text-[11px] text-gray-500 mt-1">Pris en charge par L-Marchande</p>
+                    </div>
+                </div>
+
+                <!-- Transactions History -->
+                <div class="glass-panel rounded-3xl border border-cardborder overflow-hidden">
+                    <div class="p-4 border-b border-slate-800 flex items-center justify-between">
+                        <h4 class="text-xs font-bold text-white uppercase tracking-wider">Grand Livre des Transactions</h4>
+                        <span class="text-[11px] text-gray-500">50 dernières opérations</span>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse text-xs">
+                            <thead>
+                                <tr class="border-b border-slate-800 text-[11px] font-bold text-gray-400 uppercase bg-slate-950/40">
+                                    <th class="p-4">Type</th>
+                                    <th class="p-4">Description</th>
+                                    <th class="p-4">Montant</th>
+                                    <th class="p-4">Nouveau Solde</th>
+                                    <th class="p-4">Date</th>
+                                </tr>
+                            </thead>
+                            <tbody id="wallet-transactions-body" class="divide-y divide-slate-800">
+                                <!-- Injections app.js -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ======================================================= -->
+            <!-- 6. VIEW: PROGRAMME D'AFFILIATION -->
+            <!-- ======================================================= -->
+            <section id="view-referrals" class="hidden space-y-6">
+                <div>
+                    <h2 class="text-2xl font-bold text-white">Programme de Parrainage (10% à Vie)</h2>
+                    <p class="text-xs text-gray-400 mt-1">Partagez votre lien exclusif et touchez 10% de chaque mission complétée par vos affiliés.</p>
+                </div>
+
+                <div class="glass-panel p-6 rounded-3xl border border-cardborder space-y-4">
+                    <label class="text-xs font-bold text-gray-300">Votre Lien d'Invitation Exclusif :</label>
+                    <div class="flex items-center space-x-2">
+                        <input id="ref-link-input" type="text" readonly class="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs text-cyan-400 font-mono outline-none">
+                        <button onclick="copyReferralLink()" class="px-5 py-3 text-xs font-bold text-slate-950 bg-cyan-400 hover:bg-cyan-300 rounded-xl transition flex items-center space-x-2">
+                            <i data-lucide="copy" class="w-4 h-4"></i>
+                            <span>Copier</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div class="glass-panel p-5 rounded-2xl border border-cardborder">
+                        <span class="text-xs text-gray-400">Total Filleuls Inscrits</span>
+                        <h4 id="ref-total-count" class="text-2xl font-extrabold text-white mt-1 mono">0</h4>
+                    </div>
+                    <div class="glass-panel p-5 rounded-2xl border border-cardborder">
+                        <span class="text-xs text-gray-400">Commissions Cumulées</span>
+                        <h4 id="ref-total-earned" class="text-2xl font-extrabold text-emerald-400 mt-1 mono">$0.0000</h4>
+                    </div>
+                </div>
+
+                <div class="glass-panel rounded-3xl border border-cardborder overflow-hidden">
+                    <div class="p-4 border-b border-slate-800">
+                        <h4 class="text-xs font-bold text-white uppercase tracking-wider">Liste de vos Filleuls</h4>
+                    </div>
+                    <div id="referrals-list-container" class="p-4 text-xs text-gray-400">
+                        Chargement des affiliés...
+                    </div>
+                </div>
+            </section>
+
+            <!-- ======================================================= -->
+            <!-- 7. VIEW: SENTINEL & MODÉRATION (ADMIN) -->
+            <!-- ======================================================= -->
+            <section id="view-admin" class="hidden space-y-6">
+                <div>
+                    <h2 class="text-2xl font-bold text-purple-400">Sentinel & Modération Globale</h2>
+                    <p class="text-xs text-gray-400 mt-1">Supervision de l'intégrité de la plateforme et neutralisation des tentatives de fraude.</p>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                    <div class="glass-panel p-5 rounded-2xl border border-purple-500/20">
+                        <p class="text-xs text-gray-400">Utilisateurs Totaux</p>
+                        <h4 id="admin-kpi-users" class="text-2xl font-bold text-white mt-1 mono">0</h4>
+                    </div>
+                    <div class="glass-panel p-5 rounded-2xl border border-purple-500/20">
+                        <p class="text-xs text-gray-400">Campagnes Actives</p>
+                        <h4 id="admin-kpi-campaigns" class="text-2xl font-bold text-cyan-400 mt-1 mono">0</h4>
+                    </div>
+                    <div class="glass-panel p-5 rounded-2xl border border-purple-500/20">
+                        <p class="text-xs text-gray-400">Exécutions Traitées</p>
+                        <h4 id="admin-kpi-executions" class="text-2xl font-bold text-emerald-400 mt-1 mono">0</h4>
+                    </div>
+                    <div class="glass-panel p-5 rounded-2xl border border-purple-500/20">
+                        <p class="text-xs text-gray-400">Alertes Anti-Fraude</p>
+                        <h4 id="admin-kpi-fraud" class="text-2xl font-bold text-rose-400 mt-1 mono">0</h4>
+                    </div>
+                </div>
+
+                <!-- Admin Users Table -->
+                <div class="glass-panel rounded-3xl border border-cardborder overflow-hidden">
+                    <div class="p-4 border-b border-slate-800">
+                        <h4 class="text-xs font-bold text-white uppercase tracking-wider">Gestion des Utilisateurs</h4>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse text-xs">
+                            <thead>
+                                <tr class="border-b border-slate-800 text-[11px] font-bold text-gray-400 uppercase bg-slate-950/40">
+                                    <th class="p-3">ID</th>
+                                    <th class="p-3">Utilisateur</th>
+                                    <th class="p-3">Rôle</th>
+                                    <th class="p-3">Solde</th>
+                                    <th class="p-3">Score Confiance</th>
+                                    <th class="p-3">Avertissements</th>
+                                    <th class="p-3">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="admin-users-table-body" class="divide-y divide-slate-800">
+                                <!-- Injections app.js -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- ======================================================= -->
+    <!-- MODALS -->
+    <!-- ======================================================= -->
+
+    <!-- MODAL: EXECUTION DE MISSION -->
+    <div id="modal-task-execution" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
+        <div class="glass-panel w-full max-w-lg rounded-3xl border border-cyan-500/30 p-6 space-y-5 shadow-2xl">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+                <div class="flex items-center space-x-2">
+                    <span id="exec-platform-badge" class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">INSTAGRAM</span>
+                    <h3 class="text-sm font-bold text-white">Mission en Direct</h3>
+                </div>
+                <button onclick="closeTaskModal()" class="text-gray-400 hover:text-white">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <div class="space-y-3">
+                <h4 id="exec-task-title" class="text-base font-bold text-white">Titre de la tâche</h4>
+                <p id="exec-task-desc" class="text-xs text-gray-300 leading-relaxed">Description des instructions.</p>
+                
+                <div class="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-between">
+                    <div>
+                        <span class="text-[11px] text-gray-400">Rémunération promise :</span>
+                        <p id="exec-task-reward" class="text-base font-extrabold text-emerald-400 mono">+$0.0080</p>
+                    </div>
+                    <a id="exec-task-link" href="#" target="_blank" class="px-4 py-2 text-xs font-bold text-slate-950 bg-cyan-400 hover:bg-cyan-300 rounded-xl transition flex items-center space-x-1.5">
+                        <span>Ouvrir le Lien</span>
+                        <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
+                    </a>
+                </div>
+
+                <!-- Rules alert -->
+                <div class="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-300 flex items-start space-x-2">
+                    <i data-lucide="alert-triangle" class="w-4 h-4 shrink-0 mt-0.5"></i>
+                    <span>Ne vous désabonnez jamais et ne supprimez pas votre interaction. Le Sentinel vérifie la persistance sous peine de suspension.</span>
+                </div>
+            </div>
+
+            <!-- Action Verification Buttons -->
+            <div class="space-y-2 pt-2">
+                <button onclick="confirmTaskApiCheck()" class="w-full py-3 text-xs font-bold text-slate-950 bg-gradient-to-r from-emerald-400 to-cyan-400 hover:opacity-95 rounded-xl shadow-lg shadow-emerald-500/20 transition flex items-center justify-center space-x-2">
+                    <i data-lucide="check-circle-2" class="w-4 h-4"></i>
+                    <span>⚡ Vérifier & Toucher les Gains (1-Clic)</span>
+                </button>
+                <button onclick="cancelActiveTask()" class="w-full py-2 text-xs font-semibold text-gray-400 hover:text-rose-400 transition">
+                    Abandonner cette mission
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: AUTHENTIFICATION -->
+    <div id="modal-auth" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
+        <div class="glass-panel w-full max-w-md rounded-3xl border border-cardborder p-6 space-y-5 shadow-2xl">
+            <div class="flex items-center justify-between pb-2 border-b border-slate-800">
+                <h3 id="auth-modal-title" class="text-base font-bold text-white">Connexion à L-Marchande</h3>
+                <button onclick="closeAuthModal()" class="text-gray-400 hover:text-white">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <!-- Quick Demo Login Buttons -->
+            <div class="p-3.5 rounded-2xl bg-cyan-950/20 border border-cyan-500/20">
+                <p class="text-[11px] font-bold text-cyan-400 mb-2">⚡ Connexion Démo Immédiate en 1 Clic :</p>
+                <div class="grid grid-cols-2 gap-2">
+                    <button onclick="quickLoginDemo('worker')" class="px-3 py-1.5 text-[11px] font-bold text-slate-950 bg-cyan-400 hover:bg-cyan-300 rounded-lg transition">
+                        Compte Worker (Gagner)
+                    </button>
+                    <button onclick="quickLoginDemo('advertiser')" class="px-3 py-1.5 text-[11px] font-bold text-white bg-slate-800 hover:bg-slate-700 rounded-lg transition border border-slate-700">
+                        Compte Annonceur
+                    </button>
+                </div>
+            </div>
+
+            <form id="auth-form" onsubmit="handleAuthSubmit(event)" class="space-y-3">
+                <div id="auth-field-email" class="space-y-1 hidden">
+                    <label class="text-[11px] font-semibold text-gray-400">Adresse Email</label>
+                    <input id="auth-input-email" type="email" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white outline-none focus:border-cyan-500 transition">
+                </div>
+                <div class="space-y-1">
+                    <label id="auth-label-user" class="text-[11px] font-semibold text-gray-400">Nom d'utilisateur ou Email</label>
+                    <input id="auth-input-username" type="text" required class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white outline-none focus:border-cyan-500 transition">
+                </div>
+                <div class="space-y-1">
+                    <label class="text-[11px] font-semibold text-gray-400">Mot de Passe</label>
+                    <input id="auth-input-password" type="password" required class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white outline-none focus:border-cyan-500 transition">
+                </div>
+
+                <button type="submit" id="auth-submit-btn" class="w-full mt-2 py-3 text-xs font-bold text-slate-950 bg-gradient-to-r from-cyan-400 to-emerald-400 hover:opacity-95 rounded-xl shadow-lg shadow-cyan-500/20 transition">
+                    Se Connecter
+                </button>
+            </form>
+
+            <div class="text-center pt-2">
+                <button onclick="toggleAuthMode()" id="auth-toggle-mode-btn" class="text-xs text-cyan-400 hover:underline">
+                    Pas encore de compte ? S'inscrire
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: CRÉER UNE CAMPAGNE -->
+    <div id="modal-create-campaign" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
+        <div class="glass-panel w-full max-w-lg rounded-3xl border border-cardborder p-6 space-y-4 shadow-2xl">
+            <div class="flex items-center justify-between pb-2 border-b border-slate-800">
+                <h3 class="text-base font-bold text-white">Lancer une Nouvelle Campagne</h3>
+                <button onclick="closeCreateCampaignModal()" class="text-gray-400 hover:text-white">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <form onsubmit="handleCreateCampaign(event)" class="space-y-3 text-xs">
+                <div>
+                    <label class="font-semibold text-gray-400">Titre de la Campagne</label>
+                    <input id="camp-title" type="text" required placeholder="Ex: Développer les abonnés du compte officiel" class="w-full mt-1 bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white outline-none focus:border-cyan-500">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="font-semibold text-gray-400">Réseau Social</label>
+                        <select id="camp-platform" class="w-full mt-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white outline-none">
+                            <option value="instagram">Instagram</option>
+                            <option value="telegram">Telegram</option>
+                            <option value="youtube">YouTube</option>
+                            <option value="tiktok">TikTok</option>
+                            <option value="twitter">Twitter / X</option>
+                            <option value="website">Surf Web</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="font-semibold text-gray-400">Type d'Action</label>
+                        <select id="camp-action" class="w-full mt-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white outline-none">
+                            <option value="follow">Abonnement (Follow)</option>
+                            <option value="like">Like (J'aime)</option>
+                            <option value="join">Rejoindre le canal / groupe</option>
+                            <option value="view">Visionnage Vidéo</option>
+                            <option value="surf">Visite de site web (30s)</option>
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <label class="font-semibold text-gray-400">Lien Public Cible</label>
+                    <input id="camp-url" type="url" required placeholder="https://instagram.com/moncompte" class="w-full mt-1 bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white outline-none focus:border-cyan-500">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="font-semibold text-gray-400">Quantité d'actions</label>
+                        <input id="camp-qty" type="number" min="10" value="100" oninput="calculateCampaignBudget()" class="w-full mt-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white outline-none">
+                    </div>
+                    <div>
+                        <label class="font-semibold text-gray-400">Rémunération worker ($)</label>
+                        <input id="camp-reward" type="number" step="0.001" min="0.004" value="0.008" oninput="calculateCampaignBudget()" class="w-full mt-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white outline-none">
+                    </div>
+                </div>
+
+                <div class="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-between">
+                    <span class="text-gray-400">Budget Total Requis :</span>
+                    <span id="camp-total-budget" class="text-base font-bold text-emerald-400 mono">$1.1200</span>
+                </div>
+
+                <button type="submit" class="w-full py-3 text-xs font-bold text-slate-950 bg-gradient-to-r from-cyan-400 to-emerald-400 rounded-xl shadow-lg shadow-cyan-500/20 transition">
+                    Déployer la Campagne
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: RECHARGE / RETRAIT PORTEFEUILLE -->
+    <div id="modal-wallet" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
+        <div class="glass-panel w-full max-w-md rounded-3xl border border-cardborder p-6 space-y-4 shadow-2xl">
+            <div class="flex items-center justify-between pb-2 border-b border-slate-800">
+                <h3 id="wallet-modal-title" class="text-base font-bold text-white">Opération Financière</h3>
+                <button onclick="closeWalletModal()" class="text-gray-400 hover:text-white">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <form onsubmit="handleWalletSubmit(event)" class="space-y-3 text-xs">
+                <div>
+                    <label class="font-semibold text-gray-400">Montant en Dollar ($)</label>
+                    <input id="wallet-input-amount" type="number" step="0.1" min="0.5" value="5.0" required class="w-full mt-1 bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white outline-none focus:border-cyan-500 font-mono text-base font-bold">
+                </div>
+                <div>
+                    <label class="font-semibold text-gray-400">Mode de Règlement</label>
+                    <select id="wallet-select-method" class="w-full mt-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white outline-none">
+                        <option value="crypto_usdt">Crypto USDT (TRC-20 / BEP-20)</option>
+                        <option value="payeer">Payeer USD</option>
+                        <option value="mobile_money">Mobile Money (Orange, Wave, M-Pesa)</option>
+                        <option value="card">Carte Bancaire / Virement</option>
+                    </select>
+                </div>
+                <div id="wallet-field-details">
+                    <label class="font-semibold text-gray-400">Adresse de Réception / Coordonnées</label>
+                    <input id="wallet-input-details" type="text" placeholder="Adresse USDT ou Numéro de compte" class="w-full mt-1 bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white outline-none focus:border-cyan-500">
+                </div>
+
+                <button type="submit" id="wallet-submit-btn" class="w-full py-3 text-xs font-bold text-slate-950 bg-emerald-400 hover:bg-emerald-300 rounded-xl transition">
+                    Confirmer l'opération
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- TOAST NOTIFICATION CONTAINER -->
+    <div id="toast-container" class="fixed bottom-6 right-6 z-50 flex flex-col space-y-2 pointer-events-none"></div>
+
+    <!-- Application Script -->
+    <script src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  lmarchande:
+    build: .
+    container_name: l_marchande_platform
+    ports:
+      - "8000:8000"
+    restart: always
+    environment:
+      - L_MARCHANDE_SECRET=production_super_secret_key_change_me!
+      - L_MARCHANDE_DB=/app/backend/l_marchande.db
+    volumes:
+      - lm_data:/app/backend
+
+volumes:
+  lm_data:
