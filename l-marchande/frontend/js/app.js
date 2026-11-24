@@ -1,1002 +1,793 @@
 /**
- * L-MARCHANDE ENTERPRISE - Frontend Single Page Application Engine
- * Architecture réactive, gestion d'état locale, graphiques dynamiques et Sentinel anti-fraude.
+ * L-MARCHANDE ENTERPRISE - Frontend Single-Page Application
+ * Moteur client natif sans dépendance externe · Performances instantanées
  */
 
-// --- Global State ---
-const State = {
-    token: localStorage.getItem("lm_token") || "",
-    user: JSON.parse(localStorage.getItem("lm_user") || "null"),
-    currentView: "tasks",
-    activePlatformFilter: "all",
-    tasks: [],
-    activeExecution: null,
-    earningsChart: null,
-    walletMode: "deposit",
-    authMode: "login"
+// --- Formatters & Helpers ---
+function fmtPrice(n) {
+  if (n === undefined || n === null) return "$0.0000";
+  const num = Number(n);
+  if (num >= 1) return "$" + num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+  return "$" + num.toFixed(4);
+}
+
+// --- Platform Icons SVG Map ---
+const PLATFORM_ICONS = {
+  instagram: `<svg viewBox="0 0 24 24" fill="#E4405F"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg>`,
+  youtube: `<svg viewBox="0 0 24 24" fill="#FF0000"><path d="M23.498 6.186a3.016 3.016 0 00-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 00.502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 002.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 002.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>`,
+  tiktok: `<svg viewBox="0 0 24 24" fill="#00f2ea"><path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/></svg>`,
+  telegram: `<svg viewBox="0 0 24 24" fill="#26A5E4"><path d="M11.944 0A12 12 0 000 12a12 12 0 0012 12 12 12 0 0012-12A12 12 0 0012 0h-.056zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 01.171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>`,
+  twitter: `<svg viewBox="0 0 24 24" fill="#1DA1F2"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>`,
+  website: `<svg viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>`
 };
 
-const API_BASE = window.location.origin.includes("localhost") || window.location.origin.includes("127.0.0.1")
-    ? "" 
-    : "";
+// --- API Client Engine ---
+const API = {
+  token: localStorage.getItem("lm_token") || "",
+  user: null,
 
-// --- Headers Helper ---
-function getAuthHeaders() {
+  async request(method, path, body = null) {
     const headers = { "Content-Type": "application/json" };
-    if (State.token) {
-        headers["Authorization"] = `Bearer ${State.token}`;
+    if (this.token) {
+      headers["Authorization"] = `Bearer ${this.token}`;
     }
-    return headers;
-}
+    const opts = { method, headers };
+    if (body) opts.body = JSON.stringify(body);
+
+    const res = await fetch("/api" + path, opts);
+    let data;
+    try {
+      data = await res.json();
+    } catch (e) {
+      data = { detail: "Erreur serveur inattendue" };
+    }
+    if (!res.ok) {
+      throw new Error(data.detail || data.error || "Requête échouée");
+    }
+    return data;
+  },
+
+  async login(username_or_email, password) {
+    const data = await this.request("POST", "/auth/login", { username_or_email, password });
+    this.token = data.access_token;
+    this.user = data.user;
+    localStorage.setItem("lm_token", data.access_token);
+    try { localStorage.setItem("lm-user-cache-v1", JSON.stringify(data.user)); } catch (_) {}
+    return data;
+  },
+
+  async register(username, email, password, role = "worker") {
+    const data = await this.request("POST", "/auth/register", { username, email, password, role });
+    this.token = data.access_token;
+    this.user = data.user;
+    localStorage.setItem("lm_token", data.access_token);
+    try { localStorage.setItem("lm-user-cache-v1", JSON.stringify(data.user)); } catch (_) {}
+    return data;
+  },
+
+  async getMe() {
+    let cached = null;
+    try {
+      const raw = localStorage.getItem("lm-user-cache-v1");
+      if (raw) cached = JSON.parse(raw);
+    } catch (_) {}
+
+    if (cached && cached.id) {
+      this.user = cached;
+      // Re-validate in background
+      this.request("GET", "/auth/me").then(data => {
+        if (data && data.user) {
+          this.user = data.user;
+          try { localStorage.setItem("lm-user-cache-v1", JSON.stringify(data.user)); } catch (_) {}
+          updateAppHeader();
+        }
+      }).catch(() => {
+        this.logout();
+      });
+      return cached;
+    }
+
+    try {
+      const data = await this.request("GET", "/auth/me");
+      this.user = data.user;
+      try { localStorage.setItem("lm-user-cache-v1", JSON.stringify(data.user)); } catch (_) {}
+      return data.user;
+    } catch (e) {
+      this.logout();
+      return null;
+    }
+  },
+
+  logout() {
+    this.token = "";
+    this.user = null;
+    localStorage.removeItem("lm_token");
+    localStorage.removeItem("lm-user-cache-v1");
+    renderGuestView();
+    showToast("Déconnexion réussie.", "info");
+  }
+};
+
+// --- Application State ---
+let currentTab = "tasks";
+let selectedPlatform = "all";
+let authMode = "login"; // 'login' ou 'register'
+let activeClaimedExecution = null;
+let currentWalletMode = "deposit";
 
 // --- Toast System ---
 function showToast(message, type = "success") {
-    const container = document.getElementById("toast-container");
-    if (!container) return;
+  const container = document.getElementById("toast-container");
+  if (!container) return;
 
-    const toast = document.createElement("div");
-    toast.className = `pointer-events-auto flex items-center space-x-2.5 px-4 py-3 rounded-2xl text-xs font-semibold shadow-2xl transition transform translate-y-2 opacity-0 duration-300 ${
-        type === "success" 
-            ? "bg-slate-900 border border-emerald-500/40 text-emerald-300" 
-            : type === "error"
-            ? "bg-slate-900 border border-rose-500/40 text-rose-300"
-            : "bg-slate-900 border border-cyan-500/40 text-cyan-300"
-    }`;
+  const toast = document.createElement("div");
+  toast.className = `toast ${type}`;
+  toast.innerText = message;
+  container.appendChild(toast);
 
-    const icon = type === "success" ? "check-circle" : type === "error" ? "alert-circle" : "info";
-    toast.innerHTML = `<i data-lucide="${icon}" class="w-4 h-4 shrink-0"></i><span>${message}</span>`;
-    container.appendChild(toast);
-    lucide.createIcons();
-
-    setTimeout(() => {
-        toast.classList.remove("translate-y-2", "opacity-0");
-    }, 10);
-
-    setTimeout(() => {
-        toast.classList.add("opacity-0", "translate-y-2");
-        setTimeout(() => toast.remove(), 300);
-    }, 4000);
+  setTimeout(() => {
+    toast.style.opacity = "0";
+    toast.style.transform = "translateY(10px)";
+    toast.style.transition = "all 0.2s";
+    setTimeout(() => toast.remove(), 250);
+  }, 3500);
 }
 
-// --- Navigation Controller ---
-function navigate(viewName) {
-    State.currentView = viewName;
-    const views = ["tasks", "dashboard", "campaigns", "socials", "wallet", "referrals", "admin"];
-    
-    views.forEach(v => {
-        const el = document.getElementById(`view-${v}`);
-        const btn = document.getElementById(`nav-btn-${v}`);
-        if (el) el.classList.add("hidden");
-        if (btn) {
-            btn.className = "w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-gray-400 hover:text-gray-200 hover:bg-slate-800/50 transition";
-        }
-    });
-
-    const activeEl = document.getElementById(`view-${viewName}`);
-    const activeBtn = document.getElementById(`nav-btn-${viewName}`);
-    if (activeEl) activeEl.classList.remove("hidden");
-    if (activeBtn) {
-        activeBtn.className = "w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl text-xs font-semibold bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 transition";
-    }
-
-    // Vue spécifique déclencheurs
-    if (viewName === "tasks") loadTasks();
-    if (viewName === "dashboard") loadDashboard();
-    if (viewName === "campaigns") loadCampaigns();
-    if (viewName === "socials") loadSocialAccounts();
-    if (viewName === "wallet") loadWallet();
-    if (viewName === "referrals") loadReferrals();
-    if (viewName === "admin") loadAdmin();
-
-    lucide.createIcons();
+// --- Toggle Password Visibility ---
+function togglePasswordVisibility() {
+  const inp = document.getElementById("input-password");
+  if (inp) {
+    inp.type = inp.type === "password" ? "text" : "password";
+  }
 }
 
-// --- UI Updates ---
-function updateAuthUI() {
-    const guestControls = document.getElementById("auth-guest-controls");
-    const userControls = document.getElementById("auth-user-controls");
-    const adminSection = document.getElementById("admin-sidebar-section");
+// --- Auth Mode Switcher (Login / Register) ---
+function toggleAuthMode() {
+  authMode = authMode === "login" ? "register" : "login";
+  const title = document.getElementById("guest-card-title");
+  const emailGroup = document.getElementById("group-email");
+  const labelUser = document.getElementById("label-username");
+  const rowForgot = document.getElementById("row-forgot");
+  const btnSubmit = document.getElementById("btn-guest-submit");
+  const qText = document.getElementById("text-auth-switch-question");
+  const linkSwitch = document.getElementById("link-auth-switch");
 
-    if (State.user && State.token) {
-        if (guestControls) guestControls.classList.add("hidden");
-        if (userControls) userControls.classList.remove("hidden");
+  if (authMode === "login") {
+    if (title) title.innerText = "Se connecter";
+    if (emailGroup) emailGroup.style.display = "none";
+    if (labelUser) labelUser.innerText = "E-mail ou nom sur le site";
+    if (rowForgot) rowForgot.style.display = "flex";
+    if (btnSubmit) btnSubmit.innerText = "Se connecter";
+    if (qText) qText.innerText = "Vous n'avez pas encore de compte ?";
+    if (linkSwitch) linkSwitch.innerText = "Créer un compte";
+  } else {
+    if (title) title.innerText = "Créer un compte";
+    if (emailGroup) emailGroup.style.display = "flex";
+    if (labelUser) labelUser.innerText = "Nom d'utilisateur sur le site";
+    if (rowForgot) rowForgot.style.display = "none";
+    if (btnSubmit) btnSubmit.innerText = "Créer mon compte";
+    if (qText) qText.innerText = "Vous avez déjà un compte ?";
+    if (linkSwitch) linkSwitch.innerText = "Se connecter";
+  }
+}
 
-        const balEl = document.getElementById("user-balance-badge");
-        if (balEl) balEl.innerText = `$${parseFloat(State.user.balance || 0).toFixed(4)}`;
+// --- Handle Guest Auth Submission ---
+async function handleGuestAuth(e) {
+  e.preventDefault();
+  const username = document.getElementById("input-username").value.trim();
+  const password = document.getElementById("input-password").value;
+  const email = document.getElementById("input-email")?.value.trim() || "";
 
-        const trustEl = document.getElementById("user-trust-score");
-        if (trustEl) trustEl.innerText = `${Math.round(State.user.trust_score || 100)}%`;
-
-        const nameEl = document.getElementById("user-username-display");
-        if (nameEl) nameEl.innerText = `@${State.user.username}`;
-
-        const dropEmail = document.getElementById("dropdown-email");
-        if (dropEmail) dropEmail.innerText = State.user.email;
-
-        const initials = document.getElementById("user-avatar-initials");
-        if (initials) initials.innerText = (State.user.username || "U").substring(0, 2).toUpperCase();
-
-        if (adminSection) {
-            if (State.user.role === "admin") {
-                adminSection.classList.remove("hidden");
-            } else {
-                adminSection.classList.add("hidden");
-            }
-        }
+  try {
+    if (authMode === "login") {
+      await API.login(username, password);
+      showToast("Connexion réussie !", "success");
     } else {
-        if (guestControls) guestControls.classList.remove("hidden");
-        if (userControls) userControls.classList.add("hidden");
-        if (adminSection) adminSection.classList.add("hidden");
+      await API.register(username, email, password, "worker");
+      showToast("Compte créé avec succès !", "success");
     }
+    renderAppView();
+  } catch (err) {
+    showToast(err.message || "Erreur d'authentification", "error");
+  }
 }
 
-// --- Public Platform Ticker Stats ---
-async function fetchPublicStats() {
-    try {
-        const res = await fetch(`${API_BASE}/api/public/stats`);
-        if (res.ok) {
-            const data = await res.json();
-            const wEl = document.getElementById("ticker-workers");
-            const tEl = document.getElementById("ticker-tasks");
-            const pEl = document.getElementById("ticker-paid");
-            if (wEl) wEl.innerText = `${data.active_workers.toLocaleString()}+`;
-            if (tEl) tEl.innerText = `${data.completed_tasks.toLocaleString()}+`;
-            if (pEl) pEl.innerText = `$${data.total_paid_out.toLocaleString()}+`;
-        }
-    } catch (e) {
-        console.error("Erreur stats publiques", e);
+// --- Quick Demo Login (Worker / Advertiser) ---
+async function loginDemo(role) {
+  try {
+    if (role === "worker") {
+      await API.login("top_worker", "WorkerPass2026!");
+      showToast("Session Démo Worker activée !", "success");
+    } else {
+      await API.login("lux_agency", "AdvertPass2026!");
+      showToast("Session Démo Annonceur activée !", "success");
     }
+    renderAppView();
+  } catch (err) {
+    showToast("Échec connexion démo : " + err.message, "error");
+  }
 }
 
-// --- User Profile Sync ---
-async function syncUserProfile() {
-    if (!State.token) return;
-    try {
-        const res = await fetch(`${API_BASE}/api/auth/me`, { headers: getAuthHeaders() });
-        if (res.ok) {
-            const data = await res.json();
-            State.user = data.user;
-            localStorage.setItem("lm_user", JSON.stringify(data.user));
-            updateAuthUI();
-        } else if (res.status === 401) {
-            logout();
-        }
-    } catch (e) {
-        console.error("Erreur sync user", e);
-    }
+function handleLogout() {
+  API.logout();
 }
 
-// ==============================================================================
-// 1. GESTION DES TÂCHES (WORKERS)
-// ==============================================================================
-function filterTasks(platform) {
-    State.activePlatformFilter = platform;
-    document.querySelectorAll(".platform-filter-btn").forEach(btn => {
-        if (btn.getAttribute("data-platform") === platform) {
-            btn.className = "platform-filter-btn px-4 py-2 rounded-xl text-xs font-bold bg-cyan-500 text-slate-950 transition";
-        } else {
-            btn.className = "platform-filter-btn px-4 py-2 rounded-xl text-xs font-semibold bg-slate-900 border border-slate-800 text-gray-300 hover:text-white transition";
-        }
-    });
-    loadTasks();
+// --- View Renderers (Guest vs Logged In) ---
+function renderGuestView() {
+  document.getElementById("view-guest").style.display = "flex";
+  document.getElementById("view-app").style.display = "none";
+}
+
+function renderAppView() {
+  document.getElementById("view-guest").style.display = "none";
+  document.getElementById("view-app").style.display = "flex";
+  updateAppHeader();
+  switchTab("tasks");
+}
+
+function updateAppHeader() {
+  const u = API.user;
+  if (!u) return;
+  const balFmt = fmtPrice(u.balance);
+
+  const headerBal = document.getElementById("header-balance");
+  if (headerBal) headerBal.innerText = balFmt;
+
+  const sideBal = document.getElementById("side-balance");
+  if (sideBal) sideBal.innerText = balFmt;
+
+  const sideUser = document.getElementById("side-username");
+  if (sideUser) sideUser.innerText = "@" + u.username;
+
+  const adminNav = document.getElementById("tab-btn-admin");
+  if (adminNav) {
+    adminNav.style.display = u.role === "admin" ? "flex" : "none";
+  }
+}
+
+// --- Tab Navigation Switcher ---
+function switchTab(tabName) {
+  currentTab = tabName;
+  const tabs = ["tasks", "my-tasks", "wallet", "orders", "profile", "referrals", "admin"];
+  tabs.forEach(t => {
+    const sec = document.getElementById(`tab-${t}`);
+    const btn = document.getElementById(`tab-btn-${t}`);
+    if (sec) sec.style.display = t === tabName ? "block" : "none";
+    if (btn) btn.classList.toggle("active", t === tabName);
+  });
+
+  // Mettre à jour titre et sous-titre
+  const titles = {
+    tasks: ["Tâches", "Accomplissez des micro-tâches pour être payé immédiatement."],
+    "my-tasks": ["Mes tâches", "Consultez l'historique et le statut de vos missions."],
+    wallet: ["Portefeuille", "Solde, retraits instantanés et grand livre comptable."],
+    orders: ["Campagnes", "Gérez vos commandes d'abonnés et d'interactions."],
+    profile: ["Profil & Réseaux", "Associez vos profils sociaux pour exécuter les tâches."],
+    referrals: ["Parrainage (10%)", "Invitez vos contacts et touchez 10% de leurs gains à vie."],
+    admin: ["Sentinel Admin", "Supervision globale et neutralisation des fraudes."]
+  };
+
+  const pTitle = document.getElementById("page-title");
+  const pSub = document.getElementById("page-subtitle");
+  if (pTitle && titles[tabName]) pTitle.innerText = titles[tabName][0];
+  if (pSub && titles[tabName]) pSub.innerText = titles[tabName][1];
+
+  // Chargement spécifique par onglet
+  if (tabName === "tasks") loadTasks();
+  if (tabName === "my-tasks") loadMyTasks();
+  if (tabName === "wallet") loadWallet();
+  if (tabName === "orders") loadOrders();
+  if (tabName === "profile") loadProfile();
+  if (tabName === "referrals") loadReferrals();
+  if (tabName === "admin") loadAdmin();
+}
+
+// ==========================================================================
+// 1. GESTION DES TÂCHES (FEED STYLE PR.SOCIAL)
+// ==========================================================================
+function filterPlatform(plat) {
+  selectedPlatform = plat;
+  document.querySelectorAll(".platform-chip").forEach(c => {
+    c.classList.toggle("active", c.getAttribute("data-platform") === plat);
+  });
+  loadTasks();
 }
 
 async function loadTasks() {
-    const container = document.getElementById("tasks-container");
-    if (!container) return;
+  const container = document.getElementById("tasks-list");
+  if (!container) return;
+  container.innerHTML = `<div style="text-align:center; padding:30px; font-size:0.8rem; color:var(--text-muted);">Chargement des tâches...</div>`;
 
-    if (!State.token) {
-        container.innerHTML = `
-            <div class="col-span-full p-8 text-center glass-panel rounded-3xl border border-cardborder">
-                <i data-lucide="lock" class="w-10 h-10 mx-auto text-cyan-400 mb-3"></i>
-                <h3 class="text-base font-bold text-white">Connectez-vous pour accéder au flux de missions</h3>
-                <p class="text-xs text-gray-400 mt-1 max-w-md mx-auto">Créez un compte gratuit ou utilisez la connexion démo pour exécuter des missions rémunérées.</p>
-                <button onclick="openAuthModal('login')" class="mt-4 px-6 py-2.5 text-xs font-bold text-slate-950 bg-cyan-400 hover:bg-cyan-300 rounded-xl transition">
-                    Se Connecter Immédiatement
-                </button>
+  checkActiveClaimedTask();
+
+  try {
+    const platQuery = selectedPlatform === "all" ? "" : `&platform=${selectedPlatform}`;
+    const data = await API.request("GET", `/tasks?limit=50${platQuery}`);
+    const tasks = data.tasks || [];
+
+    // Mettre à jour compteur 'Tous'
+    const chipAll = document.getElementById("chip-count-all");
+    if (chipAll) chipAll.innerText = data.total || tasks.length;
+
+    if (tasks.length === 0) {
+      container.innerHTML = `
+        <div style="background:var(--card); border:1px solid var(--border); border-radius:14px; padding:36px; text-align:center;">
+          <p style="font-size:0.85rem; font-weight:700; color:#fff;">Aucune tâche disponible dans cette catégorie</p>
+          <p style="font-size:0.75rem; color:var(--text-muted); margin-top:4px;">Revenez d'ici quelques minutes ou filtrez par un autre réseau.</p>
+        </div>
+      `;
+      return;
+    }
+
+    container.innerHTML = tasks.map(t => {
+      const iconSvg = PLATFORM_ICONS[t.platform] || PLATFORM_ICONS.website;
+      const reward = fmtPrice(t.reward_per_action);
+      const remaining = t.remaining_slots || (t.target_quantity - t.completed_quantity);
+
+      return `
+        <div class="task-card" onclick="openClaimModal(${t.id})">
+          <div class="task-card-row">
+            <div class="tc-icon">${iconSvg}</div>
+            <div class="tc-body">
+              <div class="tc-name">${t.title}</div>
+              <div class="tc-sub">
+                <span>${t.platform.toUpperCase()}</span>
+                <span>·</span>
+                <span class="tc-rem">${remaining} restantes</span>
+              </div>
             </div>
-        `;
-        lucide.createIcons();
-        return;
-    }
+            <div class="tc-reward">+${reward}</div>
+            <button class="btn-start-task" onclick="event.stopPropagation(); openClaimModal(${t.id})">Démarrer</button>
+          </div>
+        </div>
+      `;
+    }).join("");
 
-    container.innerHTML = `<div class="col-span-full py-12 text-center text-xs text-gray-400">Chargement des missions disponibles...</div>`;
-
-    try {
-        const platParam = State.activePlatformFilter === "all" ? "" : `&platform=${State.activePlatformFilter}`;
-        const res = await fetch(`${API_BASE}/api/tasks?limit=50${platParam}`, { headers: getAuthHeaders() });
-        const data = await res.json();
-        State.tasks = data.tasks || [];
-
-        // Vérifier si l'utilisateur a des tâches en cours
-        checkActiveTasks();
-
-        if (State.tasks.length === 0) {
-            container.innerHTML = `
-                <div class="col-span-full p-8 text-center glass-panel rounded-3xl border border-cardborder">
-                    <i data-lucide="check-circle" class="w-10 h-10 mx-auto text-emerald-400 mb-2"></i>
-                    <h3 class="text-sm font-bold text-white">Aucune nouvelle mission disponible pour ce filtre</h3>
-                    <p class="text-xs text-gray-400 mt-1">Revenez dans quelques instants ou sélectionnez un autre réseau social.</p>
-                </div>
-            `;
-            lucide.createIcons();
-            return;
-        }
-
-        const platformBadges = {
-            instagram: { icon: "camera", bg: "bg-fuchsia-500/10", border: "border-fuchsia-500/20", text: "text-fuchsia-400", label: "INSTAGRAM" },
-            telegram: { icon: "send", bg: "bg-sky-500/10", border: "border-sky-500/20", text: "text-sky-400", label: "TELEGRAM" },
-            youtube: { icon: "play", bg: "bg-rose-500/10", border: "border-rose-500/20", text: "text-rose-400", label: "YOUTUBE" },
-            tiktok: { icon: "music", bg: "bg-purple-500/10", border: "border-purple-500/20", text: "text-purple-400", label: "TIKTOK" },
-            twitter: { icon: "hash", bg: "bg-cyan-500/10", border: "border-cyan-500/20", text: "text-cyan-400", label: "TWITTER / X" },
-            website: { icon: "globe", bg: "bg-emerald-500/10", border: "border-emerald-500/20", text: "text-emerald-400", label: "SURF WEB" }
-        };
-
-        container.innerHTML = State.tasks.map(t => {
-            const b = platformBadges[t.platform] || platformBadges.website;
-            const rewardFmt = `$${parseFloat(t.reward_per_action).toFixed(4)}`;
-            return `
-                <div class="glass-panel p-5 rounded-3xl border border-cardborder hover:border-slate-700 transition flex flex-col justify-between space-y-4">
-                    <div class="space-y-3">
-                        <div class="flex items-center justify-between">
-                            <span class="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold ${b.bg} ${b.border} ${b.text} border">
-                                <i data-lucide="${b.icon}" class="w-3 h-3"></i>
-                                <span>${b.label}</span>
-                            </span>
-                            <span class="text-xs font-extrabold text-emerald-400 mono">${rewardFmt}</span>
-                        </div>
-                        <h4 class="text-sm font-bold text-white line-clamp-2 leading-snug">${t.title}</h4>
-                        <p class="text-[11px] text-gray-400 line-clamp-2">${t.description || 'Complétez l’action demandée pour débloquer votre rémunération.'}</p>
-                    </div>
-
-                    <div class="pt-2 border-t border-slate-800/80 flex items-center justify-between">
-                        <span class="text-[11px] text-gray-500 font-mono">${t.remaining_slots || 50} places dispo</span>
-                        <button onclick="claimAndStartTask(${t.id})" class="px-3.5 py-1.5 text-xs font-bold text-slate-950 bg-cyan-400 hover:bg-cyan-300 rounded-xl transition flex items-center space-x-1">
-                            <span>Démarrer</span>
-                            <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
-                        </button>
-                    </div>
-                </div>
-            `;
-        }).join("");
-
-        lucide.createIcons();
-    } catch (e) {
-        container.innerHTML = `<div class="col-span-full py-8 text-center text-xs text-rose-400">Erreur lors de la récupération des tâches.</div>`;
-    }
+  } catch (err) {
+    container.innerHTML = `<div style="text-align:center; color:var(--red); padding:20px;">Erreur de chargement des tâches : ${err.message}</div>`;
+  }
 }
 
-// --- Active Tasks Checker ---
-async function checkActiveTasks() {
-    if (!State.token) return;
-    try {
-        const res = await fetch(`${API_BASE}/api/tasks/my/list?status=in_progress`, { headers: getAuthHeaders() });
-        const data = await res.json();
-        const activeTasks = data.tasks || [];
-        const banner = document.getElementById("active-tasks-banner");
+async function checkActiveClaimedTask() {
+  try {
+    const data = await API.request("GET", "/tasks/my/list?status=in_progress");
+    const active = data.tasks || [];
+    const banner = document.getElementById("active-task-banner");
 
-        if (activeTasks.length > 0) {
-            State.activeExecution = activeTasks[0];
-            if (banner) {
-                banner.classList.remove("hidden");
-                const desc = document.getElementById("active-task-desc");
-                if (desc) desc.innerText = `${State.activeExecution.title} (Gain : +$${parseFloat(State.activeExecution.reward_amount).toFixed(4)})`;
-            }
-        } else {
-            State.activeExecution = null;
-            if (banner) banner.classList.add("hidden");
-        }
-    } catch (e) {
-        console.error("Erreur active tasks check", e);
+    if (active.length > 0) {
+      activeClaimedExecution = active[0];
+      if (banner) {
+        banner.style.display = "flex";
+        const bDesc = document.getElementById("active-banner-desc");
+        if (bDesc) bDesc.innerText = `${activeClaimedExecution.title} (+${fmtPrice(activeClaimedExecution.reward_amount)})`;
+      }
+    } else {
+      activeClaimedExecution = null;
+      if (banner) banner.style.display = "none";
     }
+  } catch (_) {}
 }
 
-async function claimAndStartTask(campaignId) {
-    if (!State.token) {
-        openAuthModal('login');
-        return;
-    }
-
-    try {
-        const res = await fetch(`${API_BASE}/api/tasks/${campaignId}/start`, {
-            method: "POST",
-            headers: getAuthHeaders(),
-            body: JSON.stringify({})
-        });
-        const data = await res.json();
-
-        if (res.ok) {
-            State.activeExecution = data.execution;
-            openTaskModal(data.execution);
-            checkActiveTasks();
-            showToast("Mission réservée avec succès ! Vous disposez de 25 minutes.", "success");
-        } else {
-            showToast(data.detail || "Impossible de démarrer cette mission.", "error");
-        }
-    } catch (e) {
-        showToast("Erreur de connexion au serveur.", "error");
-    }
+async function openClaimModal(campaignId) {
+  try {
+    const res = await API.request("POST", `/tasks/${campaignId}/start`, {});
+    activeClaimedExecution = res.execution;
+    showTaskModal(res.execution);
+    checkActiveClaimedTask();
+    showToast("Tâche réservée avec succès ! Vous avez 25 minutes.", "success");
+  } catch (err) {
+    showToast(err.message || "Impossible de démarrer la tâche.", "error");
+  }
 }
 
-function openTaskModal(execution) {
-    const modal = document.getElementById("modal-task-execution");
-    if (!modal) return;
+function showTaskModal(exec) {
+  const modal = document.getElementById("modal-task");
+  if (!modal) return;
 
-    document.getElementById("exec-task-title").innerText = execution.title || "Mission Réseau";
-    document.getElementById("exec-task-desc").innerText = execution.description || "Suivez le lien officiel et effectuez l'action demandée.";
-    document.getElementById("exec-task-reward").innerText = `+$${parseFloat(execution.reward_amount).toFixed(4)}`;
-    
-    const linkEl = document.getElementById("exec-task-link");
-    linkEl.href = execution.target_url || "#";
+  document.getElementById("m-task-badge").innerText = (exec.platform || "Réseau").toUpperCase();
+  document.getElementById("m-task-title").innerText = exec.title || "Mission Réseau";
+  document.getElementById("m-task-desc").innerText = exec.description || "Suivez le lien officiel et effectuez l'action demandée.";
+  document.getElementById("m-task-reward").innerText = `+${fmtPrice(exec.reward_amount)}`;
+  
+  const linkBtn = document.getElementById("m-task-url-btn");
+  if (linkBtn) linkBtn.href = exec.target_url || "#";
 
-    const badge = document.getElementById("exec-platform-badge");
-    if (badge) badge.innerText = (execution.platform || "RESEAU").toUpperCase();
-
-    modal.classList.remove("hidden");
-    lucide.createIcons();
+  modal.classList.remove("hidden");
 }
 
 function closeTaskModal() {
-    const modal = document.getElementById("modal-task-execution");
-    if (modal) modal.classList.add("hidden");
+  const modal = document.getElementById("modal-task");
+  if (modal) modal.classList.add("hidden");
 }
 
-function resumeCurrentTask() {
-    if (State.activeExecution) {
-        openTaskModal(State.activeExecution);
+function resumeClaimedTask() {
+  if (activeClaimedExecution) {
+    showTaskModal(activeClaimedExecution);
+  }
+}
+
+async function confirmTaskExecution() {
+  if (!activeClaimedExecution) return;
+  const btn = document.getElementById("btn-confirm-api-check");
+  if (btn) {
+    btn.disabled = true;
+    btn.innerText = "⏳ Vérification en cours...";
+  }
+
+  try {
+    const res = await API.request("POST", `/tasks/${activeClaimedExecution.id}/api-check`);
+    closeTaskModal();
+    showToast(res.message || "Tâche validée avec succès !", "success");
+    activeClaimedExecution = null;
+    API.getMe();
+    loadTasks();
+  } catch (err) {
+    showToast(err.message || "Échec de validation de la tâche.", "error");
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerText = "⚡ Confirmer (API Check 1-Clic)";
     }
+  }
 }
 
-async function confirmTaskApiCheck() {
-    if (!State.activeExecution) return;
-    const execId = State.activeExecution.id;
-
-    try {
-        const res = await fetch(`${API_BASE}/api/tasks/${execId}/api-check`, {
-            method: "POST",
-            headers: getAuthHeaders()
-        });
-        const data = await res.json();
-
-        if (res.ok) {
-            closeTaskModal();
-            showToast(data.message || "Mission validée avec succès !", "success");
-            State.activeExecution = null;
-            syncUserProfile();
-            loadTasks();
-        } else {
-            showToast(data.detail || "Échec de la validation de la mission.", "error");
-        }
-    } catch (e) {
-        showToast("Erreur lors de la vérification de la tâche.", "error");
-    }
+async function cancelTaskExecution() {
+  if (!activeClaimedExecution) return;
+  try {
+    await API.request("POST", `/tasks/${activeClaimedExecution.id}/cancel`);
+    closeTaskModal();
+    activeClaimedExecution = null;
+    checkActiveClaimedTask();
+    loadTasks();
+    showToast("Tâche abandonnée.", "info");
+  } catch (err) {
+    showToast(err.message || "Erreur lors de l'annulation.", "error");
+  }
 }
 
-async function cancelActiveTask() {
-    if (!State.activeExecution) return;
-    const execId = State.activeExecution.id;
+// ==========================================================================
+// 2. MES TÂCHES
+// ==========================================================================
+async function loadMyTasks() {
+  const container = document.getElementById("my-tasks-list");
+  if (!container) return;
+  container.innerHTML = `<div style="text-align:center; padding:20px; font-size:0.8rem; color:var(--text-muted);">Chargement de vos tâches...</div>`;
 
-    try {
-        const res = await fetch(`${API_BASE}/api/tasks/${execId}/cancel`, {
-            method: "POST",
-            headers: getAuthHeaders()
-        });
-        if (res.ok) {
-            closeTaskModal();
-            State.activeExecution = null;
-            checkActiveTasks();
-            loadTasks();
-            showToast("Mission abandonnée.", "info");
-        }
-    } catch (e) {
-        showToast("Erreur lors de l'annulation.", "error");
-    }
-}
+  try {
+    const data = await API.request("GET", "/tasks/my/list?status=verified");
+    const tasks = data.tasks || [];
 
-// ==============================================================================
-// 2. TABLEAU DE BORD & ANALYTIQUE
-// ==============================================================================
-async function loadDashboard() {
-    if (!State.token) return;
-    syncUserProfile();
-
-    const balEl = document.getElementById("dash-balance");
-    if (balEl && State.user) balEl.innerText = `$${parseFloat(State.user.balance || 0).toFixed(4)}`;
-
-    const trustEl = document.getElementById("dash-trust-score");
-    if (trustEl && State.user) trustEl.innerText = `${Math.round(State.user.trust_score || 100)}%`;
-
-    // Récupérer le nombre de tâches complétées
-    try {
-        const resTasks = await fetch(`${API_BASE}/api/tasks/my/list?status=verified`, { headers: getAuthHeaders() });
-        if (resTasks.ok) {
-            const data = await resTasks.json();
-            const cntEl = document.getElementById("dash-completed-count");
-            if (cntEl) cntEl.innerText = (data.tasks || []).length;
-        }
-
-        // Récupérer commissions affiliation
-        const resRef = await fetch(`${API_BASE}/api/referrals`, { headers: getAuthHeaders() });
-        if (resRef.ok) {
-            const refData = await resRef.json();
-            const refEl = document.getElementById("dash-referral-earnings");
-            if (refEl) refEl.innerText = `$${parseFloat(refData.total_commission_earned || 0).toFixed(4)}`;
-        }
-    } catch (e) {
-        console.error(e);
+    if (tasks.length === 0) {
+      container.innerHTML = `<div style="background:var(--card); border:1px solid var(--border); border-radius:14px; padding:30px; text-align:center; font-size:0.8rem; color:var(--text-muted);">Aucune tâche complétée pour le moment.</div>`;
+      return;
     }
 
-    renderEarningsChart();
+    container.innerHTML = tasks.map(t => `
+      <div class="task-card" style="cursor:default;">
+        <div class="task-card-row">
+          <div class="tc-icon">${PLATFORM_ICONS[t.platform] || PLATFORM_ICONS.website}</div>
+          <div class="tc-body">
+            <div class="tc-name">${t.title}</div>
+            <div class="tc-sub">Validée le ${t.verified_at || t.claimed_at}</div>
+          </div>
+          <div class="tc-reward" style="color:var(--green);">+${fmtPrice(t.reward_amount)}</div>
+        </div>
+      </div>
+    `).join("");
+  } catch (err) {
+    container.innerHTML = `<div style="color:var(--red); text-align:center;">Erreur : ${err.message}</div>`;
+  }
 }
 
-function renderEarningsChart() {
-    const ctx = document.getElementById('earningsChart');
-    if (!ctx) return;
-
-    if (State.earningsChart) {
-        State.earningsChart.destroy();
-    }
-
-    const labels = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
-    const dummyData = [0.12, 0.28, 0.45, 0.38, 0.62, 0.85, 1.15];
-
-    State.earningsChart = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: labels,
-            datasets: [{
-                label: 'Gains Quotidiens ($)',
-                data: dummyData,
-                borderColor: '#06B6D4',
-                backgroundColor: 'rgba(6, 182, 212, 0.15)',
-                borderWidth: 2.5,
-                fill: true,
-                tension: 0.4,
-                pointBackgroundColor: '#10B981',
-                pointBorderColor: '#fff',
-                pointRadius: 4
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: { display: false }
-            },
-            scales: {
-                x: {
-                    grid: { color: 'rgba(255, 255, 255, 0.05)' },
-                    ticks: { color: '#9CA3AF', font: { size: 10 } }
-                },
-                y: {
-                    grid: { color: 'rgba(255, 255, 255, 0.05)' },
-                    ticks: { color: '#9CA3AF', font: { size: 10 } }
-                }
-            }
-        }
-    });
-}
-
-// ==============================================================================
-// 3. ANNONCEURS & CAMPAGNES
-// ==============================================================================
-async function loadCampaigns() {
-    const tbody = document.getElementById("campaigns-table-body");
-    if (!tbody || !State.token) return;
-
-    tbody.innerHTML = `<tr><td colspan="6" class="p-6 text-center text-gray-500">Chargement des campagnes...</td></tr>`;
-
-    try {
-        const res = await fetch(`${API_BASE}/api/campaigns`, { headers: getAuthHeaders() });
-        const data = await res.json();
-        const camps = data.campaigns || [];
-
-        if (camps.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="6" class="p-6 text-center text-gray-400">Aucune campagne créée pour le moment. Cliquez sur "Nouvelle Campagne" pour commencer.</td></tr>`;
-            return;
-        }
-
-        tbody.innerHTML = camps.map(c => {
-            const pct = Math.min(100, Math.round((c.completed_quantity / c.target_quantity) * 100));
-            return `
-                <tr class="hover:bg-slate-900/50 transition">
-                    <td class="p-4 font-bold text-white">${c.title}</td>
-                    <td class="p-4 uppercase text-cyan-400 font-semibold">${c.platform}</td>
-                    <td class="p-4">
-                        <div class="flex items-center space-x-2">
-                            <div class="w-24 bg-slate-800 rounded-full h-1.5 overflow-hidden">
-                                <div class="bg-gradient-to-r from-cyan-400 to-emerald-400 h-1.5 rounded-full" style="width: ${pct}%"></div>
-                            </div>
-                            <span class="text-[11px] text-gray-400 font-mono">${c.completed_quantity}/${c.target_quantity}</span>
-                        </div>
-                    </td>
-                    <td class="p-4 font-mono text-emerald-400">$${parseFloat(c.reward_per_action).toFixed(4)}</td>
-                    <td class="p-4 font-mono text-gray-300">$${parseFloat(c.remaining_budget).toFixed(4)}</td>
-                    <td class="p-4">
-                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${c.status === 'active' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-gray-500/10 text-gray-400 border border-gray-500/20'}">
-                            ${c.status.toUpperCase()}
-                        </span>
-                    </td>
-                </tr>
-            `;
-        }).join("");
-    } catch (e) {
-        tbody.innerHTML = `<tr><td colspan="6" class="p-6 text-center text-rose-400">Erreur chargement campagnes.</td></tr>`;
-    }
-}
-
-function openCreateCampaignModal() {
-    if (!State.token) {
-        openAuthModal('login');
-        return;
-    }
-    const modal = document.getElementById("modal-create-campaign");
-    if (modal) modal.classList.remove("hidden");
-    calculateCampaignBudget();
-}
-
-function closeCreateCampaignModal() {
-    const modal = document.getElementById("modal-create-campaign");
-    if (modal) modal.classList.add("hidden");
-}
-
-function calculateCampaignBudget() {
-    const qty = parseInt(document.getElementById("camp-qty")?.value || 100);
-    const reward = parseFloat(document.getElementById("camp-reward")?.value || 0.008);
-    const cost = reward * 1.4; // 40% marge
-    const total = qty * cost;
-    const totalEl = document.getElementById("camp-total-budget");
-    if (totalEl) totalEl.innerText = `$${total.toFixed(4)}`;
-}
-
-async function handleCreateCampaign(e) {
-    e.preventDefault();
-    const title = document.getElementById("camp-title").value;
-    const platform = document.getElementById("camp-platform").value;
-    const action_type = document.getElementById("camp-action").value;
-    const target_url = document.getElementById("camp-url").value;
-    const target_quantity = parseInt(document.getElementById("camp-qty").value);
-    const reward_per_action = parseFloat(document.getElementById("camp-reward").value);
-
-    try {
-        const res = await fetch(`${API_BASE}/api/campaigns`, {
-            method: "POST",
-            headers: getAuthHeaders(),
-            body: JSON.stringify({
-                title, platform, action_type, target_url, target_quantity, reward_per_action
-            })
-        });
-        const data = await res.json();
-
-        if (res.ok) {
-            closeCreateCampaignModal();
-            showToast("Campagne déployée avec succès !", "success");
-            syncUserProfile();
-            loadCampaigns();
-        } else {
-            showToast(data.detail || "Erreur de création de la campagne.", "error");
-        }
-    } catch (e) {
-        showToast("Erreur serveur lors de la création.", "error");
-    }
-}
-
-// ==============================================================================
-// 4. RÉSEAUX SOCIAUX
-// ==============================================================================
-async function loadSocialAccounts() {
-    const container = document.getElementById("socials-container");
-    if (!container || !State.token) return;
-
-    container.innerHTML = `<div class="col-span-full py-8 text-center text-xs text-gray-500">Chargement de vos profils...</div>`;
-
-    try {
-        const res = await fetch(`${API_BASE}/api/profile/socials`, { headers: getAuthHeaders() });
-        const data = await res.json();
-        const accs = data.accounts || [];
-
-        if (accs.length === 0) {
-            container.innerHTML = `
-                <div class="col-span-full p-8 text-center glass-panel rounded-3xl border border-cardborder">
-                    <i data-lucide="share-2" class="w-10 h-10 mx-auto text-gray-500 mb-2"></i>
-                    <h3 class="text-sm font-bold text-white">Aucun profil social connecté</h3>
-                    <p class="text-xs text-gray-400 mt-1">Liez au moins un compte Instagram ou Telegram pour effectuer des actions sociales.</p>
-                </div>
-            `;
-            lucide.createIcons();
-            return;
-        }
-
-        container.innerHTML = accs.map(a => `
-            <div class="glass-panel p-5 rounded-3xl border border-cardborder flex items-center justify-between">
-                <div class="space-y-1">
-                    <span class="text-[10px] uppercase font-bold text-cyan-400 bg-cyan-500/10 px-2.5 py-0.5 rounded-full border border-cyan-500/20">${a.platform}</span>
-                    <h4 class="text-sm font-bold text-white mt-1">${a.account_identifier}</h4>
-                    <p class="text-[11px] text-emerald-400 flex items-center space-x-1">
-                        <i data-lucide="check" class="w-3 h-3"></i>
-                        <span>Vérifié & Actif</span>
-                    </p>
-                </div>
-                <button onclick="deleteSocialAccount(${a.id})" class="p-2 text-gray-500 hover:text-rose-400 transition" title="Supprimer">
-                    <i data-lucide="trash-2" class="w-4 h-4"></i>
-                </button>
-            </div>
-        `).join("");
-
-        lucide.createIcons();
-    } catch (e) {
-        container.innerHTML = `<div class="col-span-full py-6 text-center text-rose-400">Erreur comptes sociaux.</div>`;
-    }
-}
-
-async function deleteSocialAccount(id) {
-    if (!confirm("Voulez-vous supprimer ce compte ?")) return;
-    try {
-        const res = await fetch(`${API_BASE}/api/profile/socials/${id}`, {
-            method: "DELETE",
-            headers: getAuthHeaders()
-        });
-        if (res.ok) {
-            showToast("Compte retiré avec succès.", "info");
-            loadSocialAccounts();
-        }
-    } catch (e) {
-        showToast("Erreur lors de la suppression.", "error");
-    }
-}
-
-// ==============================================================================
-// 5. PORTEFEUILLE & RETRAITS
-// ==============================================================================
+// ==========================================================================
+// 3. PORTEFEUILLE & RETRAITS
+// ==========================================================================
 async function loadWallet() {
-    if (!State.token) return;
-    syncUserProfile();
-
-    const bigBal = document.getElementById("wallet-balance-big");
-    if (bigBal && State.user) bigBal.innerText = `$${parseFloat(State.user.balance || 0).toFixed(4)}`;
-
-    const tbody = document.getElementById("wallet-transactions-body");
-    if (!tbody) return;
-
-    tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-gray-500">Chargement du grand livre...</td></tr>`;
-
-    try {
-        const res = await fetch(`${API_BASE}/api/profile/wallet`, { headers: getAuthHeaders() });
-        const data = await res.json();
-        const txs = data.transactions || [];
-
-        if (txs.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-gray-400">Aucune transaction enregistrée.</td></tr>`;
-            return;
-        }
-
-        tbody.innerHTML = txs.map(t => {
-            const isPos = t.amount >= 0;
-            const amtFmt = `${isPos ? '+' : ''}$${parseFloat(t.amount).toFixed(4)}`;
-            return `
-                <tr class="hover:bg-slate-900/40 transition">
-                    <td class="p-4 uppercase font-bold text-[10px] text-cyan-400">${t.type.replace('_', ' ')}</td>
-                    <td class="p-4 text-gray-200">${t.description}</td>
-                    <td class="p-4 font-mono font-bold ${isPos ? 'text-emerald-400' : 'text-rose-400'}">${amtFmt}</td>
-                    <td class="p-4 font-mono text-gray-400">$${parseFloat(t.balance_after).toFixed(4)}</td>
-                    <td class="p-4 text-gray-500 font-mono text-[11px]">${t.created_at}</td>
-                </tr>
-            `;
-        }).join("");
-    } catch (e) {
-        tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-rose-400">Erreur historique portefeuille.</td></tr>`;
+  API.getMe().then(u => {
+    if (u) {
+      const bEl = document.getElementById("wallet-total-bal");
+      if (bEl) bEl.innerText = fmtPrice(u.balance);
     }
+  });
+
+  const txContainer = document.getElementById("wallet-txs-container");
+  if (!txContainer) return;
+  txContainer.innerHTML = `<div style="text-align:center; padding:15px; font-size:0.8rem; color:var(--text-muted);">Chargement du grand livre...</div>`;
+
+  try {
+    const data = await API.request("GET", "/profile/wallet");
+    const txs = data.transactions || [];
+
+    if (txs.length === 0) {
+      txContainer.innerHTML = `<div style="background:var(--card); border:1px solid var(--border); border-radius:14px; padding:20px; text-align:center; font-size:0.78rem; color:var(--text-muted);">Aucune transaction enregistrée.</div>`;
+      return;
+    }
+
+    txContainer.innerHTML = txs.map(t => {
+      const isPos = t.amount >= 0;
+      return `
+        <div class="task-card" style="cursor:default;">
+          <div class="task-card-row">
+            <div class="tc-icon" style="font-size:1.1rem; color:${isPos ? 'var(--green)' : 'var(--pc)'}">
+              ${isPos ? '↓' : '↑'}
+            </div>
+            <div class="tc-body">
+              <div class="tc-name">${t.description}</div>
+              <div class="tc-sub">${t.created_at} · Solde après : ${fmtPrice(t.balance_after)}</div>
+            </div>
+            <div class="tc-reward" style="color:${isPos ? 'var(--green)' : 'var(--pc)'}">
+              ${isPos ? '+' : ''}${fmtPrice(t.amount)}
+            </div>
+          </div>
+        </div>
+      `;
+    }).join("");
+  } catch (err) {
+    txContainer.innerHTML = `<div style="color:var(--red); text-align:center;">Erreur : ${err.message}</div>`;
+  }
 }
 
-function openWalletModal(mode = "deposit") {
-    if (!State.token) {
-        openAuthModal('login');
-        return;
-    }
-    State.walletMode = mode;
-    const modal = document.getElementById("modal-wallet");
-    const title = document.getElementById("wallet-modal-title");
-    const btn = document.getElementById("wallet-submit-btn");
-    const detField = document.getElementById("wallet-field-details");
+function openDepositModal() {
+  currentWalletMode = "deposit";
+  const m = document.getElementById("modal-wallet");
+  document.getElementById("m-wallet-title").innerText = "Recharger mon Compte";
+  document.getElementById("w-group-details").style.display = "none";
+  document.getElementById("w-btn-submit").innerText = "Confirmer le Dépôt";
+  if (m) m.classList.remove("hidden");
+}
 
-    if (mode === "deposit") {
-        if (title) title.innerText = "Recharger votre Compte (Dépôt Annonceur)";
-        if (btn) btn.innerText = "Confirmer le Dépôt Immédiat";
-        if (detField) detField.classList.add("hidden");
-    } else {
-        if (title) title.innerText = "Demander un Retrait de Gains";
-        if (btn) btn.innerText = "Demander le Retrait";
-        if (detField) detField.classList.remove("hidden");
-    }
-
-    if (modal) modal.classList.remove("hidden");
+function openWithdrawModal() {
+  currentWalletMode = "withdraw";
+  const m = document.getElementById("modal-wallet");
+  document.getElementById("m-wallet-title").innerText = "Demander un Retrait";
+  document.getElementById("w-group-details").style.display = "flex";
+  document.getElementById("w-btn-submit").innerText = "Demander le Retrait";
+  if (m) m.classList.remove("hidden");
 }
 
 function closeWalletModal() {
-    const modal = document.getElementById("modal-wallet");
-    if (modal) modal.classList.add("hidden");
+  const m = document.getElementById("modal-wallet");
+  if (m) m.classList.add("hidden");
 }
 
 async function handleWalletSubmit(e) {
-    e.preventDefault();
-    const amount = parseFloat(document.getElementById("wallet-input-amount").value);
-    const method = document.getElementById("wallet-select-method").value;
-    const details = document.getElementById("wallet-input-details").value;
+  e.preventDefault();
+  const amount = parseFloat(document.getElementById("w-input-amount").value);
+  const method = document.getElementById("w-select-method").value;
+  const details = document.getElementById("w-input-details").value;
 
-    const endpoint = State.walletMode === "deposit" ? "/api/wallet/deposit" : "/api/wallet/withdraw";
-    const body = State.walletMode === "deposit" 
-        ? { amount, payment_method: method }
-        : { amount, payment_method: method, account_details: details };
+  const endpoint = currentWalletMode === "deposit" ? "/wallet/deposit" : "/wallet/withdraw";
+  const body = currentWalletMode === "deposit" 
+    ? { amount, payment_method: method }
+    : { amount, payment_method: method, account_details: details };
 
-    try {
-        const res = await fetch(`${API_BASE}${endpoint}`, {
-            method: "POST",
-            headers: getAuthHeaders(),
-            body: JSON.stringify(body)
-        });
-        const data = await res.json();
-
-        if (res.ok) {
-            closeWalletModal();
-            showToast(data.message || "Opération validée !", "success");
-            syncUserProfile();
-            loadWallet();
-        } else {
-            showToast(data.detail || "Erreur de transaction.", "error");
-        }
-    } catch (e) {
-        showToast("Erreur de communication avec la passerelle.", "error");
-    }
+  try {
+    const res = await API.request("POST", endpoint, body);
+    closeWalletModal();
+    showToast(res.message || "Opération réussie !", "success");
+    API.getMe();
+    loadWallet();
+  } catch (err) {
+    showToast(err.message || "Erreur portefeuille.", "error");
+  }
 }
 
-// ==============================================================================
-// 6. PROGRAMME DE PARRAINAGE
-// ==============================================================================
+// ==========================================================================
+// 4. CAMPAGNES (ANNONCEURS)
+// ==========================================================================
+async function loadOrders() {
+  const container = document.getElementById("orders-list");
+  if (!container) return;
+  container.innerHTML = `<div style="text-align:center; padding:20px; font-size:0.8rem; color:var(--text-muted);">Chargement de vos campagnes...</div>`;
+
+  try {
+    const data = await API.request("GET", "/campaigns");
+    const camps = data.campaigns || [];
+
+    if (camps.length === 0) {
+      container.innerHTML = `<div style="background:var(--card); border:1px solid var(--border); border-radius:14px; padding:30px; text-align:center; font-size:0.8rem; color:var(--text-muted);">Vous n'avez pas encore créé de campagnes. Cliquez sur "+ Créer une Campagne".</div>`;
+      return;
+    }
+
+    container.innerHTML = camps.map(c => `
+      <div class="task-card" style="cursor:default;">
+        <div class="task-card-row">
+          <div class="tc-icon">${PLATFORM_ICONS[c.platform] || PLATFORM_ICONS.website}</div>
+          <div class="tc-body">
+            <div class="tc-name">${c.title}</div>
+            <div class="tc-sub">
+              Progression : <b>${c.completed_quantity} / ${c.target_quantity}</b> · Budget restant : ${fmtPrice(c.remaining_budget)}
+            </div>
+          </div>
+          <div class="tc-reward" style="font-size:0.8rem; color:var(--text-muted);">${c.status.toUpperCase()}</div>
+        </div>
+      </div>
+    `).join("");
+  } catch (err) {
+    container.innerHTML = `<div style="color:var(--red); text-align:center;">Erreur : ${err.message}</div>`;
+  }
+}
+
+function openCreateOrderModal() {
+  const m = document.getElementById("modal-order");
+  if (m) m.classList.remove("hidden");
+  calcOrderBudget();
+}
+
+function closeOrderModal() {
+  const m = document.getElementById("modal-order");
+  if (m) m.classList.add("hidden");
+}
+
+function calcOrderBudget() {
+  const qty = parseInt(document.getElementById("ord-qty")?.value || 100);
+  const price = parseFloat(document.getElementById("ord-price")?.value || 0.008);
+  const cost = price * 1.4; // 40% marge
+  const total = qty * cost;
+  const totEl = document.getElementById("ord-total-calc");
+  if (totEl) totEl.innerText = fmtPrice(total);
+}
+
+async function handleCreateOrder(e) {
+  e.preventDefault();
+  const title = document.getElementById("ord-title").value;
+  const platform = document.getElementById("ord-platform").value;
+  const action_type = document.getElementById("ord-action").value;
+  const target_url = document.getElementById("ord-url").value;
+  const target_quantity = parseInt(document.getElementById("ord-qty").value);
+  const reward_per_action = parseFloat(document.getElementById("ord-price").value);
+
+  try {
+    const res = await API.request("POST", "/campaigns", {
+      title, platform, action_type, target_url, target_quantity, reward_per_action
+    });
+    closeOrderModal();
+    showToast("Campagne déployée avec succès !", "success");
+    API.getMe();
+    loadOrders();
+  } catch (err) {
+    showToast(err.message || "Erreur de création de la campagne.", "error");
+  }
+}
+
+// ==========================================================================
+// 5. PROFIL & RÉSEAUX SOCIAUX
+// ==========================================================================
+async function loadProfile() {
+  const container = document.getElementById("socials-list");
+  if (!container) return;
+  container.innerHTML = `<div style="text-align:center; padding:15px; font-size:0.8rem; color:var(--text-muted);">Chargement des réseaux...</div>`;
+
+  try {
+    const data = await API.request("GET", "/profile/socials");
+    const accs = data.accounts || [];
+
+    if (accs.length === 0) {
+      container.innerHTML = `<div style="font-size:0.75rem; color:var(--text-muted); padding:10px;">Aucun réseau associé pour le moment.</div>`;
+      return;
+    }
+
+    container.innerHTML = accs.map(a => `
+      <div style="background:var(--card-inner); border:1px solid var(--border-subtle); border-radius:10px; padding:12px 14px; display:flex; align-items:center; justify-content:space-between;">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <div style="width:24px; height:24px;">${PLATFORM_ICONS[a.platform] || PLATFORM_ICONS.website}</div>
+          <div>
+            <b style="font-size:0.82rem; color:#fff;">${a.account_identifier}</b>
+            <span style="font-size:0.7rem; color:var(--green); margin-left:6px;">✓ Vérifié</span>
+          </div>
+        </div>
+        <button onclick="removeSocialAccount(${a.id})" style="background:none; border:none; color:var(--red); font-size:0.75rem; cursor:pointer;">Supprimer</button>
+      </div>
+    `).join("");
+  } catch (err) {
+    container.innerHTML = `<div style="color:var(--red); text-align:center;">Erreur : ${err.message}</div>`;
+  }
+}
+
+async function removeSocialAccount(id) {
+  if (!confirm("Voulez-vous dissocier ce compte ?")) return;
+  try {
+    await API.request("DELETE", `/profile/socials/${id}`);
+    showToast("Compte dissocié.", "info");
+    loadProfile();
+  } catch (err) {
+    showToast(err.message || "Erreur.", "error");
+  }
+}
+
+// ==========================================================================
+// 6. PARRAINAGE (10%)
+// ==========================================================================
 async function loadReferrals() {
-    if (!State.token) return;
-    try {
-        const res = await fetch(`${API_BASE}/api/referrals`, { headers: getAuthHeaders() });
-        const data = await res.json();
+  try {
+    const data = await API.request("GET", "/referrals");
+    const linkFld = document.getElementById("ref-link-field");
+    if (linkFld) linkFld.value = data.referral_link || "";
 
-        const linkInput = document.getElementById("ref-link-input");
-        if (linkInput) linkInput.value = data.referral_link || "";
+    const cVal = document.getElementById("ref-count-val");
+    if (cVal) cVal.innerText = data.total_referrals || 0;
 
-        const cntEl = document.getElementById("ref-total-count");
-        if (cntEl) cntEl.innerText = data.total_referrals || 0;
-
-        const earnEl = document.getElementById("ref-total-earned");
-        if (earnEl) earnEl.innerText = `$${parseFloat(data.total_commission_earned || 0).toFixed(4)}`;
-
-        const listContainer = document.getElementById("referrals-list-container");
-        if (listContainer) {
-            const refs = data.referrals || [];
-            if (refs.length === 0) {
-                listContainer.innerHTML = `<p class="text-gray-500 py-3 text-center">Vous n'avez pas encore d'affiliés enregistrés. Partagez votre lien pour commencer à encaisser 10% !</p>`;
-            } else {
-                listContainer.innerHTML = refs.map(r => `
-                    <div class="flex items-center justify-between py-2 border-b border-slate-800">
-                        <span class="font-bold text-white">@${r.username}</span>
-                        <span class="text-gray-400 font-mono text-[11px]">Inscrit le ${r.created_at}</span>
-                    </div>
-                `).join("");
-            }
-        }
-    } catch (e) {
-        console.error("Erreur referrals", e);
-    }
+    const eVal = document.getElementById("ref-earned-val");
+    if (eVal) eVal.innerText = fmtPrice(data.total_commission_earned);
+  } catch (_) {}
 }
 
-function copyReferralLink() {
-    const input = document.getElementById("ref-link-input");
-    if (!input) return;
-    navigator.clipboard.writeText(input.value);
-    showToast("Lien de parrainage copié dans le presse-papiers !", "success");
+function copyRefLink() {
+  const fld = document.getElementById("ref-link-field");
+  if (fld) {
+    navigator.clipboard.writeText(fld.value);
+    showToast("Lien de parrainage copié !", "success");
+  }
 }
 
-// ==============================================================================
-// 7. ADMINISTRATION & SENTINEL
-// ==============================================================================
+// ==========================================================================
+// 7. SENTINEL ADMIN
+// ==========================================================================
 async function loadAdmin() {
-    if (!State.token || State.user?.role !== "admin") return;
+  if (!API.user || API.user.role !== "admin") return;
 
-    try {
-        const resStats = await fetch(`${API_BASE}/api/admin/stats`, { headers: getAuthHeaders() });
-        if (resStats.ok) {
-            const stats = await resStats.json();
-            document.getElementById("admin-kpi-users").innerText = stats.total_users;
-            document.getElementById("admin-kpi-campaigns").innerText = stats.total_campaigns;
-            document.getElementById("admin-kpi-executions").innerText = stats.total_executions;
-            document.getElementById("admin-kpi-fraud").innerText = stats.fraud_alerts_triggered;
-        }
+  try {
+    const stats = await API.request("GET", "/admin/stats");
+    document.getElementById("admin-kpi-u").innerText = stats.total_users;
+    document.getElementById("admin-kpi-c").innerText = stats.total_campaigns;
+    document.getElementById("admin-kpi-e").innerText = stats.total_executions;
 
-        const resUsers = await fetch(`${API_BASE}/api/admin/users`, { headers: getAuthHeaders() });
-        if (resUsers.ok) {
-            const data = await resUsers.json();
-            const tbody = document.getElementById("admin-users-table-body");
-            tbody.innerHTML = (data.users || []).map(u => `
-                <tr class="hover:bg-slate-900/50">
-                    <td class="p-3 font-mono text-gray-400">#${u.id}</td>
-                    <td class="p-3 font-bold text-white">@${u.username} (${u.email})</td>
-                    <td class="p-3 uppercase text-[10px] text-cyan-400">${u.role}</td>
-                    <td class="p-3 font-mono text-emerald-400">$${parseFloat(u.balance).toFixed(4)}</td>
-                    <td class="p-3 font-mono text-purple-400">${Math.round(u.trust_score)}%</td>
-                    <td class="p-3 text-rose-400 font-bold">${u.warning_strikes}</td>
-                    <td class="p-3">
-                        ${u.is_banned ? 
-                            `<button onclick="unbanUser(${u.id})" class="px-2.5 py-1 text-[10px] font-bold bg-emerald-500/20 text-emerald-400 rounded-lg">Réactiver</button>` :
-                            `<button onclick="banUser(${u.id})" class="px-2.5 py-1 text-[10px] font-bold bg-rose-500/20 text-rose-400 rounded-lg">Bannir</button>`
-                        }
-                    </td>
-                </tr>
-            `).join("");
-        }
-    } catch (e) {
-        console.error("Erreur admin", e);
+    const usersData = await API.request("GET", "/admin/users");
+    const list = document.getElementById("admin-users-list");
+    if (list) {
+      list.innerHTML = (usersData.users || []).map(u => `
+        <div class="task-card" style="cursor:default;">
+          <div class="task-card-row">
+            <div class="tc-body">
+              <div class="tc-name">@${u.username} (${u.email})</div>
+              <div class="tc-sub">Rôle : <b>${u.role}</b> · Solde : ${fmtPrice(u.balance)} · Confiance : ${Math.round(u.trust_score)}%</div>
+            </div>
+            <div>
+              ${u.is_banned ? 
+                `<button class="btn-demo-chip" onclick="unbanAdmin(${u.id})">Réactiver</button>` :
+                `<button class="btn-demo-chip" style="color:var(--red);" onclick="banAdmin(${u.id})">Bannir</button>`
+              }
+            </div>
+          </div>
+        </div>
+      `).join("");
     }
+  } catch (_) {}
 }
 
-async function banUser(id) {
-    if (!confirm(`Bannir l'utilisateur #${id} ?`)) return;
-    try {
-        const res = await fetch(`${API_BASE}/api/admin/users/${id}/ban`, {
-            method: "POST",
-            headers: getAuthHeaders()
-        });
-        if (res.ok) {
-            showToast(`Utilisateur #${id} banni avec succès.`, "info");
-            loadAdmin();
-        }
-    } catch (e) {
-        showToast("Erreur lors du bannissement.", "error");
-    }
+async function banAdmin(id) {
+  if (!confirm(`Bannir l'utilisateur #${id} ?`)) return;
+  try {
+    await API.request("POST", `/admin/users/${id}/ban`);
+    showToast(`Utilisateur #${id} banni.`, "info");
+    loadAdmin();
+  } catch (err) {
+    showToast(err.message, "error");
+  }
 }
 
-async function unbanUser(id) {
-    try {
-        const res = await fetch(`${API_BASE}/api/admin/users/${id}/unban`, {
-            method: "POST",
-            headers: getAuthHeaders()
-        });
-        if (res.ok) {
-            showToast(`Utilisateur #${id} réactivé.`, "success");
-            loadAdmin();
-        }
-    } catch (e) {
-        showToast("Erreur lors de la réactivation.", "error");
-    }
+async function unbanAdmin(id) {
+  try {
+    await API.request("POST", `/admin/users/${id}/unban`);
+    showToast(`Utilisateur #${id} réactivé.`, "success");
+    loadAdmin();
+  } catch (err) {
+    showToast(err.message, "error");
+  }
 }
 
-// ==============================================================================
-// 8. AUTH MODAL & CONTROLS
-// ==============================================================================
-function openAuthModal(mode = "login") {
-    State.authMode = mode;
-    const modal = document.getElementById("modal-auth");
-    const title = document.getElementById("auth-modal-title");
-    const emailField = document.getElementById("auth-field-email");
-    const userLabel = document.getElementById("auth-label-user");
-    const submitBtn = document.getElementById("auth-submit-btn");
-    const toggleBtn = document.getElementById("auth-toggle-mode-btn");
-
-    if (mode === "login") {
-        if (title) title.innerText = "Connexion à L-Marchande";
-        if (emailField) emailField.classList.add("hidden");
-        if (userLabel) userLabel.innerText = "Nom d'utilisateur ou Email";
-        if (submitBtn) submitBtn.innerText = "Se Connecter";
-        if (toggleBtn) toggleBtn.innerText = "Pas encore de compte ? S'inscrire";
+// ==========================================================================
+// INITIALISATION AU CHARGEMENT DU DOM
+// ==========================================================================
+document.addEventListener("DOMContentLoaded", async () => {
+  if (API.token) {
+    const user = await API.getMe();
+    if (user) {
+      renderAppView();
     } else {
-        if (title) title.innerText = "Inscription à L-Marchande";
-        if (emailField) emailField.classList.remove("hidden");
-        if (userLabel) userLabel.innerText = "Choisissez un Nom d'utilisateur";
-        if (submitBtn) submitBtn.innerText = "Créer mon Compte";
-        if (toggleBtn) toggleBtn.innerText = "Déjà inscrit ? Se connecter";
+      renderGuestView();
     }
-
-    if (modal) modal.classList.remove("hidden");
-}
-
-function closeAuthModal() {
-    const modal = document.getElementById("modal-auth");
-    if (modal) modal.classList.add("hidden");
-}
-
-function toggleAuthMode() {
-    openAuthModal(State.authMode === "login" ? "register" : "login");
-}
-
-async function handleAuthSubmit(e) {
-    e.preventDefault();
-    const username = document.getElementById("auth-input-username").value;
-    const password = document.getElementById("auth-input-password").value;
-    const email = document.getElementById("auth-input-email")?.value || "";
-
-    const endpoint = State.authMode === "login" ? "/api/auth/login" : "/api/auth/register";
-    const body = State.authMode === "login" 
-        ? { username_or_email: username, password }
-        : { username, email, password, role: "worker" };
-
-    try {
-        const res = await fetch(`${API_BASE}${endpoint}`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(body)
-        });
-        const data = await res.json();
-
-        if (res.ok) {
-            State.token = data.access_token;
-            State.user = data.user;
-            localStorage.setItem("lm_token", data.access_token);
-            localStorage.setItem("lm_user", JSON.stringify(data.user));
-
-            closeAuthModal();
-            updateAuthUI();
-            navigate("tasks");
-            showToast(`Bienvenue, @${data.user.username} !`, "success");
-        } else {
-            showToast(data.detail || "Échec d'authentification.", "error");
-        }
-    } catch (e) {
-        showToast("Erreur lors de la connexion au serveur.", "error");
-    }
-}
-
-async function quickLoginDemo(role = "worker") {
-    const creds = role === "worker" 
-        ? { username_or_email: "top_worker", password: "WorkerPass2026!" }
-        : { username_or_email: "lux_agency", password: "AdvertPass2026!" };
-
-    try {
-        const res = await fetch(`${API_BASE}/api/auth/login`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(creds)
-        });
-        const data = await res.json();
-        if (res.ok) {
-            State.token = data.access_token;
-            State.user = data.user;
-            localStorage.setItem("lm_token", data.access_token);
-            localStorage.setItem("lm_user", JSON.stringify(data.user));
-
-            closeAuthModal();
-            updateAuthUI();
-            navigate(role === "worker" ? "tasks" : "campaigns");
-            showToast(`Session démo activée (@${data.user.username})`, "success");
-        }
-    } catch (e) {
-        showToast("Erreur connexion démo.", "error");
-    }
-}
-
-function logout() {
-    State.token = "";
-    State.user = null;
-    localStorage.removeItem("lm_token");
-    localStorage.removeItem("lm_user");
-    updateAuthUI();
-    navigate("tasks");
-    showToast("Déconnexion réussie.", "info");
-}
-
-function toggleUserDropdown() {
-    const el = document.getElementById("user-dropdown-menu");
-    if (el) el.classList.toggle("hidden");
-}
-
-// Close dropdown on outside click
-window.addEventListener("click", (e) => {
-    const menu = document.getElementById("user-dropdown-menu");
-    if (menu && !menu.contains(e.target) && !e.target.closest("button[onclick*='toggleUserDropdown']")) {
-        menu.classList.add("hidden");
-    }
-});
-
-// --- Boot Application ---
-document.addEventListener("DOMContentLoaded", () => {
-    updateAuthUI();
-    fetchPublicStats();
-    navigate("tasks");
-    lucide.createIcons();
-    setInterval(fetchPublicStats, 30000);
+  } else {
+    renderGuestView();
+  }
 });

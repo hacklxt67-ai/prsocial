@@ -122,7 +122,7 @@ def run_strict_tests():
     res = client.get("/")
     assert res.status_code == 200
     assert "L-MARCHANDE" in res.text
-    assert "Plateforme d'Engagement" in res.text
+    assert "Gagnez de l'argent sur les réseaux sociaux" in res.text
     print(f"  [✓] Frontend SPA servi avec succès ({len(res.text)} octets).")
 
     print("\n" + "=" * 70)
