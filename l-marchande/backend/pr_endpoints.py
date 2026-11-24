@@ -186,9 +186,23 @@ def tasks_available(
     page: int = 1,
     user: Dict[str, Any] = Depends(_require_user)
 ):
-    return TaskDistributionEngine.get_available_tasks(
+    res = TaskDistributionEngine.get_available_tasks(
         worker_id=user["id"], platform=platform, sort=sort, limit=limit, page=page
     )
+    enriched = []
+    for t in res.get("tasks", []):
+        item = dict(t)
+        item.setdefault("reward", item.get("reward_per_action", 0.005))
+        item.setdefault("action", item.get("action_type", "like"))
+        item.setdefault("label", item.get("title", ""))
+        item.setdefault("remaining", max(1, (item.get("target_quantity", 100) - item.get("completed_quantity", 0))))
+        item.setdefault("total_count", item.get("target_quantity", 100))
+        item.setdefault("completed_count", item.get("completed_quantity", 0))
+        enriched.append(item)
+    res["tasks"] = enriched
+    res["ok"] = True
+    res["has_more"] = False
+    return res
 
 @router.get("/api/tasks/api-check-enabled")
 def api_check_enabled():
@@ -200,18 +214,32 @@ def api_check_enabled():
 
 @router.get("/api/tasks/dashboard-init")
 def dashboard_init(user: Dict[str, Any] = Depends(_require_user)):
-    avail = TaskDistributionEngine.get_available_tasks(worker_id=user["id"], limit=10)
+    avail = TaskDistributionEngine.get_available_tasks(worker_id=user["id"], limit=50)
     completed = query_one("SELECT COUNT(*) as c, COALESCE(SUM(reward_amount),0) as s FROM task_executions WHERE worker_id=? AND status='verified'", (user["id"],))
+    pending = query_one("SELECT COUNT(*) as c FROM task_executions WHERE worker_id=? AND status='claimed'", (user["id"],))
+    recent = query_all("""
+        SELECT te.id, te.status, te.reward_amount as reward, te.created_at, c.platform, c.action_type as action, c.title as label
+        FROM task_executions te
+        JOIN campaigns c ON te.campaign_id = c.id
+        WHERE te.worker_id = ?
+        ORDER BY te.id DESC LIMIT 4
+    """, (user["id"],))
+    pcounts = {}
+    for t in avail.get("tasks", []):
+        plat = t.get("platform", "other")
+        pcounts[plat] = pcounts.get(plat, 0) + 1
+    platform_counts = [{"platform": k, "count": v} for k, v in pcounts.items()]
     return {
         "ok": True,
         "user": user,
-        "stats": {
-            "completed": completed["c"],
-            "earned": round(completed["s"], 4),
-            "balance": user["balance"],
-            "available_tasks": avail["total"]
+        "status_counts": {
+            "approved": completed["c"],
+            "pending_review": pending["c"],
         },
-        "tasks": avail["tasks"],
+        "total_earned": round(completed["s"], 4),
+        "recent_tasks": recent,
+        "platform_counts": platform_counts,
+        "chart": [],
         "news": []
     }
 
