@@ -8,12 +8,19 @@ class UserRegisterRequest(BaseModel):
     password: str = Field(..., min_length=6)
     role: Optional[str] = "worker"
     referral_code: Optional[str] = None
+    ref: Optional[str] = None
+    cfToken: Optional[str] = None
+    fingerprint: Optional[str] = None
 
 class UserLoginRequest(BaseModel):
-    username_or_email: str
+    username_or_email: Optional[str] = None
+    email: Optional[str] = None
     password: str
+    cfToken: Optional[str] = None
+    fingerprint: Optional[str] = None
 
 class TokenResponse(BaseModel):
+    ok: bool = True
     access_token: str
     token_type: str = "bearer"
     user: dict

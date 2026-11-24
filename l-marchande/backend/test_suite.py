@@ -121,9 +121,19 @@ def run_strict_tests():
     print("\n[*] 11. Test Rendu Frontend (Index HTML)...")
     res = client.get("/")
     assert res.status_code == 200
-    assert "L-MARCHANDE" in res.text
-    assert "Gagnez de l'argent sur les réseaux sociaux" in res.text
-    print(f"  [✓] Frontend SPA servi avec succès ({len(res.text)} octets).")
+    assert "PR.SOCIAL" in res.text
+    res_login = client.get("/login")
+    assert res_login.status_code == 200
+    assert "/cab/signin.618d6e73c6e1.js" in res_login.text
+    assert client.get("/live").status_code == 200
+    assert client.get("/tasks").status_code == 200
+    assert client.get("/cab/signin.618d6e73c6e1.js").status_code == 200
+    assert client.get("/css/main.css").status_code == 200
+    assert client.get("/api/cabinet/frame").status_code == 200
+    assert client.get("/api/cabinet/door").status_code == 200
+    assert client.get("/api/cabinet/live").status_code == 200
+    assert client.get("/api/tasks/advertiser-catalog").status_code == 200
+    print(f"  [✓] Frontend PR.SOCIAL Exact & Endpoints /cab/* validés ({len(res_login.text)} octets).")
 
     print("\n" + "=" * 70)
     print("  TOUS LES TESTS ONT RÉUSSI AVEC SUCCÈS (100% CONFORME & SÉCURISÉ) !")

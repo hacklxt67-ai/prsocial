@@ -1,9 +1,9 @@
 import os
 import sys
-from fastapi import FastAPI, Depends, HTTPException, Header, status, Request
+from fastapi import FastAPI, Depends, HTTPException, Header, status, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, HTMLResponse, RedirectResponse
 from typing import Optional, List, Dict, Any
 
 from database import init_db, query_one, query_all, execute_commit
@@ -16,6 +16,7 @@ from schemas import (
 from services.wallet_service import WalletService
 from services.task_engine import TaskDistributionEngine
 from services.verification_engine import VerificationEngine
+from pr_endpoints import router as pr_router
 
 # Initialisation de la base de données
 init_db()
@@ -41,16 +42,18 @@ FRONTEND_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "fr
 # ==============================================================================
 # AUTHENTICATION DEPENDENCY
 # ==============================================================================
-def get_current_user(authorization: Optional[str] = Header(None)) -> Dict[str, Any]:
-    """Extrait et valide l'utilisateur actuel via le token JWT."""
-    if not authorization:
+def get_current_user(request: Request, authorization: Optional[str] = Header(None)) -> Dict[str, Any]:
+    """Extrait et valide l'utilisateur actuel via Bearer token ou cookie pr_token."""
+    token = None
+    if authorization:
+        parts = authorization.split()
+        if len(parts) == 2 and parts[0].lower() == "bearer":
+            token = parts[1]
+    if not token:
+        token = request.cookies.get("pr_token")
+    if not token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token d'authentification manquant.")
-    
-    parts = authorization.split()
-    if len(parts) != 2 or parts[0].lower() != "bearer":
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Format de token invalide (Attendu: Bearer <token>).")
 
-    token = parts[1]
     payload = SecurityHelper.verify_jwt(token)
     if not payload or "sub" not in payload:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session expirée ou token invalide.")
@@ -74,7 +77,7 @@ def get_admin_user(current_user: Dict[str, Any] = Depends(get_current_user)) -> 
 # 1. AUTHENTICATION ENDPOINTS
 # ==============================================================================
 @app.post("/api/auth/register", response_model=TokenResponse)
-def register(req: UserRegisterRequest, request: Request):
+def register(req: UserRegisterRequest, request: Request, response: Response):
     # Vérifier l'unicité de l'email et du pseudo
     if query_one("SELECT id FROM users WHERE email = ?", (req.email,)):
         raise HTTPException(status_code=400, detail="Cette adresse email est déjà enregistrée.")
@@ -83,8 +86,9 @@ def register(req: UserRegisterRequest, request: Request):
 
     # Parrainage
     referred_by_id = None
-    if req.referral_code:
-        sponsor = query_one("SELECT id FROM users WHERE referral_code = ?", (req.referral_code.strip().upper(),))
+    ref_code_in = req.referral_code or req.ref
+    if ref_code_in:
+        sponsor = query_one("SELECT id FROM users WHERE referral_code = ?", (ref_code_in.strip().upper(),))
         if sponsor:
             referred_by_id = sponsor["id"]
 
@@ -103,14 +107,16 @@ def register(req: UserRegisterRequest, request: Request):
     # Nettoyage mot de passe avant retour
     user_data = dict(user)
     user_data.pop("hashed_password", None)
+    response.set_cookie("pr_token", token, httponly=True, samesite="lax", path="/", max_age=86400*30)
 
-    return {"access_token": token, "token_type": "bearer", "user": user_data}
+    return {"ok": True, "access_token": token, "token_type": "bearer", "user": user_data}
 
 @app.post("/api/auth/login", response_model=TokenResponse)
-def login(req: UserLoginRequest, request: Request):
+def login(req: UserLoginRequest, request: Request, response: Response):
+    ident = (req.username_or_email or req.email or "").strip()
     user = query_one("""
         SELECT * FROM users WHERE username = ? OR email = ?
-    """, (req.username_or_email, req.username_or_email))
+    """, (ident, ident))
 
     if not user or not SecurityHelper.verify_password(req.password, user["hashed_password"]):
         raise HTTPException(status_code=400, detail="Identifiants incorrects.")
@@ -124,8 +130,9 @@ def login(req: UserLoginRequest, request: Request):
     token = SecurityHelper.create_jwt({"sub": user["id"], "username": user["username"], "role": user["role"]})
     user_data = dict(user)
     user_data.pop("hashed_password", None)
+    response.set_cookie("pr_token", token, httponly=True, samesite="lax", path="/", max_age=86400*30)
 
-    return {"access_token": token, "token_type": "bearer", "user": user_data}
+    return {"ok": True, "access_token": token, "token_type": "bearer", "user": user_data}
 
 @app.get("/api/auth/me")
 def me(current_user: Dict[str, Any] = Depends(get_current_user)):
@@ -394,18 +401,61 @@ def admin_unban_user(user_id: int, admin: Dict[str, Any] = Depends(get_admin_use
     return {"status": "success", "message": f"Utilisateur #{user_id} réactivé."}
 
 # ==============================================================================
-# 9. FRONTEND STATIC ASSETS
+# 9. PR.SOCIAL COMPATIBILITY ROUTER & EXACT FRONTEND SERVING
 # ==============================================================================
+app.include_router(pr_router)
+
 if os.path.exists(FRONTEND_DIR):
+    for sub in ("cab", "css", "js", "assets"):
+        sub_dir = os.path.join(FRONTEND_DIR, sub)
+        if os.path.isdir(sub_dir):
+            app.mount(f"/{sub}", StaticFiles(directory=sub_dir), name=sub)
     app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")
+
+def _serve_login_view(view_name: str = "in") -> HTMLResponse:
+    login_path = os.path.join(FRONTEND_DIR, "login.html")
+    if os.path.exists(login_path):
+        html = open(login_path, encoding="utf-8").read()
+        if view_name != "in":
+            html = html.replace('"view":"in"', f'"view":"{view_name}"')
+        return HTMLResponse(html)
+    return HTMLResponse("<h1>Login</h1>")
+
+@app.get("/login")
+def page_login():
+    return _serve_login_view("in")
+
+@app.get("/register")
+def page_register():
+    return _serve_login_view("up")
+
+@app.get("/forgot-password")
+@app.get("/forgot")
+def page_forgot():
+    return _serve_login_view("forgot")
+
+@app.get("/live")
+def page_live():
+    p = os.path.join(FRONTEND_DIR, "live.html")
+    if os.path.exists(p):
+        return FileResponse(p)
+    return _serve_login_view("in")
+
+@app.get("/")
+def page_root(request: Request):
+    token = request.cookies.get("pr_token")
+    if token and SecurityHelper.verify_jwt(token):
+        app_path = os.path.join(FRONTEND_DIR, "app.html")
+        if os.path.exists(app_path):
+            return FileResponse(app_path)
+    return _serve_login_view("in")
 
 @app.get("/{full_path:path}")
 def serve_spa(full_path: str):
     target = os.path.join(FRONTEND_DIR, full_path)
     if full_path and os.path.isfile(target):
         return FileResponse(target)
-    # SPA Fallback sur index.html
-    index_file = os.path.join(FRONTEND_DIR, "index.html")
-    if os.path.exists(index_file):
-        return FileResponse(index_file)
-    return JSONResponse({"status": "L-MARCHANDE Core API Online", "version": "1.0.0"})
+    app_file = os.path.join(FRONTEND_DIR, "app.html")
+    if os.path.exists(app_file):
+        return FileResponse(app_file)
+    return JSONResponse({"status": "PR.SOCIAL Clone API Online", "version": "1.0.0"})
