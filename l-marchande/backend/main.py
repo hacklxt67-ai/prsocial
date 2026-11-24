@@ -141,29 +141,8 @@ def me(current_user: Dict[str, Any] = Depends(get_current_user)):
     return {"user": user_data}
 
 # ==============================================================================
-# 2. PROFILE & SOCIAL ACCOUNTS
+# 2. PROFILE & WARNINGS (Socials handled in pr_endpoints.py)
 # ==============================================================================
-@app.get("/api/profile/socials")
-def list_social_accounts(current_user: Dict[str, Any] = Depends(get_current_user)):
-    accounts = query_all("SELECT * FROM social_accounts WHERE user_id = ?", (current_user["id"],))
-    return {"accounts": accounts}
-
-@app.post("/api/profile/socials")
-def add_social_account(req: SocialAccountCreate, current_user: Dict[str, Any] = Depends(get_current_user)):
-    try:
-        acc_id = execute_commit("""
-            INSERT INTO social_accounts (user_id, platform, account_identifier, account_url, status)
-            VALUES (?, ?, ?, ?, 'verified')
-        """, (current_user["id"], req.platform.lower(), req.account_identifier.strip(), req.account_url))
-        return {"status": "success", "message": "Compte social associé avec succès !", "account_id": acc_id}
-    except Exception:
-        raise HTTPException(status_code=400, detail="Ce compte est déjà associé à votre profil.")
-
-@app.delete("/api/profile/socials/{account_id}")
-def delete_social_account(account_id: int, current_user: Dict[str, Any] = Depends(get_current_user)):
-    execute_commit("DELETE FROM social_accounts WHERE id = ? AND user_id = ?", (account_id, current_user["id"]))
-    return {"status": "success", "message": "Compte supprimé."}
-
 @app.get("/api/profile/warnings")
 def get_warnings(current_user: Dict[str, Any] = Depends(get_current_user)):
     return {

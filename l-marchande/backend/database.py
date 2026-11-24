@@ -54,8 +54,10 @@ def init_db():
             platform TEXT NOT NULL, -- 'instagram', 'telegram', 'youtube', 'tiktok', 'twitter', 'vk', 'website'
             account_identifier TEXT NOT NULL,
             account_url TEXT,
-            status TEXT DEFAULT 'verified', -- 'verified', 'pending', 'invalid', 'restricted'
+            status TEXT DEFAULT 'verified', -- 'verified', 'approved', 'pending', 'invalid', 'restricted'
             verification_token TEXT,
+            is_default INTEGER DEFAULT 0,
+            ai_attempts INTEGER DEFAULT 0,
             followers_count INTEGER DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             last_checked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -149,6 +151,15 @@ def init_db():
         );
         """)
 
+        for col_sql in (
+            "ALTER TABLE social_accounts ADD COLUMN is_default INTEGER DEFAULT 0",
+            "ALTER TABLE social_accounts ADD COLUMN ai_attempts INTEGER DEFAULT 0",
+        ):
+            try:
+                cur.execute(col_sql)
+            except sqlite3.OperationalError:
+                pass
+
         conn.commit()
         conn.close()
 
@@ -181,7 +192,16 @@ def execute_commit(query: str, params: tuple = ()) -> int:
         try:
             cur = conn.cursor()
             cur.execute(query, params)
-            conn.commit()
+            for col_sql in (
+            "ALTER TABLE social_accounts ADD COLUMN is_default INTEGER DEFAULT 0",
+            "ALTER TABLE social_accounts ADD COLUMN ai_attempts INTEGER DEFAULT 0",
+        ):
+            try:
+                cur.execute(col_sql)
+            except sqlite3.OperationalError:
+                pass
+
+        conn.commit()
             return cur.lastrowid
         finally:
             conn.close()
