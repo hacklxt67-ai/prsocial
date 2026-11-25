@@ -457,6 +457,22 @@ async def create_social(request: Request, user: Dict[str, Any] = Depends(_requir
 
     return {"ok": True, "account_id": acc_id, "code": code, "message": "Compte enregistré. Veuillez procéder à la vérification."}
 
+@router.delete("/api/profile/socials/cancel-verify")
+@router.post("/api/profile/socials/cancel-verify")
+async def socials_cancel_verify(request: Request, user: Dict[str, Any] = Depends(_require_user)):
+    body = {}
+    try:
+        body = await request.json()
+    except Exception:
+        pass
+    acc_id = body.get("account_id")
+    plat = body.get("platform")
+    if acc_id:
+        execute_commit("DELETE FROM social_accounts WHERE id = ? AND user_id = ? AND status = 'pending'", (acc_id, user["id"]))
+    elif plat:
+        execute_commit("DELETE FROM social_accounts WHERE platform = ? AND user_id = ? AND status = 'pending'", (plat.lower(), user["id"]))
+    return {"ok": True}
+
 @router.delete("/api/profile/socials/{account_id}")
 def delete_social(account_id: int, user: Dict[str, Any] = Depends(_require_user)):
     execute_commit("DELETE FROM social_accounts WHERE id = ? AND user_id = ?", (account_id, user["id"]))
@@ -585,22 +601,6 @@ async def socials_verify_screenshot(
         """, (user["id"], platform.lower(), clean_u, build_profile_url(platform.lower(), clean_u), res_or_err))
 
     return {"ok": True, "verified": True, "message": f"Capture vérifiée et compte @{clean_u} approuvé !"}
-
-@router.delete("/api/profile/socials/cancel-verify")
-@router.post("/api/profile/socials/cancel-verify")
-async def socials_cancel_verify(request: Request, user: Dict[str, Any] = Depends(_require_user)):
-    body = {}
-    try:
-        body = await request.json()
-    except Exception:
-        pass
-    acc_id = body.get("account_id")
-    plat = body.get("platform")
-    if acc_id:
-        execute_commit("DELETE FROM social_accounts WHERE id = ? AND user_id = ? AND status = 'pending'", (acc_id, user["id"]))
-    elif plat:
-        execute_commit("DELETE FROM social_accounts WHERE platform = ? AND user_id = ? AND status = 'pending'", (plat.lower(), user["id"]))
-    return {"ok": True}
 
 @router.post("/api/profile/socials/{account_id}/set-default")
 def socials_set_default(account_id: int, user: Dict[str, Any] = Depends(_require_user)):
