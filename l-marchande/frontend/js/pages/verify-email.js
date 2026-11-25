@@ -40,6 +40,14 @@ Router.register('verify-email', async (app) => {
         <a href="/dashboard" class="btn btn-primary" style="margin-top:1.5rem;display:inline-block">Go to Dashboard</a>
       </div>`;
     if (API.user) API.user.email_verified = 1;
+    try {
+      const cached = JSON.parse(localStorage.getItem('pr-user-cache-v1') || '{}');
+      if (cached && cached.id) {
+        cached.email_verified = 1;
+        localStorage.setItem('pr-user-cache-v1', JSON.stringify(cached));
+      }
+      if (typeof API.refreshMe === 'function') await API.refreshMe();
+    } catch (_) {}
   } catch (e) {
     app.querySelector('.auth-card').innerHTML = `
       <div style="text-align:center">

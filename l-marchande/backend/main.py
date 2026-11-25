@@ -144,7 +144,7 @@ def login(req: UserLoginRequest, request: Request, response: Response):
 def me(current_user: Dict[str, Any] = Depends(get_current_user)):
     user_data = dict(current_user)
     user_data.pop("hashed_password", None)
-    return {"user": user_data}
+    return {**user_data, "ok": True, "user": user_data}
 
 # ==============================================================================
 # 2. PROFILE & WARNINGS (Socials handled in pr_endpoints.py)

@@ -133,6 +133,10 @@ const API = {
         if (data && data.user) {
           this.user = data.user;
           try { localStorage.setItem('pr-user-cache-v1', JSON.stringify(data.user)); } catch (_) {}
+          if (data.user.email_verified) {
+            const b = document.getElementById('verifyBanner');
+            if (b) b.remove();
+          }
         }
       }).catch(() => {
         // Server says not authenticated (cookie expired/invalidated) — drop cache.

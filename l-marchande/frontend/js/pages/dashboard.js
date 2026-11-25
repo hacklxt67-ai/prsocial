@@ -786,6 +786,13 @@ Router.register('dashboard', async (app) => {
             setTimeout(() => banner.remove(), 600);
           }
           if (API.user) API.user.email_verified = 1;
+          try {
+            const cached = JSON.parse(localStorage.getItem('pr-user-cache-v1') || '{}');
+            if (cached && cached.id) {
+              cached.email_verified = 1;
+              localStorage.setItem('pr-user-cache-v1', JSON.stringify(cached));
+            }
+          } catch (_) {}
         }
       } catch(e) {}
     }, 30000); // poll every 30s instead of 5s — verification is rare event, 6× less /auth/me load
