@@ -35,16 +35,160 @@ function renderSidebar(activeRoute) {
   const initial = (u.username || 'U')[0].toUpperCase();
   const userMode = getUserMode();
 
-  // Schedule async premium chip update after DOM mount (Phase 1.4)
-  setTimeout(() => initPremiumSidebarChip(), 0);
+  // Schedule async premium chip + tasks count update after DOM mount
+  setTimeout(() => {
+    initPremiumSidebarChip();
+    if (typeof initSidebarTasksCount === 'function') initSidebarTasksCount();
+  }, 0);
 
   return `
   <aside class="sidebar" id="sidebar">
+    <style id="sbCabMatch">
+      .sidebar-logo{display:flex;align-items:center;gap:10px;padding:16px 16px 12px}
+      .sb-brand-mark{width:28px;height:28px;border-radius:8px;background:rgba(255,255,255,0.08);border:1px solid var(--border);display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:11px;letter-spacing:-0.03em;color:var(--text-primary)}
+      .sidebar-mode-toggle{display:flex;gap:4px;padding:3px;margin:0 14px 12px;border-radius:10px;background:rgba(255,255,255,0.04);border:1px solid var(--border)}
+      .sidebar-mode-btn{flex:1;padding:6px 8px;border:none;border-radius:8px;background:transparent;color:var(--text-muted);font-size:12px;font-weight:600;cursor:pointer;transition:all .15s}
+      .sidebar-mode-btn.active{background:rgba(255,255,255,0.09);color:var(--text-primary)}
+      .sidebar-link.active{background:linear-gradient(135deg,#22c55e,#16a34a)!important;color:#fff!important;font-weight:600;box-shadow:0 4px 12px rgba(34,197,94,0.25)}
+      .sidebar-link.active svg{color:#fff!important;stroke:#fff!important}
+      .sb-count-pill{margin-left:auto;background:rgba(255,255,255,0.08);color:var(--text-secondary);padding:2px 7px;border-radius:999px;font-size:11px;font-weight:600;line-height:1.2}
+      .sb-follow-row{display:flex;align-items:center;justify-content:space-between;padding:8px 16px;margin-top:4px}
+      .sb-follow-lbl{font-size:10px;font-weight:700;letter-spacing:0.06em;color:var(--text-muted);text-transform:uppercase}
+      .sb-follow-icons{display:flex;align-items:center;gap:10px}
+      .sb-follow-icons a{color:var(--text-muted);display:inline-flex;align-items:center;transition:color .15s}
+      .sb-follow-icons a:hover{color:var(--text-primary)}
+      .sb-footer-tools{display:flex;align-items:center;gap:6px;padding:10px 14px 6px;border-top:1px solid var(--border)}
+      .sb-footer-tools .sidebar-lang-select{flex:1;position:relative}
+      .sb-footer-tools .sb-lang-popup{top:auto!important;bottom:calc(100% + 6px)!important}
+      .sb-user-trust{font-size:11px;color:#22c55e;font-weight:600;display:flex;align-items:center;gap:4px}
+    </style>
+
     <div class="sidebar-logo">
-      <h1>PR<span style="color:var(--accent)">.</span>SOCIAL</h1>
+      <span class="sb-brand-mark">PR</span>
+      <h1 style="margin:0;font-size:16px;letter-spacing:-0.02em">PR<span style="color:var(--accent)">.</span>SOCIAL</h1>
     </div>
 
-    <div class="sidebar-lang" style="gap:6px;padding:0 16px 12px;border-bottom:1px solid var(--border);margin-bottom:4px">
+    <div class="sidebar-mode-toggle">
+      <button onclick="switchUserMode('worker')" class="sidebar-mode-btn ${userMode === 'worker' ? 'active' : ''}">
+        ${t('mode_worker') || 'Travailleur'}
+      </button>
+      <button onclick="switchUserMode('advertiser')" class="sidebar-mode-btn ${userMode === 'advertiser' ? 'active' : ''}">
+        ${t('mode_advertiser') || 'Annonceur'}
+      </button>
+    </div>
+
+    <nav class="sidebar-nav">
+      <div class="sidebar-section" style="margin-bottom:6px">
+        <a class="sidebar-link ${activeRoute === 'dashboard' ? 'active' : ''}" onclick="Router.navigate('/dashboard')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+          ${t('nav_dashboard') || 'Tableau de bord'}
+        </a>
+      </div>
+
+      <div class="sidebar-section" style="${userMode === 'worker' ? '' : 'display:none'}">
+        <div class="sidebar-section-title">${t('nav_earn') || 'GAGNER'}</div>
+        <a class="sidebar-link ${activeRoute === 'tasks' ? 'active' : ''}" onclick="Router.navigate('/tasks')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+          ${t('nav_tasks') || 'Tâches'}
+          <span class="sb-count-pill" id="sb-tasks-count" style="display:none">0</span>
+        </a>
+        <a class="sidebar-link ${activeRoute === 'premium' ? 'active' : ''}" id="sidebar-premium-link" style="display:none" onclick="Router.navigate('/premium')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          Premium
+          <span class="sidebar-premium-count" style="display:none;margin-left:auto;background:linear-gradient(135deg,#a855f7,#7c3aed);color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600">0</span>
+        </a>
+        <a class="sidebar-link ${activeRoute === 'my-tasks' ? 'active' : ''}" onclick="Router.navigate('/my-tasks')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          ${t('nav_my_tasks') || 'Mes tâches'}
+        </a>
+        <a class="sidebar-link ${activeRoute === 'leaderboard' ? 'active' : ''}" onclick="Router.navigate('/leaderboard')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 15l-2 5 2-1 2 1-2-5z"/><path d="M6 3h12l-1.5 7h-9L6 3z"/></svg>
+          ${t('nav_leaderboard') || 'Classement'}
+        </a>
+        <a class="sidebar-link ${activeRoute === 'tools' ? 'active' : ''}" onclick="Router.navigate('/tools')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+          ${t('nav_tools') || 'Outils'}
+        </a>
+      </div>
+
+      <div class="sidebar-section" style="${userMode === 'advertiser' ? '' : 'display:none'}">
+        <div class="sidebar-section-title">${t('nav_advertiser') || 'ANNONCEUR'}</div>
+        <a class="sidebar-link ${activeRoute === 'create-order' ? 'active' : ''}" onclick="Router.navigate('/create-order')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          ${t('nav_new_order') || 'Nouvelle commande'}
+        </a>
+        <a class="sidebar-link ${activeRoute === 'orders' ? 'active' : ''}" onclick="Router.navigate('/orders')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 14h6M9 18h6"/></svg>
+          ${t('nav_my_orders') || 'Mes commandes'}
+        </a>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">${t('nav_account') || 'COMPTE'}</div>
+        <a class="sidebar-link ${activeRoute === 'wallet' ? 'active' : ''}" onclick="Router.navigate('/wallet')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 10h20"/><circle cx="16" cy="14" r="1.5"/></svg>
+          ${t('nav_wallet') || 'Portefeuille'}
+        </a>
+        <a class="sidebar-link ${activeRoute === 'referrals' ? 'active' : ''}" onclick="Router.navigate('/referrals')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          ${t('nav_referrals') || 'Parrainage'}
+        </a>
+        <a class="sidebar-link ${activeRoute === 'profile' ? 'active' : ''}" onclick="Router.navigate('/profile')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          ${t('nav_profile_security') || t('nav_profile') || 'Profil et sécurité'}
+        </a>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">${t('nav_help') || 'AIDE'}</div>
+        <a class="sidebar-link ${activeRoute === 'support' ? 'active' : ''}" onclick="Router.navigate('/support')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          ${t('nav_support') || 'Assistance'}
+          <span class="sup-unread-badge" data-sup-unread-badge style="display:none;margin-left:auto;background:#ef4444;color:#fff;font-size:11px;font-weight:700;padding:2px 7px;border-radius:10px;min-width:18px;text-align:center;line-height:1"></span>
+        </a>
+        <a class="sidebar-link ${activeRoute === 'guides' ? 'active' : ''}" href="/guides" onclick="var l=localStorage.getItem('pr-social-lang')||'en';if(l!=='en'){window.location.href='/'+l+'/guides';return false;}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+          ${t('nav_guides') || 'Guides'}
+        </a>
+        <a class="sidebar-link ${activeRoute === 'faq' ? 'active' : ''}" onclick="Router.navigate('/faq')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
+          ${t('nav_faq') || 'FAQ'}
+        </a>
+        <a class="sidebar-link ${activeRoute === 'rules' ? 'active' : ''}" onclick="Router.navigate('/rules')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          ${t('rules_link') || 'Règles'}
+        </a>
+      </div>
+
+      <div class="sidebar-section" style="border-top:1px solid var(--border);padding-top:8px;margin-top:4px">
+        <a class="sidebar-link" href="https://telegram.me/prsocial_community" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+          Communauté
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:11px;height:11px;margin-left:auto;opacity:0.45"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+        </a>
+        <a class="sidebar-link" onclick="window.open('/api/developer-redirect','_blank')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+          ${t('nav_developer') || 'Développeurs'}
+        </a>
+      </div>
+
+      <div class="sb-follow-row">
+        <span class="sb-follow-lbl">${t('nav_follow_us') || 'SUIVEZ-NOUS'}</span>
+        <div class="sb-follow-icons">
+          <a href="https://x.com/prsocial_app" target="_blank" rel="noopener" title="X / Twitter">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231z"/></svg>
+          </a>
+          <a href="https://t.me/prsocial_info" target="_blank" rel="noopener" title="Telegram">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M9.78 18.65l.28-4.23 7.68-6.92c.34-.31-.07-.46-.52-.19L7.74 13.3 3.64 12c-.88-.25-.89-.86.2-1.3l15.97-6.16c.73-.33 1.43.18 1.15 1.3l-2.72 12.81c-.19.91-.74 1.13-1.5.71L12.6 16.3l-1.99 1.93c-.23.23-.42.42-.83.42z"/></svg>
+          </a>
+          <a href="https://www.youtube.com/@prsocial_app" target="_blank" rel="noopener" title="YouTube">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.5 12 3.5 12 3.5s-7.5 0-9.4.6A3 3 0 0 0 .5 6.2C0 8.1 0 12 0 12s0 3.9.5 5.8a3 3 0 0 0 2.1 2.1c1.9.6 9.4.6 9.4.6s7.5 0 9.4-.6a3 3 0 0 0 2.1-2.1c.5-1.9.5-5.8.5-5.8s0-3.9-.5-5.8zM9.5 15.6V8.4l6.3 3.6-6.3 3.6z"/></svg>
+          </a>
+        </div>
+      </div>
+    </nav>
+
+    <div class="sb-footer-tools">
       <div class="sidebar-lang-select">
         <button type="button" class="sb-lang-trigger" onclick="event.stopPropagation();document.getElementById('sbLangPopup').classList.toggle('open');">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:13px;height:13px;flex-shrink:0"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
@@ -56,141 +200,36 @@ function renderSidebar(activeRoute) {
         </div>
       </div>
       <button class="theme-toggle" onclick="toggleTheme()" title="Toggle theme" style="height:28px;width:28px;border-radius:6px;flex-shrink:0">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:14px;height:14px"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:14px;height:14px"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
       </button>
     </div>
 
-    <div class="sidebar-mode-toggle" style="display:flex;gap:4px;padding:0 16px 12px;border-bottom:1px solid var(--border);margin-bottom:4px">
-      <button onclick="switchUserMode('worker')" class="sidebar-mode-btn ${userMode === 'worker' ? 'active' : ''}" style="flex:1;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:${userMode === 'worker' ? 'var(--accent)' : 'transparent'};color:${userMode === 'worker' ? '#fff' : 'var(--text-secondary)'};font-size:11px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:11px;height:11px"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-        ${t('mode_worker') || 'Worker'}
-      </button>
-      <button onclick="switchUserMode('advertiser')" class="sidebar-mode-btn ${userMode === 'advertiser' ? 'active' : ''}" style="flex:1;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:${userMode === 'advertiser' ? 'var(--accent)' : 'transparent'};color:${userMode === 'advertiser' ? '#fff' : 'var(--text-secondary)'};font-size:11px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:11px;height:11px"><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/><path d="M9 21V3"/></svg>
-        ${t('mode_advertiser') || 'Advertiser'}
-      </button>
-    </div>
-
-    <nav class="sidebar-nav">
-      <div class="sidebar-section">
-        <div class="sidebar-section-title">${t('nav_main')}</div>
-        <a class="sidebar-link ${activeRoute === 'dashboard' ? 'active' : ''}" onclick="Router.navigate('/dashboard')">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
-          ${t('nav_dashboard')}
-        </a>
-      </div>
-
-      <div class="sidebar-section" style="${userMode === 'worker' ? '' : 'display:none'}">
-        <div class="sidebar-section-title">${t('nav_earn')}</div>
-        <a class="sidebar-link ${activeRoute === 'tasks' ? 'active' : ''}" onclick="Router.navigate('/tasks')">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-          ${t('nav_available_tasks')}
-        </a>
-        <a class="sidebar-link ${activeRoute === 'premium' ? 'active' : ''}" id="sidebar-premium-link" style="display:none" onclick="Router.navigate('/premium')">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-          Premium Tasks
-          <span class="sidebar-premium-count" style="display:none;margin-left:auto;background:linear-gradient(135deg,#a855f7,#7c3aed);color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600">0</span>
-        </a>
-        <a class="sidebar-link ${activeRoute === 'my-tasks' ? 'active' : ''}" onclick="Router.navigate('/my-tasks')">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-          ${t('nav_my_tasks')}
-        </a>
-        <a class="sidebar-link ${activeRoute === 'leaderboard' ? 'active' : ''}" onclick="Router.navigate('/leaderboard')">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 15l-2 5 2-1 2 1-2-5z"/><path d="M6 3h12l-1.5 7h-9L6 3z"/></svg>
-          ${t('nav_leaderboard')}
-        </a>
-        <a class="sidebar-link ${activeRoute === 'tools' ? 'active' : ''}" onclick="Router.navigate('/tools')">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
-          ${t('nav_tools') || 'Tools'}
-        </a>
-        <a class="sidebar-link" onclick="window.open('/api/developer-redirect','_blank')">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
-          ${t('nav_developer') || 'Developer'}
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:10px;height:10px;margin-left:auto;opacity:0.4"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-        </a>
-      </div>
-
-      <div class="sidebar-section" style="${userMode === 'advertiser' ? '' : 'display:none'}">
-        <div class="sidebar-section-title">${t('nav_advertiser') || 'ADVERTISER'}</div>
-        <a class="sidebar-link ${activeRoute === 'create-order' ? 'active' : ''}" onclick="Router.navigate('/create-order')">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          ${t('nav_new_order') || 'New Order'}
-        </a>
-        <a class="sidebar-link ${activeRoute === 'orders' ? 'active' : ''}" onclick="Router.navigate('/orders')">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 14h6M9 18h6"/></svg>
-          ${t('nav_my_orders') || 'My Orders'}
-        </a>
-      </div>
-
-      <div class="sidebar-section">
-        <div class="sidebar-section-title">${t('nav_account')}</div>
-        <a class="sidebar-link ${activeRoute === 'wallet' ? 'active' : ''}" onclick="Router.navigate('/wallet')">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 10h20"/><circle cx="16" cy="14" r="1.5"/></svg>
-          ${t('nav_wallet')}
-        </a>
-        <a class="sidebar-link ${activeRoute === 'profile' ? 'active' : ''}" onclick="Router.navigate('/profile')">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-          ${t('nav_profile')}
-        </a>
-        <a class="sidebar-link ${activeRoute === 'referrals' ? 'active' : ''}" onclick="Router.navigate('/referrals')">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-          ${t('nav_referrals')}
-        </a>
-      </div>
-
-      <div class="sidebar-section">
-        <div class="sidebar-section-title">${t('nav_help') || 'HELP'}</div>
-        <a class="sidebar-link ${activeRoute === 'guides' ? 'active' : ''}" href="/guides" onclick="var l=localStorage.getItem('pr-social-lang')||'en';if(l!=='en'){window.location.href='/'+l+'/guides';return false;}">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
-          ${t('nav_guides') || 'Guides'}
-        </a>
-        <a class="sidebar-link ${activeRoute === 'faq' ? 'active' : ''}" onclick="Router.navigate('/faq')">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
-          ${t('nav_faq')}
-        </a>
-        <a class="sidebar-link ${activeRoute === 'rules' ? 'active' : ''}" onclick="Router.navigate('/rules')">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-          ${t('rules_link')}
-        </a>
-        <a class="sidebar-link ${activeRoute === 'support' ? 'active' : ''}" onclick="Router.navigate('/support')">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-          ${t('nav_support')}
-          <span class="sup-unread-badge" data-sup-unread-badge style="display:none;margin-left:auto;background:#ef4444;color:#fff;font-size:11px;font-weight:700;padding:2px 7px;border-radius:10px;min-width:18px;text-align:center;line-height:1"></span>
-        </a>
-        ${u.cabinet_back ? `<a class="sidebar-link" onclick="backToNewCabinet()">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
-          ${t('nav_new_version') || 'New version'}
-        </a>` : ''}
-      </div>
-
-      <div class="sidebar-section">
-        <div class="sidebar-section-title">${t('nav_follow_us') || 'FOLLOW US'}</div>
-        <a class="sidebar-link" href="https://t.me/prsocial_info" target="_blank" rel="noopener">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V9a2 2 0 012-2h2a2 2 0 012 2v9a2 2 0 01-2 2h-2z"/></svg>
-          ${t('nav_follow_news') || 'News'}
-        </a>
-        <a class="sidebar-link" href="https://telegram.me/prsocial_community" target="_blank" rel="noopener">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/><path d="M8 10h8M8 14h4"/></svg>
-          Community
-        </a>
-        <a class="sidebar-link" href="https://x.com/prsocial_app" target="_blank" rel="noopener">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231z" fill="currentColor" stroke="none"/></svg>
-          ${t('nav_follow_twitter') || 'Twitter/X'}
-        </a>
-      </div>
-    </nav>
-
-    <div class="sidebar-footer">
+    <div class="sidebar-footer" style="border-top:none;padding-top:4px">
       <div class="sidebar-user" onclick="handleLogout()">
-        <div class="sidebar-avatar">${initial}</div>
+        <div class="sidebar-avatar" style="background:rgba(34,197,94,0.2);color:#22c55e">${initial}</div>
         <div class="sidebar-user-info">
           <div class="sidebar-user-name">${u.username || 'User'}</div>
-          <div class="sidebar-user-balance">$${(u.balance || 0).toLocaleString()}</div>
+          <div class="sb-user-trust">✓ ${u.trust_score >= 80 || u.trust_score == null ? (t('nav_trusted') || 'De confiance') : '$' + (u.balance || 0).toFixed(2)}</div>
         </div>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
       </div>
     </div>
   </aside>`;
+}
+
+async function initSidebarTasksCount() {
+  const el = document.getElementById('sb-tasks-count');
+  if (!el) return;
+  try {
+    const r = await fetch('/api/cabinet/frame', { credentials: 'same-origin' });
+    if (!r.ok) return;
+    const d = await r.json();
+    const c = d && d.counts && d.counts.tasks;
+    if (c > 0) {
+      el.textContent = c;
+      el.style.display = 'inline-flex';
+    }
+  } catch (_) {}
 }
 
 // The new cabinet is this person's, and they are here because they asked for the old one (or the new one could not start in their
