@@ -37,6 +37,8 @@ def init_db():
             pending_email TEXT,
             email_change_code TEXT,
             email_change_expires_at TIMESTAMP,
+            reset_token TEXT,
+            reset_expires_at TIMESTAMP,
             balance REAL DEFAULT 0.0,
             hold_balance REAL DEFAULT 0.0,
             referral_code TEXT UNIQUE NOT NULL,
@@ -158,6 +160,32 @@ def init_db():
         );
         """)
 
+        # 8. Tickets de Support
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS support_tickets (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            subject TEXT NOT NULL,
+            category TEXT DEFAULT 'general',
+            status TEXT DEFAULT 'open',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+        );
+        """)
+
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS support_messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ticket_id INTEGER NOT NULL,
+            sender_id INTEGER NOT NULL,
+            is_staff INTEGER DEFAULT 0,
+            message TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (ticket_id) REFERENCES support_tickets (id) ON DELETE CASCADE
+        );
+        """)
+
         for col_sql in (
             "ALTER TABLE social_accounts ADD COLUMN is_default INTEGER DEFAULT 0",
             "ALTER TABLE social_accounts ADD COLUMN ai_attempts INTEGER DEFAULT 0",
@@ -168,6 +196,8 @@ def init_db():
             "ALTER TABLE users ADD COLUMN pending_email TEXT",
             "ALTER TABLE users ADD COLUMN email_change_code TEXT",
             "ALTER TABLE users ADD COLUMN email_change_expires_at TIMESTAMP",
+            "ALTER TABLE users ADD COLUMN reset_token TEXT",
+            "ALTER TABLE users ADD COLUMN reset_expires_at TIMESTAMP",
         ):
             try:
                 cur.execute(col_sql)

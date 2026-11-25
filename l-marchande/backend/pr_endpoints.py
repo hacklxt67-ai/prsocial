@@ -13,7 +13,8 @@ from services.social_verification import (
 )
 from services.email_service import (
     issue_verification_email, verify_email_token,
-    initiate_email_change, confirm_email_change
+    initiate_email_change, confirm_email_change,
+    issue_password_reset, consume_password_reset
 )
 
 router = APIRouter()
@@ -153,12 +154,36 @@ def invite_code(code: str = ""):
     return {"ok": True, "valid": False, "kind": "none", "bonus": 0}
 
 @router.post("/api/auth/forgot-password")
-async def forgot_password():
-    return {"ok": True, "message": "Password reset link sent if account exists."}
+async def forgot_password(request: Request):
+    body = {}
+    try:
+        body = await request.json()
+    except Exception:
+        pass
+    issue_password_reset(body.get("email", ""), base_url=str(request.base_url))
+    return {"ok": True, "message": "Si cet e-mail existe, un lien de réinitialisation a été envoyé."}
 
 @router.post("/api/auth/reset-password")
-async def reset_password():
-    return {"ok": True}
+async def reset_password(request: Request):
+    body = await request.json()
+    ok, msg = consume_password_reset(body.get("token", ""), body.get("password", ""))
+    if not ok:
+        return JSONResponse({"ok": False, "error": msg}, status_code=400)
+    return {"ok": True, "message": msg}
+
+@router.post("/api/profile/password")
+async def profile_change_password(request: Request, user: Dict[str, Any] = Depends(_require_user)):
+    body = await request.json()
+    cur_pw = body.get("current_password", "")
+    new_pw = body.get("new_password", "")
+    if not new_pw or len(new_pw) < 6:
+        return JSONResponse({"ok": False, "error": "Le nouveau mot de passe doit contenir au moins 6 caractères."}, status_code=400)
+    db_user = query_one("SELECT hashed_password FROM users WHERE id = ?", (user["id"],))
+    if not db_user or not SecurityHelper.verify_password(cur_pw, db_user["hashed_password"]):
+        return JSONResponse({"ok": False, "error": "Mot de passe actuel incorrect."}, status_code=400)
+    new_hash = SecurityHelper.hash_password(new_pw)
+    execute_commit("UPDATE users SET hashed_password = ? WHERE id = ?", (new_hash, user["id"]))
+    return {"ok": True, "message": "Mot de passe modifié avec succès !"}
 
 @router.post("/api/auth/resend-verification")
 async def resend_verification(request: Request, user: Dict[str, Any] = Depends(_require_user)):
@@ -718,12 +743,56 @@ def autoearn_accounts():
     return {"ok": True, "accounts": []}
 
 @router.get("/api/support/tickets")
-def support_tickets():
-    return {"ok": True, "tickets": []}
+def support_tickets(user: Dict[str, Any] = Depends(_require_user)):
+    rows = query_all("SELECT * FROM support_tickets WHERE user_id = ? ORDER BY id DESC", (user["id"],))
+    return {"ok": True, "tickets": rows}
 
 @router.post("/api/support/tickets")
-async def create_ticket():
-    return {"ok": True, "ticket_id": 1}
+async def create_ticket(request: Request, user: Dict[str, Any] = Depends(_require_user)):
+    body = await request.json()
+    subject = str(body.get("subject", "")).strip()
+    message = str(body.get("message", "")).strip()
+    category = str(body.get("category", "general")).strip()
+    if not subject or not message:
+        return JSONResponse({"ok": False, "error": "Sujet et message requis."}, status_code=400)
+    tid = execute_commit(
+        "INSERT INTO support_tickets (user_id, subject, category, status) VALUES (?, ?, ?, 'open')",
+        (user["id"], subject, category)
+    )
+    execute_commit(
+        "INSERT INTO support_messages (ticket_id, sender_id, is_staff, message) VALUES (?, ?, 0, ?)",
+        (tid, user["id"], message)
+    )
+    return {"ok": True, "ticket_id": tid}
+
+@router.get("/api/support/tickets/{ticket_id}")
+def get_ticket_detail(ticket_id: int, user: Dict[str, Any] = Depends(_require_user)):
+    t = query_one("SELECT * FROM support_tickets WHERE id = ? AND user_id = ?", (ticket_id, user["id"]))
+    if not t:
+        return JSONResponse({"ok": False, "error": "Ticket introuvable."}, status_code=404)
+    msgs = query_all("SELECT * FROM support_messages WHERE ticket_id = ? ORDER BY id ASC", (ticket_id,))
+    return {"ok": True, "ticket": t, "messages": msgs}
+
+@router.post("/api/support/tickets/{ticket_id}/reply")
+async def reply_ticket(ticket_id: int, request: Request, user: Dict[str, Any] = Depends(_require_user)):
+    t = query_one("SELECT * FROM support_tickets WHERE id = ? AND user_id = ?", (ticket_id, user["id"]))
+    if not t:
+        return JSONResponse({"ok": False, "error": "Ticket introuvable."}, status_code=404)
+    body = await request.json()
+    msg = str(body.get("message", "")).strip()
+    if not msg:
+        return JSONResponse({"ok": False, "error": "Message vide."}, status_code=400)
+    execute_commit(
+        "INSERT INTO support_messages (ticket_id, sender_id, is_staff, message) VALUES (?, ?, 0, ?)",
+        (ticket_id, user["id"], msg)
+    )
+    execute_commit("UPDATE support_tickets SET updated_at = CURRENT_TIMESTAMP, status = 'open' WHERE id = ?", (ticket_id,))
+    return {"ok": True}
+
+@router.post("/api/support/tickets/{ticket_id}/close")
+def close_ticket(ticket_id: int, user: Dict[str, Any] = Depends(_require_user)):
+    execute_commit("UPDATE support_tickets SET status = 'closed', updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?", (ticket_id, user["id"]))
+    return {"ok": True}
 
 @router.get("/api/support/unread-count")
 def support_unread():

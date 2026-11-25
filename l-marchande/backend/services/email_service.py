@@ -179,3 +179,33 @@ def confirm_email_change(user_id: int, code: str) -> Tuple[bool, str]:
         WHERE id = ?
     """, (new_email, user_id))
     return True, "Adresse e-mail modifiée et vérifiée avec succès !"
+
+def issue_password_reset(email: str, base_url: str = "http://127.0.0.1:8000") -> Optional[str]:
+    em = (email or "").strip().lower()
+    if not is_valid_email(em):
+        return None
+    user = query_one("SELECT id, email FROM users WHERE LOWER(email) = ?", (em,))
+    if not user:
+        return None
+    token = secrets.token_urlsafe(32)
+    exp = (_now_utc() + timedelta(hours=1)).isoformat()
+    execute_commit("UPDATE users SET reset_token = ?, reset_expires_at = ? WHERE id = ?", (token, exp, user["id"]))
+    link = f"{base_url.rstrip('/')}/reset-password?token={token}"
+    send_mail(user["email"], "Réinitialisation de votre mot de passe", f"Cliquez sur ce lien (valide 1h) pour réinitialiser votre mot de passe :\n{link}")
+    return token
+
+def consume_password_reset(token: str, new_password: str) -> Tuple[bool, str]:
+    tok = (token or "").strip()
+    if not tok or len(tok) < 16:
+        return False, "Token de réinitialisation invalide."
+    if not new_password or len(new_password) < 6:
+        return False, "Le nouveau mot de passe doit contenir au moins 6 caractères."
+    user = query_one("SELECT id, reset_expires_at FROM users WHERE reset_token = ?", (tok,))
+    if not user:
+        return False, "Lien de réinitialisation invalide ou déjà utilisé."
+    exp = _parse_iso(user.get("reset_expires_at"))
+    if not exp or _now_utc() > exp:
+        return False, "Lien de réinitialisation expiré."
+    hashed = SecurityHelper.hash_password(new_password)
+    execute_commit("UPDATE users SET hashed_password = ?, reset_token = NULL, reset_expires_at = NULL WHERE id = ?", (hashed, user["id"]))
+    return True, "Mot de passe réinitialisé avec succès !"
