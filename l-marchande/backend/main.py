@@ -55,8 +55,9 @@ async def csrf_origin_guard(request: Request, call_next):
     if request.method in ("POST", "PUT", "PATCH", "DELETE"):
         has_cookie = bool(request.cookies.get("pr_token"))
         has_bearer = bool(request.headers.get("authorization"))
+        is_public_entry = request.url.path in ("/api/auth/login", "/api/auth/register")
         is_webhook = request.url.path.startswith("/api/wallet/webhook/")
-        if has_cookie and not has_bearer and not is_webhook:
+        if has_cookie and not has_bearer and not is_webhook and not is_public_entry:
             origin = request.headers.get("origin")
             referer = request.headers.get("referer")
             check_url = origin or referer
