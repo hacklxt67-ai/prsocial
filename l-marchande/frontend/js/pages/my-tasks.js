@@ -291,7 +291,9 @@ Router.register('my-tasks', async (app) => {
         if (platform && tab !== 'app') q.set('platform', platform);
         d = await API.request('GET', '/tasks/my/list?' + q);
         if (seq !== listSeq) return; // a newer choice replaced this one
-        if (d.items.length || !d.has_more || !d.next || hop >= 200) break;
+        const dItems = d.items || d.tasks || [];
+        d.items = dItems;
+        if (dItems.length || !d.has_more || !d.next || hop >= 200) break;
         cursor = d.next;
       }
       const isApp = d.kind === 'daily';
@@ -405,7 +407,7 @@ Router.register('my-tasks', async (app) => {
     body.innerHTML = `<div class="mt-loading">${t('stats_loading') || 'Loading…'}</div>`;
     try {
       const d = await API.request('GET', '/tasks/my/rates');
-      const table = (rows, title) => !rows.length ? '' : `
+      const table = (rows, title) => !(rows || []).length ? '' : `
         <div class="mt-note">${title}</div>
         <div class="mt-table-wrap">
           <table class="mt-table">

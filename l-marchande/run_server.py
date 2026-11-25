@@ -61,7 +61,7 @@ def main():
     import threading
     threading.Thread(target=open_browser, daemon=True).start()
 
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=False, app_dir=backend_dir)
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True, app_dir=backend_dir)
 
 if __name__ == "__main__":
     main()
