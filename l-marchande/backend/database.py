@@ -186,6 +186,38 @@ def init_db():
         );
         """)
 
+        # 9. Tables Idempotence Webhooks, Audit Admin & Migrations Versionnées
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS webhook_events (
+            event_id TEXT PRIMARY KEY,
+            tx_id INTEGER,
+            amount REAL,
+            currency TEXT DEFAULT 'USD',
+            processed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        """)
+
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS audit_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            actor_id INTEGER,
+            action TEXT NOT NULL,
+            target_type TEXT,
+            target_id INTEGER,
+            details TEXT,
+            ip_address TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        """)
+
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS schema_migrations (
+            version INTEGER PRIMARY KEY,
+            name TEXT NOT NULL,
+            applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        """)
+
         for col_sql in (
             "ALTER TABLE social_accounts ADD COLUMN is_default INTEGER DEFAULT 0",
             "ALTER TABLE social_accounts ADD COLUMN ai_attempts INTEGER DEFAULT 0",
@@ -198,6 +230,7 @@ def init_db():
             "ALTER TABLE users ADD COLUMN email_change_expires_at TIMESTAMP",
             "ALTER TABLE users ADD COLUMN reset_token TEXT",
             "ALTER TABLE users ADD COLUMN reset_expires_at TIMESTAMP",
+            "ALTER TABLE transactions ADD COLUMN currency TEXT DEFAULT 'USD'",
         ):
             try:
                 cur.execute(col_sql)
@@ -205,7 +238,65 @@ def init_db():
                 pass
 
         conn.commit()
+        _run_migrations(conn)
         conn.close()
+
+def _run_migrations(conn: sqlite3.Connection):
+    """Exécute les migrations versionnées (compatibles avec les anciennes bases SQLite)."""
+    cur = conn.cursor()
+    applied = {r[0] for r in cur.execute("SELECT version FROM schema_migrations").fetchall()}
+
+    # Migration 1 : Contrainte CHECK(role IN ('worker', 'advertiser', 'admin')) sur anciennes tables users
+    if 1 not in applied:
+        row = cur.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='users'").fetchone()
+        if row and row[0] and "CHECK" not in row[0].upper():
+            cols = [r[1] for r in cur.execute("PRAGMA table_info(users)").fetchall()]
+            col_list = ", ".join(cols)
+            cur.execute("PRAGMA foreign_keys = OFF;")
+            try:
+                cur.execute("BEGIN;")
+                cur.execute("""
+                CREATE TABLE users_new (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    email TEXT UNIQUE NOT NULL,
+                    username TEXT UNIQUE NOT NULL,
+                    hashed_password TEXT NOT NULL,
+                    role TEXT DEFAULT 'worker' CHECK(role IN ('worker', 'advertiser', 'admin')),
+                    email_verified INTEGER DEFAULT 0,
+                    email_verify_token TEXT,
+                    email_verify_expires_at TIMESTAMP,
+                    email_verify_sent_at TIMESTAMP,
+                    pending_email TEXT,
+                    email_change_code TEXT,
+                    email_change_expires_at TIMESTAMP,
+                    reset_token TEXT,
+                    reset_expires_at TIMESTAMP,
+                    balance REAL DEFAULT 0.0,
+                    hold_balance REAL DEFAULT 0.0,
+                    referral_code TEXT UNIQUE NOT NULL,
+                    referred_by INTEGER,
+                    is_active INTEGER DEFAULT 1,
+                    is_banned INTEGER DEFAULT 0,
+                    ban_reason TEXT,
+                    warning_strikes INTEGER DEFAULT 0,
+                    trust_score REAL DEFAULT 100.0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    last_login_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    last_ip TEXT DEFAULT '127.0.0.1',
+                    FOREIGN KEY (referred_by) REFERENCES users (id)
+                );
+                """)
+                cur.execute(f"INSERT INTO users_new ({col_list}) SELECT {col_list} FROM users;")
+                cur.execute("DROP TABLE users;")
+                cur.execute("ALTER TABLE users_new RENAME TO users;")
+                cur.execute("COMMIT;")
+            except Exception:
+                cur.execute("ROLLBACK;")
+                raise
+            finally:
+                cur.execute("PRAGMA foreign_keys = ON;")
+        cur.execute("INSERT OR IGNORE INTO schema_migrations (version, name) VALUES (1, '001_users_role_check')")
+        conn.commit()
 
 def query_one(query: str, params: tuple = ()) -> Optional[Dict[str, Any]]:
     """Exécute une requête et renvoie une ligne sous forme de dictionnaire."""

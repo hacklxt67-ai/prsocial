@@ -16,10 +16,14 @@ _WEAK_SECRETS = {
 
 def _load_or_create_secret() -> str:
     env_sec = (os.environ.get("L_MARCHANDE_SECRET") or "").strip()
+    is_prod = os.environ.get("L_MARCHANDE_ENV", "").strip().lower() == "production"
     if env_sec:
         if env_sec in _WEAK_SECRETS or len(env_sec) < 32:
             raise RuntimeError("L_MARCHANDE_SECRET est trop faible ou prédéfini. Utilisez au moins 32 caractères aléatoires.")
         return env_sec
+
+    if is_prod:
+        raise RuntimeError("L_MARCHANDE_SECRET est obligatoire en production (L_MARCHANDE_ENV=production).")
 
     secret_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".secret_key")
     if os.path.isfile(secret_file):
@@ -28,7 +32,8 @@ def _load_or_create_secret() -> str:
             return val
 
     generated = secrets.token_hex(32)
-    with open(secret_file, "w", encoding="utf-8") as f:
+    fd = os.open(secret_file, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
         f.write(generated)
     try:
         os.chmod(secret_file, 0o600)

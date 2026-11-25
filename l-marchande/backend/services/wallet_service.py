@@ -144,7 +144,7 @@ class WalletService:
             conn.close()
 
     @classmethod
-    def create_pending_deposit(cls, user_id: int, amount: float, payment_method: str, reference_id: str) -> Optional[int]:
+    def create_pending_deposit(cls, user_id: int, amount: float, payment_method: str, reference_id: str, currency: str = "USD") -> Optional[int]:
         """Enregistre une intention de dépôt en attente de confirmation prestataire/admin (sans créditer le solde)."""
         if amount <= 0:
             return None
@@ -152,41 +152,90 @@ class WalletService:
         if not user:
             return None
         return execute_commit("""
-            INSERT INTO transactions (user_id, type, amount, balance_after, status, reference_id, description)
-            VALUES (?, 'deposit', ?, ?, 'pending', ?, ?)
-        """, (user_id, amount, float(user["balance"]), reference_id, f"Dépôt en attente ({payment_method.upper()})"))
+            INSERT INTO transactions (user_id, type, amount, balance_after, status, reference_id, description, currency)
+            VALUES (?, 'deposit', ?, ?, 'pending', ?, ?, ?)
+        """, (user_id, round(amount, 4), float(user["balance"]), reference_id, f"Dépôt en attente ({payment_method.upper()})", currency.upper()))
 
     @classmethod
-    def approve_pending_deposit(cls, tx_id: int, provider_ref: str = "") -> Tuple[bool, str]:
-        """Valide un dépôt en attente et crédite le solde de façon atomique et idempotente."""
+    def approve_pending_deposit(
+        cls,
+        tx_id: int,
+        provider_ref: str = "",
+        event_id: Optional[str] = None,
+        expected_amount: Optional[float] = None,
+        expected_currency: Optional[str] = None,
+        actor_id: Optional[int] = None,
+        ip_address: str = "127.0.0.1",
+    ) -> Tuple[bool, str, bool]:
+        """Valide un dépôt en attente de façon atomique, idempotente (webhook_events) et auditée."""
         conn = get_db_connection()
         try:
             cur = conn.cursor()
             cur.execute("BEGIN IMMEDIATE;")
+
+            if event_id:
+                seen = cur.execute("SELECT event_id FROM webhook_events WHERE event_id = ?", (event_id,)).fetchone()
+                if seen:
+                    conn.rollback()
+                    return True, f"Événement webhook {event_id} déjà traité (idempotent).", True
+
             cur.execute("SELECT * FROM transactions WHERE id = ? AND type = 'deposit'", (tx_id,))
             tx = cur.fetchone()
             if not tx:
                 conn.rollback()
-                return False, "Transaction de dépôt introuvable."
+                return False, "Transaction de dépôt introuvable.", False
             if tx["status"] != "pending":
                 conn.rollback()
-                return False, f"Dépôt déjà traité (statut: {tx['status']})."
+                return False, f"Dépôt déjà traité (statut: {tx['status']}).", False
+
+            tx_currency = (tx["currency"] or "USD").upper() if "currency" in tx.keys() else "USD"
+            if expected_currency is not None and expected_currency.strip().upper() != tx_currency:
+                conn.rollback()
+                return False, f"Devise invalide : attendu {tx_currency}, reçu {expected_currency}.", False
+
+            if expected_amount is not None and abs(float(expected_amount) - float(tx["amount"])) > 1e-6:
+                conn.rollback()
+                return False, f"Montant invalide : attendu {float(tx['amount']):.4f}, reçu {float(expected_amount):.4f}.", False
 
             cur.execute("SELECT balance FROM users WHERE id = ?", (tx["user_id"],))
             u = cur.fetchone()
             if not u:
                 conn.rollback()
-                return False, "Utilisateur introuvable."
+                return False, "Utilisateur introuvable.", False
 
             new_bal = round(float(u["balance"]) + float(tx["amount"]), 6)
             cur.execute("UPDATE users SET balance = ? WHERE id = ?", (new_bal, tx["user_id"]))
             ref_val = provider_ref or tx["reference_id"]
-            cur.execute("UPDATE transactions SET status = 'completed', balance_after = ?, reference_id = ? WHERE id = ?", (new_bal, ref_val, tx_id))
+            cur.execute(
+                "UPDATE transactions SET status = 'completed', balance_after = ?, reference_id = ? WHERE id = ? AND status = 'pending'",
+                (new_bal, ref_val, tx_id)
+            )
+            if cur.rowcount != 1:
+                conn.rollback()
+                return False, "Conflit de concurrence : dépôt déjà traité.", False
+
+            if event_id:
+                cur.execute(
+                    "INSERT INTO webhook_events (event_id, tx_id, amount, currency) VALUES (?, ?, ?, ?)",
+                    (event_id, tx_id, float(tx["amount"]), tx_currency)
+                )
+
+            cur.execute("""
+                INSERT INTO audit_logs (actor_id, action, target_type, target_id, details, ip_address)
+                VALUES (?, ?, 'deposit', ?, ?, ?)
+            """, (
+                actor_id,
+                "webhook_deposit_approved" if event_id else "admin_deposit_approved",
+                tx_id,
+                f"amount={float(tx['amount']):.4f} {tx_currency} ref={ref_val} event={event_id or 'manual'}",
+                ip_address
+            ))
+
             conn.commit()
-            return True, f"Dépôt #{tx_id} confirmé (+${float(tx['amount']):.2f})."
+            return True, f"Dépôt #{tx_id} confirmé (+${float(tx['amount']):.2f}).", False
         except Exception as e:
             conn.rollback()
-            return False, str(e)
+            return False, str(e), False
         finally:
             conn.close()
 
@@ -222,8 +271,18 @@ class WalletService:
             conn.close()
 
     @classmethod
-    def resolve_withdrawal(cls, tx_id: int, approve: bool, reason: str = "") -> Tuple[bool, str]:
-        """Approuve ou rejette (avec remboursement atomique) une demande de retrait."""
+    def resolve_withdrawal(
+        cls,
+        tx_id: int,
+        approve: bool,
+        reason: str = "",
+        payout_reference: str = "",
+        actor_id: Optional[int] = None,
+        ip_address: str = "127.0.0.1",
+    ) -> Tuple[bool, str]:
+        """Approuve (avec preuve de versement) ou rejette (avec remboursement atomique) une demande de retrait."""
+        if approve and not (payout_reference or "").strip():
+            return False, "Référence de versement (payout_reference) requise pour approuver un retrait."
         conn = get_db_connection()
         try:
             cur = conn.cursor()
@@ -244,13 +303,26 @@ class WalletService:
             new_hold = max(0.0, round(float(u["hold_balance"] or 0.0) - amt, 6))
             if approve:
                 cur.execute("UPDATE users SET hold_balance = ? WHERE id = ?", (new_hold, tx["user_id"]))
-                cur.execute("UPDATE transactions SET status = 'completed', reference_id = 'PAID_OUT' WHERE id = ?", (tx_id,))
-                msg = f"Retrait #{tx_id} approuvé et payé."
+                cur.execute("UPDATE transactions SET status = 'completed', reference_id = ? WHERE id = ? AND status = 'pending'", (payout_reference.strip(), tx_id))
+                if cur.rowcount != 1:
+                    conn.rollback()
+                    return False, "Conflit de concurrence : retrait déjà résolu."
+                msg = f"Retrait #{tx_id} approuvé et payé ({payout_reference.strip()})."
+                audit_action = "admin_withdrawal_approved"
             else:
                 new_bal = round(float(u["balance"]) + amt, 6)
                 cur.execute("UPDATE users SET balance = ?, hold_balance = ? WHERE id = ?", (new_bal, new_hold, tx["user_id"]))
-                cur.execute("UPDATE transactions SET status = 'rejected', balance_after = ?, reference_id = ? WHERE id = ?", (new_bal, reason or "REJECTED", tx_id))
+                cur.execute("UPDATE transactions SET status = 'rejected', balance_after = ?, reference_id = ? WHERE id = ? AND status = 'pending'", (new_bal, reason or "REJECTED", tx_id))
+                if cur.rowcount != 1:
+                    conn.rollback()
+                    return False, "Conflit de concurrence : retrait déjà résolu."
                 msg = f"Retrait #{tx_id} rejeté et remboursé."
+                audit_action = "admin_withdrawal_rejected"
+
+            cur.execute("""
+                INSERT INTO audit_logs (actor_id, action, target_type, target_id, details, ip_address)
+                VALUES (?, ?, 'withdrawal', ?, ?, ?)
+            """, (actor_id, audit_action, tx_id, msg, ip_address))
             conn.commit()
             return True, msg
         except Exception as e:

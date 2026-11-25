@@ -3,7 +3,8 @@ import sys
 import hmac
 import hashlib
 import secrets
-from urllib.parse import urlparse
+import posixpath
+from urllib.parse import urlparse, unquote
 from fastapi import FastAPI, Depends, HTTPException, Header, status, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -48,7 +49,7 @@ app.add_middleware(
     allow_headers=["Authorization", "Content-Type", "X-Webhook-Signature"],
 )
 
-# Protection CSRF sur les requêtes mutantes authentifiées par cookie
+# Protection CSRF stricte sur toutes les routes mutantes authentifiées par cookie
 @app.middleware("http")
 async def csrf_origin_guard(request: Request, call_next):
     if request.method in ("POST", "PUT", "PATCH", "DELETE"):
@@ -59,12 +60,18 @@ async def csrf_origin_guard(request: Request, call_next):
             origin = request.headers.get("origin")
             referer = request.headers.get("referer")
             check_url = origin or referer
-            if check_url:
+            if not check_url:
+                return JSONResponse({"detail": "Requête bloquée par la protection CSRF (Origin/Referer manquant)."}, status_code=403)
+            try:
                 parsed = urlparse(check_url)
-                req_origin = f"{parsed.scheme}://{parsed.netloc}"
-                host_origin = f"{request.url.scheme}://{request.headers.get('host', '')}"
-                if req_origin not in ALLOWED_ORIGINS and req_origin != host_origin:
-                    return JSONResponse({"detail": "Requête bloquée par la protection CSRF (Origin invalide)."}, status_code=403)
+            except Exception:
+                return JSONResponse({"detail": "Requête bloquée par la protection CSRF (En-tête mal formé)."}, status_code=403)
+            if not parsed.scheme or not parsed.netloc:
+                return JSONResponse({"detail": "Requête bloquée par la protection CSRF (Origin/Referer invalide)."}, status_code=403)
+            req_origin = f"{parsed.scheme}://{parsed.netloc}".lower()
+            host_origin = f"{request.url.scheme}://{request.headers.get('host', '')}".lower()
+            if req_origin not in [o.lower() for o in ALLOWED_ORIGINS] and req_origin != host_origin:
+                return JSONResponse({"detail": "Requête bloquée par la protection CSRF (Origin non autorisée)."}, status_code=403)
     return await call_next(request)
 
 # Répertoire du frontend
@@ -416,19 +423,42 @@ def deposit(req: DepositRequest, current_user: Dict[str, Any] = Depends(get_curr
 
 @app.post("/api/wallet/webhook/deposit")
 async def deposit_webhook(request: Request, x_webhook_signature: Optional[str] = Header(None)):
+    from security import SECRET_KEY as JWT_SECRET_KEY
     webhook_secret = os.environ.get("L_MARCHANDE_WEBHOOK_SECRET", "").strip()
-    if not webhook_secret:
-        raise HTTPException(status_code=503, detail="Webhook de paiement non configuré.")
+    if not webhook_secret or len(webhook_secret) < 32:
+        raise HTTPException(status_code=503, detail="Webhook de paiement non configuré ou clé trop faible.")
+    if hmac.compare_digest(webhook_secret, JWT_SECRET_KEY):
+        raise HTTPException(status_code=503, detail="La clé webhook doit être distincte de la clé JWT.")
+
     raw_body = await request.body()
     expected = hmac.new(webhook_secret.encode("utf-8"), raw_body, hashlib.sha256).hexdigest()
     if not x_webhook_signature or not hmac.compare_digest(expected, x_webhook_signature.strip()):
         raise HTTPException(status_code=403, detail="Signature webhook invalide.")
-    payload = await request.json()
+
+    try:
+        import json as _json
+        payload = _json.loads(raw_body.decode("utf-8"))
+    except Exception:
+        raise HTTPException(status_code=400, detail="Payload JSON invalide.")
+
+    event_id = str(payload.get("event_id", "")).strip()
     tx_id = int(payload.get("tx_id", 0))
-    ok, msg = WalletService.approve_pending_deposit(tx_id, provider_ref=str(payload.get("provider_ref", "")))
+    if not event_id or tx_id <= 0 or "amount" not in payload:
+        raise HTTPException(status_code=400, detail="event_id, tx_id et amount sont obligatoires.")
+
+    client_ip = request.client.host if request.client else "127.0.0.1"
+    ok, msg, replayed = WalletService.approve_pending_deposit(
+        tx_id=tx_id,
+        provider_ref=str(payload.get("provider_ref", "")),
+        event_id=event_id,
+        expected_amount=float(payload["amount"]),
+        expected_currency=str(payload.get("currency", "USD")),
+        actor_id=0,
+        ip_address=client_ip,
+    )
     if not ok:
         raise HTTPException(status_code=400, detail=msg)
-    return {"ok": True, "message": msg}
+    return {"ok": True, "idempotent_replay": replayed, "message": msg}
 
 @app.post("/api/wallet/withdraw")
 def withdraw(req: WithdrawalRequest, current_user: Dict[str, Any] = Depends(get_current_user)):
@@ -492,22 +522,38 @@ def admin_unban_user(user_id: int, admin: Dict[str, Any] = Depends(get_admin_use
     return {"status": "success", "message": f"Utilisateur #{user_id} réactivé."}
 
 @app.post("/api/admin/deposits/{tx_id}/approve")
-def admin_approve_deposit(tx_id: int, admin: Dict[str, Any] = Depends(get_admin_user)):
-    ok, msg = WalletService.approve_pending_deposit(tx_id, provider_ref=f"ADMIN:{admin['id']}")
+def admin_approve_deposit(tx_id: int, request: Request, admin: Dict[str, Any] = Depends(get_admin_user)):
+    client_ip = request.client.host if request.client else "127.0.0.1"
+    ok, msg, _ = WalletService.approve_pending_deposit(
+        tx_id, provider_ref=f"ADMIN:{admin['id']}", actor_id=admin["id"], ip_address=client_ip
+    )
     if not ok:
         raise HTTPException(status_code=400, detail=msg)
     return {"ok": True, "message": msg}
 
 @app.post("/api/admin/withdrawals/{tx_id}/approve")
-def admin_approve_withdrawal(tx_id: int, admin: Dict[str, Any] = Depends(get_admin_user)):
-    ok, msg = WalletService.resolve_withdrawal(tx_id, approve=True)
+async def admin_approve_withdrawal(tx_id: int, request: Request, payout_reference: Optional[str] = None, admin: Dict[str, Any] = Depends(get_admin_user)):
+    ref = (payout_reference or "").strip()
+    if not ref:
+        try:
+            body = await request.json()
+            ref = str(body.get("payout_reference", "")).strip()
+        except Exception:
+            pass
+    client_ip = request.client.host if request.client else "127.0.0.1"
+    ok, msg = WalletService.resolve_withdrawal(
+        tx_id, approve=True, payout_reference=ref, actor_id=admin["id"], ip_address=client_ip
+    )
     if not ok:
         raise HTTPException(status_code=400, detail=msg)
     return {"ok": True, "message": msg}
 
 @app.post("/api/admin/withdrawals/{tx_id}/reject")
-def admin_reject_withdrawal(tx_id: int, reason: str = "Refusé par l'administrateur", admin: Dict[str, Any] = Depends(get_admin_user)):
-    ok, msg = WalletService.resolve_withdrawal(tx_id, approve=False, reason=reason)
+def admin_reject_withdrawal(tx_id: int, request: Request, reason: str = "Refusé par l'administrateur", admin: Dict[str, Any] = Depends(get_admin_user)):
+    client_ip = request.client.host if request.client else "127.0.0.1"
+    ok, msg = WalletService.resolve_withdrawal(
+        tx_id, approve=False, reason=reason, actor_id=admin["id"], ip_address=client_ip
+    )
     if not ok:
         raise HTTPException(status_code=400, detail=msg)
     return {"ok": True, "message": msg}
@@ -583,12 +629,21 @@ def page_root(request: Request):
             return FileResponse(app_path)
     return _serve_login_view("in")
 
+SAFE_STATIC_EXTS = {".html", ".css", ".js", ".json", ".woff2", ".png", ".ico", ".svg", ".jpg", ".webp"}
+
 @app.get("/{full_path:path}")
 def serve_spa(full_path: str, request: Request):
-    clean = full_path.strip("/")
-    target = os.path.join(FRONTEND_DIR, clean)
-    if clean and os.path.isfile(target):
-        return FileResponse(target)
+    decoded = unquote(full_path or "")
+    norm = posixpath.normpath("/" + decoded).lstrip("/")
+    if ".." in norm.split("/"):
+        raise HTTPException(status_code=400, detail="Chemin invalide.")
+    clean = norm.strip("/")
+
+    target = os.path.abspath(os.path.join(FRONTEND_DIR, clean))
+    if clean and target.startswith(FRONTEND_DIR + os.sep) and os.path.isfile(target):
+        if os.path.splitext(target)[1].lower() in SAFE_STATIC_EXTS:
+            return FileResponse(target)
+        raise HTTPException(status_code=403, detail="Type de fichier non autorisé.")
 
     # Routes d'administration protégées côté serveur
     if clean == "admin" or clean.startswith("admin/"):

@@ -1,0 +1,10 @@
+.env
+backend/.secret_key
+backend/*.db
+backend/*.db-wal
+backend/*.db-shm
+backend/outbox/
+backend/uploads/
+__pycache__/
+*.pyc
+.git/
