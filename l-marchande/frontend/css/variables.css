@@ -23,7 +23,7 @@
   --accent: #22c55e;
   --accent-hover: #4ade80;
   --accent-light: rgba(34, 197, 94, 0.15);
-  --accent-gradient: linear-gradient(135deg, #dc2626, #22c55e);
+  --accent-gradient: linear-gradient(135deg, #16a34a, #22c55e);
 
   /* Status */
   --success: #22c55e;

@@ -111,7 +111,7 @@
     style.textContent = `
       #ai-help-widget { position:fixed; bottom:20px; right:20px; z-index:9999; font-family:inherit; }
       #ai-help-btn {
-        width:52px; height:52px; border-radius:50%; background:linear-gradient(135deg,#dc2626,#22c55e);
+        width:52px; height:52px; border-radius:50%; background:linear-gradient(135deg,#16a34a,#22c55e);
         color:#fff; display:flex; align-items:center; justify-content:center; cursor:pointer;
         box-shadow:0 4px 16px rgba(34,197,94,0.4); transition:transform 0.2s,box-shadow 0.2s;
       }
@@ -125,7 +125,7 @@
       #ai-help-header {
         display:flex; align-items:center; justify-content:space-between;
         padding:12px 16px; border-bottom:1px solid #2a2a2e;
-        background:linear-gradient(135deg,#dc2626,#22c55e); color:#fff;
+        background:linear-gradient(135deg,#16a34a,#22c55e); color:#fff;
       }
       #ai-help-close {
         background:none; border:none; color:#fff; font-size:22px; cursor:pointer;
@@ -139,7 +139,7 @@
       }
       .ai-msg { max-width:85%; padding:10px 14px; border-radius:14px; font-size:13px; line-height:1.5; word-wrap:break-word; }
       .ai-msg-bot { align-self:flex-start; background:#27272a; color:#e4e4e7; border-bottom-left-radius:4px; }
-      .ai-msg-user { align-self:flex-end; background:linear-gradient(135deg,#dc2626,#22c55e); color:#fff; border-bottom-right-radius:4px; }
+      .ai-msg-user { align-self:flex-end; background:linear-gradient(135deg,#16a34a,#22c55e); color:#fff; border-bottom-right-radius:4px; }
       .ai-msg-typing { align-self:flex-start; background:#27272a; color:#a1a1aa; font-style:italic; border-bottom-left-radius:4px; }
       #ai-help-footer { border-top:1px solid #2a2a2e; padding:10px 12px; background:#18181b; }
       #ai-help-input-row { display:flex; gap:8px; }
@@ -150,7 +150,7 @@
       #ai-help-input:focus { border-color:#22c55e; }
       #ai-help-send {
         padding:8px 16px; border:none; border-radius:20px;
-        background:linear-gradient(135deg,#dc2626,#22c55e); color:#fff;
+        background:linear-gradient(135deg,#16a34a,#22c55e); color:#fff;
         font-size:13px; font-weight:600; cursor:pointer; white-space:nowrap;
         transition:opacity 0.15s;
       }

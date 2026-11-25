@@ -62,6 +62,7 @@ def fetch_live_bio(platform: str, username: str, code: str) -> Tuple[str, str]:
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
         "Accept-Language": "en-US,en;q=0.9,fr;q=0.8",
+        "Cookie": "CONSENT=YES+1; SOCS=CAESEwgDEgk0ODE3Nzk3MjQaAmVuIAEaBgiA_LyaBg",
     }
 
     if p == "github":
@@ -78,9 +79,9 @@ def fetch_live_bio(platform: str, username: str, code: str) -> Tuple[str, str]:
 
     req = urllib.request.Request(url, headers=headers)
     try:
-        with urllib.request.urlopen(req, timeout=8) as resp:
+        with urllib.request.urlopen(req, timeout=12) as resp:
             status_code = resp.getcode()
-            body = resp.read(250_000).decode("utf-8", errors="ignore")
+            body = resp.read(2_500_000).decode("utf-8", errors="ignore")
     except urllib.error.HTTPError as e:
         if e.code == 404:
             return "profile_not_found", f"Profil @{username} introuvable sur {platform}."

@@ -2,7 +2,7 @@ CAB.lang = {"af":"/cab/lang.af.live.1657cbb34bb9.js","am":"/cab/lang.am.live.153
 const DOC_TABS = [['guides', 'Guides'], ['faq', 'FAQ~short'], ['rules', 'Rules'], ['terms', 'Terms of use'], ['privacy', 'Privacy policy'], ['refund', 'Refund policy']];
 const DOC = { at: 0, tick: 0, pin: -1, pinY: 0, pinOn: false, pinT: 0 };
 const docNn = (i) => String(i + 1).padStart(2, '0');
-const DOC_TONE = { blue: ['#3b82f6', '#6366f1'], green: ['#10b981', '#059669'], amber: ['#f59e0b', '#ef4444'], red: ['#fb7185', '#e11d48'], violet: ['#8b5cf6', '#d946ef'], teal: ['#14b8a6', '#0ea5e9'], orange: ['#ff8a3d', '#f05a1a'], slate: ['#64748b', '#334155'] };
+const DOC_TONE = { blue: ['#3b82f6', '#6366f1'], green: ['#10b981', '#059669'], amber: ['#f59e0b', '#ef4444'], red: ['#fb7185', '#e11d48'], violet: ['#8b5cf6', '#d946ef'], teal: ['#14b8a6', '#0ea5e9'], orange: ['#4ade80', '#22c55e'], slate: ['#64748b', '#334155'] };
 const docIco = (icon, tone) => ico(I[icon], DOC_TONE[tone][0], DOC_TONE[tone][1]);
 const docSaid = (x) => (x && x.said !== undefined ? x.said : T(x));
 const docSteps = (rows) => '<ol class="doc-steps">' + rows.map((x, i) => '<li><i>' + (i + 1) + '</i><span>' + docSaid(x) + '</span></li>').join('') + '</ol>';
@@ -13,7 +13,7 @@ const docShots = (rows) => '<div class="doc-shots">' + rows.map((x) => '<figure>
 const docBody = (i, blocks, tone) => { let k = 0; const num = () => (i + 1) + '.' + (++k), ul = (kind, icon, rows) => '<ul class="doc-ul ' + kind + '">' + rows.map((x) => '<li>' + icon + '<span>' + docSaid(x) + '</span></li>').join('') + '</ul>';
   return blocks.map((b) => (b.pts ? '<ol class="doc-p">' + b.pts.map((x) => '<li><em>' + num() + '</em><span>' + docSaid(x) + '</span></li>').join('') + '</ol>'
     : b.yes ? ul('yes', I.check, b.yes) : b.no ? ul('no', I.x, b.no) : b.off ? ul('off', I.minus, b.off)
-    : b.kv ? '<dl class="doc-kv" style="--tn:' + (tone || '#f05a1a') + '">' + b.kv.map((x) => '<div><i>' + I[x[2] || 'info'] + '</i><dt>' + docSaid(x[0]) + '</dt><dd>' + docSaid(x[1]) + '</dd></div>').join('') + '</dl>'
+    : b.kv ? '<dl class="doc-kv" style="--tn:' + (tone || '#22c55e') + '">' + b.kv.map((x) => '<div><i>' + I[x[2] || 'info'] + '</i><dt>' + docSaid(x[0]) + '</dt><dd>' + docSaid(x[1]) + '</dd></div>').join('') + '</dl>'
     : b.two ? '<div class="doc-two">' + b.two.map((x) => '<div' + (x[2] ? ' class="' + x[2] + '"' : '') + '><em>' + num() + '</em><b>' + docSaid(x[0]) + '</b><p>' + docSaid(x[1]) + '</p></div>').join('') + '</div>'
     : b.say ? '<p class="doc-say">' + I.info + '<span>' + docSaid(b.say) + '</span></p>'
     : b.text ? b.text.map((x) => '<p class="doc-t">' + docSaid(x) + '</p>').join('')
