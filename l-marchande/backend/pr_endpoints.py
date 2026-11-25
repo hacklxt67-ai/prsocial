@@ -441,12 +441,20 @@ async def create_order_alias(request: Request, user: Dict[str, Any] = Depends(_r
     qty = int(body.get("target_quantity", 10))
     cost = round(reward * 1.4, 4)
     total_budget = round(cost * qty, 4)
-    if not WalletService.debit_user(user["id"], total_budget, "campaign_funding", f"Order: {title}", platform):
-        raise HTTPException(status_code=400, detail="Insufficient balance")
-    cid = execute_commit("""
-        INSERT INTO campaigns (advertiser_id, title, description, platform, action_type, target_url, reward_per_action, cost_per_action, target_quantity, total_budget, remaining_budget, status)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')
-    """, (user["id"], title, body.get("description", ""), platform, action_type, target_url, reward, cost, qty, total_budget, total_budget))
+    ok, cid, msg = WalletService.create_campaign_atomic(
+        advertiser_id=user["id"],
+        title=title,
+        description=body.get("description", ""),
+        platform=platform,
+        action_type=action_type,
+        target_url=target_url,
+        reward_per_action=reward,
+        cost_per_action=cost,
+        target_quantity=qty,
+        total_budget=total_budget,
+    )
+    if not ok:
+        raise HTTPException(status_code=400, detail=msg)
     return {"ok": True, "order_id": cid}
 
 @router.post("/api/tasks/orders/{order_id}/cancel")

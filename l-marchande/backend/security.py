@@ -7,7 +7,36 @@ import time
 import secrets
 from typing import Optional, Dict, Any, Tuple
 
-SECRET_KEY = os.environ.get("L_MARCHANDE_SECRET", "lmarchande_super_secure_vault_key_2026_x89a!")
+_WEAK_SECRETS = {
+    "production_super_secret_key_change_me!",
+    "lmarchande_super_secure_vault_key_2026_x89a!",
+    "changeme",
+    "secret",
+}
+
+def _load_or_create_secret() -> str:
+    env_sec = (os.environ.get("L_MARCHANDE_SECRET") or "").strip()
+    if env_sec:
+        if env_sec in _WEAK_SECRETS or len(env_sec) < 32:
+            raise RuntimeError("L_MARCHANDE_SECRET est trop faible ou prédéfini. Utilisez au moins 32 caractères aléatoires.")
+        return env_sec
+
+    secret_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".secret_key")
+    if os.path.isfile(secret_file):
+        val = open(secret_file, encoding="utf-8").read().strip()
+        if len(val) >= 32 and val not in _WEAK_SECRETS:
+            return val
+
+    generated = secrets.token_hex(32)
+    with open(secret_file, "w", encoding="utf-8") as f:
+        f.write(generated)
+    try:
+        os.chmod(secret_file, 0o600)
+    except Exception:
+        pass
+    return generated
+
+SECRET_KEY = _load_or_create_secret()
 TOKEN_EXPIRE_SECONDS = 86400 * 7  # 7 jours
 
 class SecurityHelper:

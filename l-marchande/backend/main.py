@@ -1,5 +1,9 @@
 import os
 import sys
+import hmac
+import hashlib
+import secrets
+from urllib.parse import urlparse
 from fastapi import FastAPI, Depends, HTTPException, Header, status, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -28,14 +32,40 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Configuration CORS
+# Configuration CORS restreinte (jamais "*" avec allow_credentials=True)
+ALLOWED_ORIGINS = [
+    o.strip() for o in os.environ.get(
+        "L_MARCHANDE_CORS_ORIGINS",
+        "http://localhost:8000,http://127.0.0.1:8000"
+    ).split(",") if o.strip()
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-Webhook-Signature"],
 )
+
+# Protection CSRF sur les requêtes mutantes authentifiées par cookie
+@app.middleware("http")
+async def csrf_origin_guard(request: Request, call_next):
+    if request.method in ("POST", "PUT", "PATCH", "DELETE"):
+        has_cookie = bool(request.cookies.get("pr_token"))
+        has_bearer = bool(request.headers.get("authorization"))
+        is_webhook = request.url.path.startswith("/api/wallet/webhook/")
+        if has_cookie and not has_bearer and not is_webhook:
+            origin = request.headers.get("origin")
+            referer = request.headers.get("referer")
+            check_url = origin or referer
+            if check_url:
+                parsed = urlparse(check_url)
+                req_origin = f"{parsed.scheme}://{parsed.netloc}"
+                host_origin = f"{request.url.scheme}://{request.headers.get('host', '')}"
+                if req_origin not in ALLOWED_ORIGINS and req_origin != host_origin:
+                    return JSONResponse({"detail": "Requête bloquée par la protection CSRF (Origin invalide)."}, status_code=403)
+    return await call_next(request)
 
 # Répertoire du frontend
 FRONTEND_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "frontend"))
@@ -95,6 +125,10 @@ def register(req: UserRegisterRequest, request: Request, response: Response):
         if sponsor:
             referred_by_id = sponsor["id"]
 
+    requested_role = (req.role or "worker").strip().lower()
+    if requested_role not in ("worker", "advertiser"):
+        raise HTTPException(status_code=403, detail="Rôle non autorisé lors de l'inscription.")
+
     client_ip = request.client.host if request.client else "127.0.0.1"
     hashed_pwd = SecurityHelper.hash_password(req.password)
     new_ref_code = SecurityHelper.generate_referral_code("LM")
@@ -102,7 +136,7 @@ def register(req: UserRegisterRequest, request: Request, response: Response):
     user_id = execute_commit("""
         INSERT INTO users (email, username, hashed_password, role, email_verified, referral_code, referred_by, last_ip)
         VALUES (?, ?, ?, ?, 0, ?, ?, ?)
-    """, (req.email.strip().lower(), req.username.strip(), hashed_pwd, req.role or "worker", new_ref_code, referred_by_id, client_ip))
+    """, (req.email.strip().lower(), req.username.strip(), hashed_pwd, requested_role, new_ref_code, referred_by_id, client_ip))
 
     # Envoyer un vrai e-mail de vérification (token 24h)
     issue_verification_email(user_id, req.email.strip().lower(), base_url=str(request.base_url), enforce_cooldown=False)
@@ -173,6 +207,7 @@ def get_wallet(current_user: Dict[str, Any] = Depends(get_current_user)):
 # 3. TASKS & WORKER MISSIONS
 # ==============================================================================
 @app.get("/api/tasks")
+@app.get("/api/tasks/")
 def get_available_tasks(
     platform: Optional[str] = "all",
     sort: str = "reward",
@@ -317,22 +352,22 @@ def create_campaign(req: CampaignCreateRequest, current_user: Dict[str, Any] = D
     cost_per_action = round(req.reward_per_action * 1.4, 4)  # Marge plateforme de 40%
     total_budget = round(cost_per_action * req.target_quantity, 4)
 
-    # Débiter le solde de l'annonceur
-    if not WalletService.debit_user(
-        user_id=current_user["id"],
-        amount=total_budget,
-        tx_type="campaign_funding",
-        description=f"Financement Campagne : {req.title} ({req.target_quantity} actions)",
-        reference_id=req.platform
-    ):
-        raise HTTPException(status_code=400, detail=f"Solde insuffisant. Budget requis : ${total_budget:.4f}")
+    ok, camp_id, msg = WalletService.create_campaign_atomic(
+        advertiser_id=current_user["id"],
+        title=req.title,
+        description=req.description or "",
+        platform=req.platform.lower(),
+        action_type=req.action_type.lower(),
+        target_url=req.target_url,
+        reward_per_action=req.reward_per_action,
+        cost_per_action=cost_per_action,
+        target_quantity=req.target_quantity,
+        total_budget=total_budget,
+    )
+    if not ok:
+        raise HTTPException(status_code=400, detail=msg)
 
-    camp_id = execute_commit("""
-        INSERT INTO campaigns (advertiser_id, title, description, platform, action_type, target_url, reward_per_action, cost_per_action, target_quantity, total_budget, remaining_budget, status)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')
-    """, (current_user["id"], req.title, req.description, req.platform.lower(), req.action_type.lower(), req.target_url, req.reward_per_action, cost_per_action, req.target_quantity, total_budget, total_budget))
-
-    return {"status": "success", "message": "Campagne créée et déployée avec succès !", "campaign_id": camp_id}
+    return {"status": "success", "message": msg, "campaign_id": camp_id}
 
 # ==============================================================================
 # 5. REFERRAL PROGRAM
@@ -359,34 +394,53 @@ def get_referral_info(current_user: Dict[str, Any] = Depends(get_current_user)):
     }
 
 # ==============================================================================
-# 6. WALLET TRANSACTIONS (DEPOSIT / WITHDRAW)
+# 6. WALLET TRANSACTIONS (DEPOSIT INTENT / WEBHOOK / ESCROW WITHDRAW)
 # ==============================================================================
 @app.post("/api/wallet/deposit")
 def deposit(req: DepositRequest, current_user: Dict[str, Any] = Depends(get_current_user)):
-    WalletService.credit_user(
+    intent_ref = f"DEP-{secrets.token_hex(6).upper()}"
+    tx_id = WalletService.create_pending_deposit(
         user_id=current_user["id"],
         amount=req.amount,
-        tx_type="deposit",
-        description=f"Dépôt via {req.payment_method.upper()}",
-        reference_id="SIMULATED_GATEWAY_TX"
+        payment_method=req.payment_method,
+        reference_id=intent_ref
     )
-    return {"status": "success", "message": f"${req.amount:.2f} crédités avec succès sur votre compte !"}
+    if not tx_id:
+        raise HTTPException(status_code=400, detail="Impossible de créer la demande de dépôt.")
+    return {
+        "status": "pending",
+        "tx_id": tx_id,
+        "payment_intent_id": intent_ref,
+        "message": f"Intention de dépôt (${req.amount:.2f}) créée ({intent_ref}). En attente de confirmation prestataire/administrateur."
+    }
+
+@app.post("/api/wallet/webhook/deposit")
+async def deposit_webhook(request: Request, x_webhook_signature: Optional[str] = Header(None)):
+    webhook_secret = os.environ.get("L_MARCHANDE_WEBHOOK_SECRET", "").strip()
+    if not webhook_secret:
+        raise HTTPException(status_code=503, detail="Webhook de paiement non configuré.")
+    raw_body = await request.body()
+    expected = hmac.new(webhook_secret.encode("utf-8"), raw_body, hashlib.sha256).hexdigest()
+    if not x_webhook_signature or not hmac.compare_digest(expected, x_webhook_signature.strip()):
+        raise HTTPException(status_code=403, detail="Signature webhook invalide.")
+    payload = await request.json()
+    tx_id = int(payload.get("tx_id", 0))
+    ok, msg = WalletService.approve_pending_deposit(tx_id, provider_ref=str(payload.get("provider_ref", "")))
+    if not ok:
+        raise HTTPException(status_code=400, detail=msg)
+    return {"ok": True, "message": msg}
 
 @app.post("/api/wallet/withdraw")
 def withdraw(req: WithdrawalRequest, current_user: Dict[str, Any] = Depends(get_current_user)):
-    if current_user["balance"] < req.amount:
-        raise HTTPException(status_code=400, detail="Solde insuffisant pour ce montant.")
-
-    if not WalletService.debit_user(
+    ok, tx_id, msg = WalletService.request_withdrawal(
         user_id=current_user["id"],
         amount=req.amount,
-        tx_type="withdrawal",
-        description=f"Demande de Retrait ({req.payment_method}) -> {req.account_details}",
-        reference_id="PENDING_PAYOUT"
-    ):
-        raise HTTPException(status_code=400, detail="Erreur lors du traitement du retrait.")
-
-    return {"status": "success", "message": "Votre demande de retrait a été enregistrée et sera traitée sous 2h."}
+        payment_method=req.payment_method,
+        account_details=req.account_details
+    )
+    if not ok:
+        raise HTTPException(status_code=400, detail=msg)
+    return {"status": "pending", "tx_id": tx_id, "message": msg}
 
 # ==============================================================================
 # 7. PUBLIC STATS & PLATFORM METRICS
@@ -437,6 +491,27 @@ def admin_unban_user(user_id: int, admin: Dict[str, Any] = Depends(get_admin_use
     execute_commit("UPDATE users SET is_banned = 0, ban_reason = NULL, warning_strikes = 0 WHERE id = ?", (user_id,))
     return {"status": "success", "message": f"Utilisateur #{user_id} réactivé."}
 
+@app.post("/api/admin/deposits/{tx_id}/approve")
+def admin_approve_deposit(tx_id: int, admin: Dict[str, Any] = Depends(get_admin_user)):
+    ok, msg = WalletService.approve_pending_deposit(tx_id, provider_ref=f"ADMIN:{admin['id']}")
+    if not ok:
+        raise HTTPException(status_code=400, detail=msg)
+    return {"ok": True, "message": msg}
+
+@app.post("/api/admin/withdrawals/{tx_id}/approve")
+def admin_approve_withdrawal(tx_id: int, admin: Dict[str, Any] = Depends(get_admin_user)):
+    ok, msg = WalletService.resolve_withdrawal(tx_id, approve=True)
+    if not ok:
+        raise HTTPException(status_code=400, detail=msg)
+    return {"ok": True, "message": msg}
+
+@app.post("/api/admin/withdrawals/{tx_id}/reject")
+def admin_reject_withdrawal(tx_id: int, reason: str = "Refusé par l'administrateur", admin: Dict[str, Any] = Depends(get_admin_user)):
+    ok, msg = WalletService.resolve_withdrawal(tx_id, approve=False, reason=reason)
+    if not ok:
+        raise HTTPException(status_code=400, detail=msg)
+    return {"ok": True, "message": msg}
+
 # ==============================================================================
 # 9. PR.SOCIAL COMPATIBILITY ROUTER & EXACT FRONTEND SERVING
 # ==============================================================================
@@ -478,21 +553,66 @@ def page_live():
         return FileResponse(p)
     return _serve_login_view("in")
 
+AUTH_PAGE_ROUTES = {
+    "dashboard", "tasks", "my-tasks", "orders", "create-order",
+    "wallet", "profile", "referrals", "leaderboard", "tools",
+    "premium", "recovery", "autoearn", "support"
+}
+PUBLIC_SPA_ROUTES = {
+    "faq", "rules", "privacy", "terms", "refunds", "guides",
+    "verify-email", "reset-password"
+}
+
+def _get_cookie_user(request: Request) -> Optional[Dict[str, Any]]:
+    token = request.cookies.get("pr_token")
+    if not token:
+        return None
+    payload = SecurityHelper.verify_jwt(token)
+    if not payload or "sub" not in payload:
+        return None
+    u = query_one("SELECT id, role, is_banned FROM users WHERE id = ?", (payload["sub"],))
+    if not u or u["is_banned"]:
+        return None
+    return u
+
 @app.get("/")
 def page_root(request: Request):
-    token = request.cookies.get("pr_token")
-    if token and SecurityHelper.verify_jwt(token):
+    if _get_cookie_user(request):
         app_path = os.path.join(FRONTEND_DIR, "app.html")
         if os.path.exists(app_path):
             return FileResponse(app_path)
     return _serve_login_view("in")
 
 @app.get("/{full_path:path}")
-def serve_spa(full_path: str):
-    target = os.path.join(FRONTEND_DIR, full_path)
-    if full_path and os.path.isfile(target):
+def serve_spa(full_path: str, request: Request):
+    clean = full_path.strip("/")
+    target = os.path.join(FRONTEND_DIR, clean)
+    if clean and os.path.isfile(target):
         return FileResponse(target)
-    app_file = os.path.join(FRONTEND_DIR, "app.html")
-    if os.path.exists(app_file):
-        return FileResponse(app_file)
-    return JSONResponse({"status": "PR.SOCIAL Clone API Online", "version": "1.0.0"})
+
+    # Routes d'administration protégées côté serveur
+    if clean == "admin" or clean.startswith("admin/"):
+        u = _get_cookie_user(request)
+        if not u:
+            return RedirectResponse(url=f"/login?next=/{clean}", status_code=302)
+        if u.get("role") != "admin":
+            raise HTTPException(status_code=403, detail="Accès administrateur requis.")
+        app_file = os.path.join(FRONTEND_DIR, "app.html")
+        if os.path.exists(app_file):
+            return FileResponse(app_file)
+
+    # Routes applicatives protégées côté serveur
+    if clean in AUTH_PAGE_ROUTES:
+        if not _get_cookie_user(request):
+            return RedirectResponse(url=f"/login?next=/{clean}", status_code=302)
+        app_file = os.path.join(FRONTEND_DIR, "app.html")
+        if os.path.exists(app_file):
+            return FileResponse(app_file)
+
+    # Routes publiques connues (guides, faq, verify-email, etc.)
+    if clean in PUBLIC_SPA_ROUTES:
+        app_file = os.path.join(FRONTEND_DIR, "app.html")
+        if os.path.exists(app_file):
+            return FileResponse(app_file)
+
+    raise HTTPException(status_code=404, detail="Page introuvable.")

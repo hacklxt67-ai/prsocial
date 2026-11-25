@@ -29,7 +29,7 @@ def init_db():
             email TEXT UNIQUE NOT NULL,
             username TEXT UNIQUE NOT NULL,
             hashed_password TEXT NOT NULL,
-            role TEXT DEFAULT 'worker', -- 'worker', 'advertiser', 'admin'
+            role TEXT DEFAULT 'worker' CHECK(role IN ('worker', 'advertiser', 'admin')), -- 'worker', 'advertiser', 'admin'
             email_verified INTEGER DEFAULT 0,
             email_verify_token TEXT,
             email_verify_expires_at TIMESTAMP,

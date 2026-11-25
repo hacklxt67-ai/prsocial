@@ -1,12 +1,12 @@
 from pydantic import BaseModel, Field
-from typing import Optional, List, Any
+from typing import Optional, List, Any, Literal
 
 # --- Auth Schemas ---
 class UserRegisterRequest(BaseModel):
     email: str = Field(..., min_length=5, max_length=120)
     username: str = Field(..., min_length=3, max_length=32)
     password: str = Field(..., min_length=6)
-    role: Optional[str] = "worker"
+    role: Optional[Literal["worker", "advertiser"]] = "worker"
     referral_code: Optional[str] = None
     ref: Optional[str] = None
     cfToken: Optional[str] = None
