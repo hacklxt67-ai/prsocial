@@ -39,6 +39,7 @@ def init_db():
             email_change_expires_at TIMESTAMP,
             reset_token TEXT,
             reset_expires_at TIMESTAMP,
+            token_version INTEGER DEFAULT 1,
             balance REAL DEFAULT 0.0,
             hold_balance REAL DEFAULT 0.0,
             referral_code TEXT UNIQUE NOT NULL,
@@ -193,6 +194,7 @@ def init_db():
             tx_id INTEGER,
             amount REAL,
             currency TEXT DEFAULT 'USD',
+            payload_hash TEXT,
             processed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
         """)
@@ -230,7 +232,9 @@ def init_db():
             "ALTER TABLE users ADD COLUMN email_change_expires_at TIMESTAMP",
             "ALTER TABLE users ADD COLUMN reset_token TEXT",
             "ALTER TABLE users ADD COLUMN reset_expires_at TIMESTAMP",
+            "ALTER TABLE users ADD COLUMN token_version INTEGER DEFAULT 1",
             "ALTER TABLE transactions ADD COLUMN currency TEXT DEFAULT 'USD'",
+            "ALTER TABLE webhook_events ADD COLUMN payload_hash TEXT",
         ):
             try:
                 cur.execute(col_sql)
@@ -252,6 +256,9 @@ def _run_migrations(conn: sqlite3.Connection):
         if row and row[0] and "CHECK" not in row[0].upper():
             cols = [r[1] for r in cur.execute("PRAGMA table_info(users)").fetchall()]
             col_list = ", ".join(cols)
+            saved_objs = cur.execute(
+                "SELECT type, name, sql FROM sqlite_master WHERE tbl_name='users' AND type IN ('index','trigger') AND sql IS NOT NULL"
+            ).fetchall()
             cur.execute("PRAGMA foreign_keys = OFF;")
             try:
                 cur.execute("BEGIN;")
@@ -271,6 +278,7 @@ def _run_migrations(conn: sqlite3.Connection):
                     email_change_expires_at TIMESTAMP,
                     reset_token TEXT,
                     reset_expires_at TIMESTAMP,
+                    token_version INTEGER DEFAULT 1,
                     balance REAL DEFAULT 0.0,
                     hold_balance REAL DEFAULT 0.0,
                     referral_code TEXT UNIQUE NOT NULL,
@@ -289,6 +297,11 @@ def _run_migrations(conn: sqlite3.Connection):
                 cur.execute(f"INSERT INTO users_new ({col_list}) SELECT {col_list} FROM users;")
                 cur.execute("DROP TABLE users;")
                 cur.execute("ALTER TABLE users_new RENAME TO users;")
+                for _, _, obj_sql in saved_objs:
+                    cur.execute(obj_sql)
+                fk_errs = cur.execute("PRAGMA foreign_key_check(users)").fetchall()
+                if fk_errs:
+                    raise RuntimeError(f"Foreign key check failed after users migration: {fk_errs}")
                 cur.execute("COMMIT;")
             except Exception:
                 cur.execute("ROLLBACK;")

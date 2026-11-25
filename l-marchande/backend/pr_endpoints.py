@@ -38,6 +38,8 @@ def _get_optional_user(request: Request, authorization: Optional[str] = Header(N
     user = query_one("SELECT * FROM users WHERE id = ?", (payload["sub"],))
     if not user or user["is_banned"]:
         return None
+    if payload.get("ver", 1) != (user.get("token_version") or 1):
+        return None
     u = dict(user)
     u.pop("hashed_password", None)
     return u
@@ -138,7 +140,10 @@ async def cabinet_oops():
 # 2. AUTH EXTRAS & COMPATIBILITY
 # ==============================================================================
 @router.post("/api/auth/logout")
-def auth_logout(response: Response):
+def auth_logout(request: Request, response: Response, authorization: Optional[str] = Header(None)):
+    u = _get_optional_user(request, authorization)
+    if u:
+        execute_commit("UPDATE users SET token_version = COALESCE(token_version, 1) + 1 WHERE id = ?", (u["id"],))
     response.delete_cookie("pr_token", path="/")
     return {"ok": True}
 
@@ -182,7 +187,7 @@ async def profile_change_password(request: Request, user: Dict[str, Any] = Depen
     if not db_user or not SecurityHelper.verify_password(cur_pw, db_user["hashed_password"]):
         return JSONResponse({"ok": False, "error": "Mot de passe actuel incorrect."}, status_code=400)
     new_hash = SecurityHelper.hash_password(new_pw)
-    execute_commit("UPDATE users SET hashed_password = ? WHERE id = ?", (new_hash, user["id"]))
+    execute_commit("UPDATE users SET hashed_password = ?, token_version = COALESCE(token_version, 1) + 1 WHERE id = ?", (new_hash, user["id"]))
     return {"ok": True, "message": "Mot de passe modifié avec succès !"}
 
 @router.post("/api/auth/resend-verification")

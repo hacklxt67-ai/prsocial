@@ -1,9 +1,12 @@
 import os
 import sys
 import hmac
+import time
 import hashlib
 import secrets
+import ipaddress
 import posixpath
+from collections import defaultdict
 from urllib.parse import urlparse, unquote
 from fastapi import FastAPI, Depends, HTTPException, Header, status, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -49,7 +52,52 @@ app.add_middleware(
     allow_headers=["Authorization", "Content-Type", "X-Webhook-Signature"],
 )
 
-# Protection CSRF stricte sur toutes les routes mutantes authentifiées par cookie
+TRUST_PROXY = os.environ.get("L_MARCHANDE_TRUST_PROXY", "0").strip() == "1"
+_RATE_BUCKETS: Dict[str, List[float]] = defaultdict(list)
+
+def _check_rate_limit(key: str, limit: int = 30, window_sec: int = 60):
+    now = time.time()
+    q = [t for t in _RATE_BUCKETS[key] if now - t < window_sec]
+    if len(q) >= limit:
+        raise HTTPException(status_code=429, detail="Trop de tentatives. Réessayez dans une minute.")
+    q.append(now)
+    _RATE_BUCKETS[key] = q
+
+def _norm_origin_tuple(url_str: str) -> Optional[tuple]:
+    try:
+        p = urlparse(url_str)
+    except Exception:
+        return None
+    if not p.scheme or not p.hostname:
+        return None
+    scheme = p.scheme.lower()
+    if scheme not in ("http", "https"):
+        return None
+    port = p.port or (443 if scheme == "https" else 80)
+    return (scheme, p.hostname.lower(), port)
+
+_ALLOWED_ORIGIN_TUPLES = {t for o in ALLOWED_ORIGINS if (t := _norm_origin_tuple(o))}
+
+def _validate_campaign_url(raw_url: str) -> str:
+    u = (raw_url or "").strip()
+    try:
+        p = urlparse(u)
+    except Exception:
+        raise HTTPException(status_code=400, detail="URL cible invalide.")
+    if p.scheme.lower() not in ("http", "https") or not p.hostname:
+        raise HTTPException(status_code=400, detail="L'URL cible doit commencer par http:// ou https://.")
+    host = p.hostname.lower()
+    if host in ("localhost", "127.0.0.1", "::1", "0.0.0.0"):
+        raise HTTPException(status_code=400, detail="URL locale ou interne non autorisée.")
+    try:
+        ip = ipaddress.ip_address(host)
+        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved:
+            raise HTTPException(status_code=400, detail="Adresse IP privée ou réservée non autorisée.")
+    except ValueError:
+        pass
+    return u
+
+# Protection CSRF stricte (schéma + hôte + port exacts, support proxy) sur toutes les routes mutantes authentifiées par cookie
 @app.middleware("http")
 async def csrf_origin_guard(request: Request, call_next):
     if request.method in ("POST", "PUT", "PATCH", "DELETE"):
@@ -63,15 +111,13 @@ async def csrf_origin_guard(request: Request, call_next):
             check_url = origin or referer
             if not check_url:
                 return JSONResponse({"detail": "Requête bloquée par la protection CSRF (Origin/Referer manquant)."}, status_code=403)
-            try:
-                parsed = urlparse(check_url)
-            except Exception:
-                return JSONResponse({"detail": "Requête bloquée par la protection CSRF (En-tête mal formé)."}, status_code=403)
-            if not parsed.scheme or not parsed.netloc:
-                return JSONResponse({"detail": "Requête bloquée par la protection CSRF (Origin/Referer invalide)."}, status_code=403)
-            req_origin = f"{parsed.scheme}://{parsed.netloc}".lower()
-            host_origin = f"{request.url.scheme}://{request.headers.get('host', '')}".lower()
-            if req_origin not in [o.lower() for o in ALLOWED_ORIGINS] and req_origin != host_origin:
+            req_tuple = _norm_origin_tuple(check_url)
+            if not req_tuple:
+                return JSONResponse({"detail": "Requête bloquée par la protection CSRF (Origin/Referer mal formé)."}, status_code=403)
+            proto = request.headers.get("x-forwarded-proto", request.url.scheme) if TRUST_PROXY else request.url.scheme
+            host_hdr = request.headers.get("x-forwarded-host", request.headers.get("host", "")) if TRUST_PROXY else request.headers.get("host", "")
+            host_tuple = _norm_origin_tuple(f"{proto}://{host_hdr}")
+            if req_tuple not in _ALLOWED_ORIGIN_TUPLES and req_tuple != host_tuple:
                 return JSONResponse({"detail": "Requête bloquée par la protection CSRF (Origin non autorisée)."}, status_code=403)
     return await call_next(request)
 
@@ -104,6 +150,9 @@ def get_current_user(request: Request, authorization: Optional[str] = Header(Non
     if user["is_banned"]:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=f"Compte suspendu : {user.get('ban_reason') or 'Infraction aux règles'}")
 
+    if payload.get("ver", 1) != (user.get("token_version") or 1):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session révoquée. Veuillez vous reconnecter.")
+
     return user
 
 def get_admin_user(current_user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
@@ -117,6 +166,8 @@ def get_admin_user(current_user: Dict[str, Any] = Depends(get_current_user)) -> 
 # ==============================================================================
 @app.post("/api/auth/register", response_model=TokenResponse)
 def register(req: UserRegisterRequest, request: Request, response: Response):
+    client_ip = request.client.host if request.client else "127.0.0.1"
+    _check_rate_limit(f"reg:{client_ip}", limit=20, window_sec=60)
     if not is_valid_email(req.email):
         raise HTTPException(status_code=400, detail="Format d'adresse e-mail invalide.")
     # Vérifier l'unicité de l'email et du pseudo
@@ -150,7 +201,7 @@ def register(req: UserRegisterRequest, request: Request, response: Response):
     issue_verification_email(user_id, req.email.strip().lower(), base_url=str(request.base_url), enforce_cooldown=False)
 
     user = query_one("SELECT * FROM users WHERE id = ?", (user_id,))
-    token = SecurityHelper.create_jwt({"sub": user_id, "username": user["username"], "role": user["role"]})
+    token = SecurityHelper.create_jwt({"sub": user_id, "username": user["username"], "role": user["role"], "ver": user.get("token_version") or 1})
 
     # Nettoyage mot de passe avant retour
     user_data = dict(user)
@@ -161,6 +212,8 @@ def register(req: UserRegisterRequest, request: Request, response: Response):
 
 @app.post("/api/auth/login", response_model=TokenResponse)
 def login(req: UserLoginRequest, request: Request, response: Response):
+    client_ip = request.client.host if request.client else "127.0.0.1"
+    _check_rate_limit(f"login:{client_ip}", limit=30, window_sec=60)
     ident = (req.username_or_email or req.email or "").strip()
     user = query_one("""
         SELECT * FROM users WHERE username = ? OR email = ?
@@ -175,7 +228,7 @@ def login(req: UserLoginRequest, request: Request, response: Response):
     client_ip = request.client.host if request.client else "127.0.0.1"
     execute_commit("UPDATE users SET last_login_at = CURRENT_TIMESTAMP, last_ip = ? WHERE id = ?", (client_ip, user["id"]))
 
-    token = SecurityHelper.create_jwt({"sub": user["id"], "username": user["username"], "role": user["role"]})
+    token = SecurityHelper.create_jwt({"sub": user["id"], "username": user["username"], "role": user["role"], "ver": user.get("token_version") or 1})
     user_data = dict(user)
     user_data.pop("hashed_password", None)
     response.set_cookie("pr_token", token, httponly=True, samesite="lax", path="/", max_age=86400*30)
@@ -360,13 +413,14 @@ def create_campaign(req: CampaignCreateRequest, current_user: Dict[str, Any] = D
     cost_per_action = round(req.reward_per_action * 1.4, 4)  # Marge plateforme de 40%
     total_budget = round(cost_per_action * req.target_quantity, 4)
 
+    target_url = _validate_campaign_url(req.target_url)
     ok, camp_id, msg = WalletService.create_campaign_atomic(
         advertiser_id=current_user["id"],
         title=req.title,
         description=req.description or "",
         platform=req.platform.lower(),
         action_type=req.action_type.lower(),
-        target_url=req.target_url,
+        target_url=target_url,
         reward_per_action=req.reward_per_action,
         cost_per_action=cost_per_action,
         target_quantity=req.target_quantity,
@@ -436,6 +490,7 @@ async def deposit_webhook(request: Request, x_webhook_signature: Optional[str] =
     if not x_webhook_signature or not hmac.compare_digest(expected, x_webhook_signature.strip()):
         raise HTTPException(status_code=403, detail="Signature webhook invalide.")
 
+    payload_hash = hashlib.sha256(raw_body).hexdigest()
     try:
         import json as _json
         payload = _json.loads(raw_body.decode("utf-8"))
@@ -448,15 +503,18 @@ async def deposit_webhook(request: Request, x_webhook_signature: Optional[str] =
         raise HTTPException(status_code=400, detail="event_id, tx_id et amount sont obligatoires.")
 
     client_ip = request.client.host if request.client else "127.0.0.1"
-    ok, msg, replayed = WalletService.approve_pending_deposit(
+    ok, msg, replayed, conflict = WalletService.approve_pending_deposit(
         tx_id=tx_id,
         provider_ref=str(payload.get("provider_ref", "")),
         event_id=event_id,
+        payload_hash=payload_hash,
         expected_amount=float(payload["amount"]),
         expected_currency=str(payload.get("currency", "USD")),
         actor_id=0,
         ip_address=client_ip,
     )
+    if conflict:
+        raise HTTPException(status_code=409, detail=msg)
     if not ok:
         raise HTTPException(status_code=400, detail=msg)
     return {"ok": True, "idempotent_replay": replayed, "message": msg}
@@ -514,8 +572,8 @@ def admin_users(admin: Dict[str, Any] = Depends(get_admin_user)):
 
 @app.post("/api/admin/users/{user_id}/ban")
 def admin_ban_user(user_id: int, reason: str = "Non-respect des règles de conformité", admin: Dict[str, Any] = Depends(get_admin_user)):
-    execute_commit("UPDATE users SET is_banned = 1, ban_reason = ? WHERE id = ?", (reason, user_id))
-    return {"status": "success", "message": f"Utilisateur #{user_id} banni."}
+    execute_commit("UPDATE users SET is_banned = 1, ban_reason = ?, token_version = COALESCE(token_version, 1) + 1 WHERE id = ?", (reason, user_id))
+    return {"status": "success", "message": f"Utilisateur #{user_id} banni et sessions révoquées."}
 
 @app.post("/api/admin/users/{user_id}/unban")
 def admin_unban_user(user_id: int, admin: Dict[str, Any] = Depends(get_admin_user)):
@@ -523,14 +581,25 @@ def admin_unban_user(user_id: int, admin: Dict[str, Any] = Depends(get_admin_use
     return {"status": "success", "message": f"Utilisateur #{user_id} réactivé."}
 
 @app.post("/api/admin/deposits/{tx_id}/approve")
-def admin_approve_deposit(tx_id: int, request: Request, admin: Dict[str, Any] = Depends(get_admin_user)):
+async def admin_approve_deposit(tx_id: int, request: Request, provider_ref: Optional[str] = None, admin: Dict[str, Any] = Depends(get_admin_user)):
+    ref = (provider_ref or "").strip()
+    if not ref:
+        try:
+            body = await request.json()
+            ref = str(body.get("provider_ref", "")).strip()
+        except Exception:
+            pass
     client_ip = request.client.host if request.client else "127.0.0.1"
-    ok, msg, _ = WalletService.approve_pending_deposit(
-        tx_id, provider_ref=f"ADMIN:{admin['id']}", actor_id=admin["id"], ip_address=client_ip
+    ok, msg, _, _ = WalletService.approve_pending_deposit(
+        tx_id, provider_ref=ref, actor_id=admin["id"], ip_address=client_ip
     )
     if not ok:
         raise HTTPException(status_code=400, detail=msg)
     return {"ok": True, "message": msg}
+
+@app.get("/api/admin/audit-logs")
+def admin_audit_logs(limit: int = 100, admin: Dict[str, Any] = Depends(get_admin_user)):
+    return {"ok": True, "logs": query_all("SELECT * FROM audit_logs ORDER BY id DESC LIMIT ?", (min(limit, 500),))}
 
 @app.post("/api/admin/withdrawals/{tx_id}/approve")
 async def admin_approve_withdrawal(tx_id: int, request: Request, payout_reference: Optional[str] = None, admin: Dict[str, Any] = Depends(get_admin_user)):
@@ -610,6 +679,26 @@ PUBLIC_SPA_ROUTES = {
     "verify-email", "reset-password"
 }
 
+def _build_static_allowlist() -> set:
+    allowed = set()
+    if not os.path.isdir(FRONTEND_DIR):
+        return allowed
+    allowed_dirs = ("cab", "css", "js", "i18n", "assets")
+    allowed_root = {"favicon.ico", "favicon-32.png", "favicon-192.png", "favicon.svg", "apple-touch-icon.png"}
+    for fn in allowed_root:
+        if os.path.isfile(os.path.join(FRONTEND_DIR, fn)):
+            allowed.add(fn)
+    for sub in allowed_dirs:
+        sd = os.path.join(FRONTEND_DIR, sub)
+        if os.path.isdir(sd):
+            for dp, _, fns in os.walk(sd):
+                for fn in fns:
+                    rel = os.path.relpath(os.path.join(dp, fn), FRONTEND_DIR).replace("\\", "/")
+                    allowed.add(rel)
+    return allowed
+
+STATIC_ALLOWLIST = _build_static_allowlist()
+
 def _get_cookie_user(request: Request) -> Optional[Dict[str, Any]]:
     token = request.cookies.get("pr_token")
     if not token:
@@ -617,8 +706,10 @@ def _get_cookie_user(request: Request) -> Optional[Dict[str, Any]]:
     payload = SecurityHelper.verify_jwt(token)
     if not payload or "sub" not in payload:
         return None
-    u = query_one("SELECT id, role, is_banned FROM users WHERE id = ?", (payload["sub"],))
+    u = query_one("SELECT id, role, is_banned, token_version FROM users WHERE id = ?", (payload["sub"],))
     if not u or u["is_banned"]:
+        return None
+    if payload.get("ver", 1) != (u.get("token_version") or 1):
         return None
     return u
 
@@ -630,21 +721,21 @@ def page_root(request: Request):
             return FileResponse(app_path)
     return _serve_login_view("in")
 
-SAFE_STATIC_EXTS = {".html", ".css", ".js", ".json", ".woff2", ".png", ".ico", ".svg", ".jpg", ".webp"}
-
 @app.get("/{full_path:path}")
 def serve_spa(full_path: str, request: Request):
-    decoded = unquote(full_path or "")
-    norm = posixpath.normpath("/" + decoded).lstrip("/")
-    if ".." in norm.split("/"):
+    raw = full_path or ""
+    low = raw.lower()
+    if "\\" in raw or "%2e" in low or "%5c" in low or "%25" in low:
         raise HTTPException(status_code=400, detail="Chemin invalide.")
-    clean = norm.strip("/")
+    decoded = unquote(raw)
+    if "\\" in decoded or ".." in decoded:
+        raise HTTPException(status_code=400, detail="Chemin invalide.")
+    clean = posixpath.normpath("/" + decoded).strip("/")
 
-    target = os.path.abspath(os.path.join(FRONTEND_DIR, clean))
-    if clean and target.startswith(FRONTEND_DIR + os.sep) and os.path.isfile(target):
-        if os.path.splitext(target)[1].lower() in SAFE_STATIC_EXTS:
+    if clean in STATIC_ALLOWLIST:
+        target = os.path.abspath(os.path.join(FRONTEND_DIR, clean))
+        if target.startswith(FRONTEND_DIR + os.sep) and os.path.isfile(target):
             return FileResponse(target)
-        raise HTTPException(status_code=403, detail="Type de fichier non autorisé.")
 
     # Routes d'administration protégées côté serveur
     if clean == "admin" or clean.startswith("admin/"):

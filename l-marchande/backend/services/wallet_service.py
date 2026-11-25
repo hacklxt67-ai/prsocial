@@ -162,46 +162,53 @@ class WalletService:
         tx_id: int,
         provider_ref: str = "",
         event_id: Optional[str] = None,
+        payload_hash: Optional[str] = None,
         expected_amount: Optional[float] = None,
         expected_currency: Optional[str] = None,
         actor_id: Optional[int] = None,
         ip_address: str = "127.0.0.1",
-    ) -> Tuple[bool, str, bool]:
-        """Valide un dépôt en attente de façon atomique, idempotente (webhook_events) et auditée."""
+    ) -> Tuple[bool, str, bool, bool]:
+        """Valide un dépôt en attente de façon atomique, idempotente (webhook_events) et auditée.
+        Retourne: (ok, message, idempotent_replay, conflict_409)
+        """
+        if not event_id and len((provider_ref or "").strip()) < 6:
+            return False, "Référence externe vérifiable (provider_ref >= 6 car.) requise.", False, False
         conn = get_db_connection()
         try:
             cur = conn.cursor()
             cur.execute("BEGIN IMMEDIATE;")
 
             if event_id:
-                seen = cur.execute("SELECT event_id FROM webhook_events WHERE event_id = ?", (event_id,)).fetchone()
+                seen = cur.execute("SELECT event_id, payload_hash FROM webhook_events WHERE event_id = ?", (event_id,)).fetchone()
                 if seen:
                     conn.rollback()
-                    return True, f"Événement webhook {event_id} déjà traité (idempotent).", True
+                    if payload_hash and seen["payload_hash"] and seen["payload_hash"] != payload_hash:
+                        return False, f"Conflit : event_id {event_id} déjà utilisé avec un contenu différent.", False, True
+                    return True, f"Événement webhook {event_id} déjà traité (idempotent).", True, False
 
             cur.execute("SELECT * FROM transactions WHERE id = ? AND type = 'deposit'", (tx_id,))
             tx = cur.fetchone()
             if not tx:
                 conn.rollback()
-                return False, "Transaction de dépôt introuvable.", False
+                return False, "Transaction de dépôt introuvable.", False, False
             if tx["status"] != "pending":
                 conn.rollback()
-                return False, f"Dépôt déjà traité (statut: {tx['status']}).", False
+                return False, f"Dépôt déjà traité (statut: {tx['status']}).", False, False
 
             tx_currency = (tx["currency"] or "USD").upper() if "currency" in tx.keys() else "USD"
             if expected_currency is not None and expected_currency.strip().upper() != tx_currency:
                 conn.rollback()
-                return False, f"Devise invalide : attendu {tx_currency}, reçu {expected_currency}.", False
+                return False, f"Devise invalide : attendu {tx_currency}, reçu {expected_currency}.", False, False
 
             if expected_amount is not None and abs(float(expected_amount) - float(tx["amount"])) > 1e-6:
                 conn.rollback()
-                return False, f"Montant invalide : attendu {float(tx['amount']):.4f}, reçu {float(expected_amount):.4f}.", False
+                return False, f"Montant invalide : attendu {float(tx['amount']):.4f}, reçu {float(expected_amount):.4f}.", False, False
 
             cur.execute("SELECT balance FROM users WHERE id = ?", (tx["user_id"],))
             u = cur.fetchone()
             if not u:
                 conn.rollback()
-                return False, "Utilisateur introuvable.", False
+                return False, "Utilisateur introuvable.", False, False
 
             new_bal = round(float(u["balance"]) + float(tx["amount"]), 6)
             cur.execute("UPDATE users SET balance = ? WHERE id = ?", (new_bal, tx["user_id"]))
@@ -212,12 +219,12 @@ class WalletService:
             )
             if cur.rowcount != 1:
                 conn.rollback()
-                return False, "Conflit de concurrence : dépôt déjà traité.", False
+                return False, "Conflit de concurrence : dépôt déjà traité.", False, False
 
             if event_id:
                 cur.execute(
-                    "INSERT INTO webhook_events (event_id, tx_id, amount, currency) VALUES (?, ?, ?, ?)",
-                    (event_id, tx_id, float(tx["amount"]), tx_currency)
+                    "INSERT INTO webhook_events (event_id, tx_id, amount, currency, payload_hash) VALUES (?, ?, ?, ?, ?)",
+                    (event_id, tx_id, float(tx["amount"]), tx_currency, payload_hash)
                 )
 
             cur.execute("""
@@ -232,10 +239,10 @@ class WalletService:
             ))
 
             conn.commit()
-            return True, f"Dépôt #{tx_id} confirmé (+${float(tx['amount']):.2f}).", False
+            return True, f"Dépôt #{tx_id} confirmé (+${float(tx['amount']):.2f}).", False, False
         except Exception as e:
             conn.rollback()
-            return False, str(e), False
+            return False, str(e), False, False
         finally:
             conn.close()
 
@@ -281,8 +288,8 @@ class WalletService:
         ip_address: str = "127.0.0.1",
     ) -> Tuple[bool, str]:
         """Approuve (avec preuve de versement) ou rejette (avec remboursement atomique) une demande de retrait."""
-        if approve and not (payout_reference or "").strip():
-            return False, "Référence de versement (payout_reference) requise pour approuver un retrait."
+        if approve and len((payout_reference or "").strip()) < 6:
+            return False, "Référence de versement (payout_reference >= 6 car.) requise pour approuver un retrait."
         conn = get_db_connection()
         try:
             cur = conn.cursor()
