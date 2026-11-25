@@ -34,6 +34,9 @@ function renderSidebar(activeRoute) {
   const u = API.user || {};
   const initial = (u.username || 'U')[0].toUpperCase();
   const userMode = getUserMode();
+  const _st = (k, fb) => {
+    try { const v = typeof t === 'function' ? t(k) : ''; return (v && v !== k) ? v : fb; } catch { return fb; }
+  };
 
   // Schedule async premium chip + tasks count update after DOM mount
   setTimeout(() => {
@@ -70,10 +73,10 @@ function renderSidebar(activeRoute) {
 
     <div class="sidebar-mode-toggle">
       <button onclick="switchUserMode('worker')" class="sidebar-mode-btn ${userMode === 'worker' ? 'active' : ''}">
-        ${t('mode_worker') || 'Travailleur'}
+        ${_st('mode_worker', 'Travailleur')}
       </button>
       <button onclick="switchUserMode('advertiser')" class="sidebar-mode-btn ${userMode === 'advertiser' ? 'active' : ''}">
-        ${t('mode_advertiser') || 'Annonceur'}
+        ${_st('mode_advertiser', 'Annonceur')}
       </button>
     </div>
 
@@ -81,15 +84,15 @@ function renderSidebar(activeRoute) {
       <div class="sidebar-section" style="margin-bottom:6px">
         <a class="sidebar-link ${activeRoute === 'dashboard' ? 'active' : ''}" onclick="Router.navigate('/dashboard')">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
-          ${t('nav_dashboard') || 'Tableau de bord'}
+          ${_st('nav_dashboard', 'Tableau de bord')}
         </a>
       </div>
 
       <div class="sidebar-section" style="${userMode === 'worker' ? '' : 'display:none'}">
-        <div class="sidebar-section-title">${t('nav_earn') || 'GAGNER'}</div>
+        <div class="sidebar-section-title">${_st('nav_earn', 'GAGNER')}</div>
         <a class="sidebar-link ${activeRoute === 'tasks' ? 'active' : ''}" onclick="Router.navigate('/tasks')">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-          ${t('nav_tasks') || 'Tâches'}
+          ${_st('nav_tasks', I18N.lang === 'fr' ? 'Tâches' : 'Tasks')}
           <span class="sb-count-pill" id="sb-tasks-count" style="display:none">0</span>
         </a>
         <a class="sidebar-link ${activeRoute === 'premium' ? 'active' : ''}" id="sidebar-premium-link" style="display:none" onclick="Router.navigate('/premium')">
@@ -99,64 +102,64 @@ function renderSidebar(activeRoute) {
         </a>
         <a class="sidebar-link ${activeRoute === 'my-tasks' ? 'active' : ''}" onclick="Router.navigate('/my-tasks')">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-          ${t('nav_my_tasks') || 'Mes tâches'}
+          ${_st('nav_my_tasks', 'Mes tâches')}
         </a>
         <a class="sidebar-link ${activeRoute === 'leaderboard' ? 'active' : ''}" onclick="Router.navigate('/leaderboard')">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 15l-2 5 2-1 2 1-2-5z"/><path d="M6 3h12l-1.5 7h-9L6 3z"/></svg>
-          ${t('nav_leaderboard') || 'Classement'}
+          ${_st('nav_leaderboard', 'Classement')}
         </a>
         <a class="sidebar-link ${activeRoute === 'tools' ? 'active' : ''}" onclick="Router.navigate('/tools')">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
-          ${t('nav_tools') || 'Outils'}
+          ${_st('nav_tools', 'Outils')}
         </a>
       </div>
 
       <div class="sidebar-section" style="${userMode === 'advertiser' ? '' : 'display:none'}">
-        <div class="sidebar-section-title">${t('nav_advertiser') || 'ANNONCEUR'}</div>
+        <div class="sidebar-section-title">${_st('nav_advertiser', 'ANNONCEUR')}</div>
         <a class="sidebar-link ${activeRoute === 'create-order' ? 'active' : ''}" onclick="Router.navigate('/create-order')">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          ${t('nav_new_order') || 'Nouvelle commande'}
+          ${_st('nav_new_order', 'Nouvelle commande')}
         </a>
         <a class="sidebar-link ${activeRoute === 'orders' ? 'active' : ''}" onclick="Router.navigate('/orders')">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 14h6M9 18h6"/></svg>
-          ${t('nav_my_orders') || 'Mes commandes'}
+          ${_st('nav_my_orders', 'Mes commandes')}
         </a>
       </div>
 
       <div class="sidebar-section">
-        <div class="sidebar-section-title">${t('nav_account') || 'COMPTE'}</div>
+        <div class="sidebar-section-title">${_st('nav_account', 'COMPTE')}</div>
         <a class="sidebar-link ${activeRoute === 'wallet' ? 'active' : ''}" onclick="Router.navigate('/wallet')">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 10h20"/><circle cx="16" cy="14" r="1.5"/></svg>
-          ${t('nav_wallet') || 'Portefeuille'}
+          ${_st('nav_wallet', 'Portefeuille')}
         </a>
         <a class="sidebar-link ${activeRoute === 'referrals' ? 'active' : ''}" onclick="Router.navigate('/referrals')">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-          ${t('nav_referrals') || 'Parrainage'}
+          ${_st('nav_referrals', 'Parrainage')}
         </a>
         <a class="sidebar-link ${activeRoute === 'profile' ? 'active' : ''}" onclick="Router.navigate('/profile')">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-          ${t('nav_profile_security') || t('nav_profile') || 'Profil et sécurité'}
+          ${_st('nav_profile_security', I18N.lang === 'fr' ? 'Profil et sécurité' : 'Profile & security')}
         </a>
       </div>
 
       <div class="sidebar-section">
-        <div class="sidebar-section-title">${t('nav_help') || 'AIDE'}</div>
+        <div class="sidebar-section-title">${_st('nav_help', 'AIDE')}</div>
         <a class="sidebar-link ${activeRoute === 'support' ? 'active' : ''}" onclick="Router.navigate('/support')">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-          ${t('nav_support') || 'Assistance'}
+          ${_st('nav_support', 'Assistance')}
           <span class="sup-unread-badge" data-sup-unread-badge style="display:none;margin-left:auto;background:#ef4444;color:#fff;font-size:11px;font-weight:700;padding:2px 7px;border-radius:10px;min-width:18px;text-align:center;line-height:1"></span>
         </a>
         <a class="sidebar-link ${activeRoute === 'guides' ? 'active' : ''}" href="/guides" onclick="var l=localStorage.getItem('pr-social-lang')||'en';if(l!=='en'){window.location.href='/'+l+'/guides';return false;}">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
-          ${t('nav_guides') || 'Guides'}
+          ${_st('nav_guides', 'Guides')}
         </a>
         <a class="sidebar-link ${activeRoute === 'faq' ? 'active' : ''}" onclick="Router.navigate('/faq')">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
-          ${t('nav_faq') || 'FAQ'}
+          ${_st('nav_faq', 'FAQ')}
         </a>
         <a class="sidebar-link ${activeRoute === 'rules' ? 'active' : ''}" onclick="Router.navigate('/rules')">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-          ${t('rules_link') || 'Règles'}
+          ${_st('rules_link', 'Règles')}
         </a>
       </div>
 
@@ -168,12 +171,12 @@ function renderSidebar(activeRoute) {
         </a>
         <a class="sidebar-link" onclick="window.open('/api/developer-redirect','_blank')">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
-          ${t('nav_developer') || 'Développeurs'}
+          ${_st('nav_developer', 'Développeurs')}
         </a>
       </div>
 
       <div class="sb-follow-row">
-        <span class="sb-follow-lbl">${t('nav_follow_us') || 'SUIVEZ-NOUS'}</span>
+        <span class="sb-follow-lbl">${_st('nav_follow_us', 'SUIVEZ-NOUS')}</span>
         <div class="sb-follow-icons">
           <a href="https://x.com/prsocial_app" target="_blank" rel="noopener" title="X / Twitter">
             <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231z"/></svg>
@@ -209,7 +212,7 @@ function renderSidebar(activeRoute) {
         <div class="sidebar-avatar" style="background:rgba(34,197,94,0.2);color:#22c55e">${initial}</div>
         <div class="sidebar-user-info">
           <div class="sidebar-user-name">${u.username || 'User'}</div>
-          <div class="sb-user-trust">✓ ${u.trust_score >= 80 || u.trust_score == null ? (t('nav_trusted') || 'De confiance') : '$' + (u.balance || 0).toFixed(2)}</div>
+          <div class="sb-user-trust">✓ ${u.trust_score >= 80 || u.trust_score == null ? _st('nav_trusted', I18N.lang === 'fr' ? 'De confiance' : 'Trusted') : '$' + (u.balance || 0).toFixed(2)}</div>
         </div>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
       </div>
