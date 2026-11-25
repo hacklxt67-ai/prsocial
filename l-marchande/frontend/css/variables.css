@@ -20,10 +20,10 @@
   --text-muted: #71717a;
 
   /* Accent — red → orange gradient */
-  --accent: #ea580c;
-  --accent-hover: #f97316;
-  --accent-light: rgba(234, 88, 12, 0.15);
-  --accent-gradient: linear-gradient(135deg, #dc2626, #ea580c);
+  --accent: #22c55e;
+  --accent-hover: #4ade80;
+  --accent-light: rgba(34, 197, 94, 0.15);
+  --accent-gradient: linear-gradient(135deg, #dc2626, #22c55e);
 
   /* Status */
   --success: #22c55e;
@@ -86,7 +86,7 @@
   --text-secondary: #52525b;
   --text-muted: #a1a1aa;
 
-  --accent-light: rgba(234, 88, 12, 0.08);
+  --accent-light: rgba(34, 197, 94, 0.08);
 
   --success-bg: rgba(34, 197, 94, 0.08);
   --warning-bg: rgba(234, 179, 8, 0.08);

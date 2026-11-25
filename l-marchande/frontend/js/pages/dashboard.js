@@ -41,7 +41,7 @@ async function renderAdvertiserDashboard(app) {
   // Recent orders list — compact, click → /orders page details
   const recentHtml = recentOrders.length ? recentOrders.map(o => {
     const pct = o.total_count > 0 ? Math.round((o.completed_count || 0) / o.total_count * 100) : 0;
-    const color = (typeof PLATFORM_COLORS !== 'undefined' && PLATFORM_COLORS[o.platform]) || '#ea580c';
+    const color = (typeof PLATFORM_COLORS !== 'undefined' && PLATFORM_COLORS[o.platform]) || '#22c55e';
     const icon = (typeof PLATFORM_ICONS !== 'undefined' && PLATFORM_ICONS[o.platform])
       || '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg>';
     return `
@@ -110,14 +110,14 @@ function renderAdvertiserStyles() {
       /* Layout — center content on huge screens, breathing room on narrow */
       #advDashRoot{max-width:1200px;margin:0 auto;width:100%}
 
-      .advd-hero{background:linear-gradient(135deg,rgba(234,88,12,0.06),rgba(249,115,22,0.03));border:1px solid rgba(234,88,12,0.18);border-radius:14px;padding:18px 22px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+      .advd-hero{background:linear-gradient(135deg,rgba(34,197,94,0.06),rgba(74,222,128,0.03));border:1px solid rgba(34,197,94,0.18);border-radius:14px;padding:18px 22px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
       .advd-hero-greeting{font-size:18px;font-weight:700;color:var(--text-primary);line-height:1.25}
-      .advd-hero-greeting .accent{color:#ea580c}
+      .advd-hero-greeting .accent{color:#22c55e}
       .advd-hero-meta{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:4px}
       .advd-hero-balance{font-size:13px;color:var(--text-secondary,#6b7280);font-variant-numeric:tabular-nums}
       .advd-hero-balance strong{color:var(--text-primary);font-weight:700;font-size:14px}
-      .advd-hero-cta{padding:10px 18px;border-radius:10px;background:linear-gradient(135deg,#dc2626,#ea580c,#f97316);color:#fff;font-weight:700;font-size:13.5px;text-decoration:none;border:0;cursor:pointer;box-shadow:0 4px 12px rgba(234,88,12,0.25);transition:transform .12s, box-shadow .15s;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
-      .advd-hero-cta:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(234,88,12,0.35)}
+      .advd-hero-cta{padding:10px 18px;border-radius:10px;background:linear-gradient(135deg,#16a34a,#22c55e,#4ade80);color:#fff;font-weight:700;font-size:13.5px;text-decoration:none;border:0;cursor:pointer;box-shadow:0 4px 12px rgba(34,197,94,0.25);transition:transform .12s, box-shadow .15s;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+      .advd-hero-cta:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(34,197,94,0.35)}
 
       /* KPI grid — responsive: 1 col on phones, 2 on small tablets, 4 on >=720 */
       .advd-kpis{display:grid;grid-template-columns:1fr;gap:10px;margin-bottom:16px}
@@ -127,8 +127,8 @@ function renderAdvertiserStyles() {
       .advd-kpi-label{font-size:10.5px;text-transform:uppercase;letter-spacing:0.04em;color:var(--text-secondary,#6b7280);font-weight:700;line-height:1.2}
       .advd-kpi-value{font-size:20px;font-weight:800;font-variant-numeric:tabular-nums;margin-top:4px;line-height:1.1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
       .advd-kpi-sub{font-size:10.5px;color:var(--text-secondary,#9ca3af);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-      .advd-kpi.spend{background:linear-gradient(135deg,rgba(234,88,12,0.06),rgba(249,115,22,0.03));border-color:rgba(234,88,12,0.18)}
-      .advd-kpi.spend .advd-kpi-value{color:#ea580c}
+      .advd-kpi.spend{background:linear-gradient(135deg,rgba(34,197,94,0.06),rgba(74,222,128,0.03));border-color:rgba(34,197,94,0.18)}
+      .advd-kpi.spend .advd-kpi-value{color:#22c55e}
       .advd-kpi.lifetime{background:linear-gradient(135deg,rgba(99,102,241,0.05),rgba(139,92,246,0.02));border-color:rgba(99,102,241,0.18)}
       .advd-kpi.lifetime .advd-kpi-value{color:#6366f1}
 
@@ -136,21 +136,21 @@ function renderAdvertiserStyles() {
       .advd-chart-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;gap:10px;flex-wrap:wrap}
       .advd-chart-head h3{margin:0;font-size:13px;font-weight:700;color:var(--text-primary)}
       .advd-chart-head .total{font-size:12.5px;color:var(--text-secondary,#6b7280)}
-      .advd-chart-head .total strong{color:#ea580c;font-weight:700}
+      .advd-chart-head .total strong{color:#22c55e;font-weight:700}
       .advd-chart-bars{display:flex;align-items:flex-end;gap:3px;height:60px;justify-content:space-between}
-      .advd-bar{flex:1;background:linear-gradient(180deg,#ea580c,#f97316);border-radius:3px 3px 0 0;min-height:2px;cursor:default;transition:opacity .12s}
+      .advd-bar{flex:1;background:linear-gradient(180deg,#22c55e,#4ade80);border-radius:3px 3px 0 0;min-height:2px;cursor:default;transition:opacity .12s}
       .advd-bar:hover{opacity:0.8}
 
       .advd-section-head{display:flex;justify-content:space-between;align-items:center;margin:18px 0 10px;gap:10px}
       .advd-section-head h3{margin:0;font-size:14px;font-weight:700}
-      .advd-section-head a{font-size:12px;color:#ea580c;text-decoration:none;font-weight:600;cursor:pointer}
+      .advd-section-head a{font-size:12px;color:#22c55e;text-decoration:none;font-weight:600;cursor:pointer}
       .advd-section-head a:hover{text-decoration:underline}
 
       .advd-recent{background:var(--card-bg,#fff);border:1px solid var(--border);border-radius:12px;overflow:hidden}
       .advd-recent-row{display:flex;align-items:center;gap:12px;padding:12px 14px;border-top:1px solid var(--border);cursor:pointer;transition:background .12s}
       .advd-recent-row:first-child{border-top:0}
-      .advd-recent-row:hover{background:var(--bg-hover,rgba(234,88,12,0.04))}
-      .advd-recent-row:focus{outline:2px solid rgba(234,88,12,0.4);outline-offset:-2px}
+      .advd-recent-row:hover{background:var(--bg-hover,rgba(34,197,94,0.04))}
+      .advd-recent-row:focus{outline:2px solid rgba(34,197,94,0.4);outline-offset:-2px}
       .advd-recent-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
       .advd-recent-icon svg{width:18px;height:18px}
       .advd-recent-info{flex:1;min-width:0}
@@ -159,7 +159,7 @@ function renderAdvertiserStyles() {
       .advd-recent-meta{display:flex;align-items:center;gap:10px;font-size:12px;flex-shrink:0}
       .advd-recent-progress{display:flex;align-items:center;gap:6px;font-variant-numeric:tabular-nums;color:var(--text-secondary,#6b7280)}
       .advd-mini-bar{display:inline-block;width:60px;height:4px;background:var(--bg-secondary,#f3f4f6);border-radius:99px;overflow:hidden}
-      .advd-mini-bar-fill{height:100%;background:linear-gradient(90deg,#ea580c,#f97316)}
+      .advd-mini-bar-fill{height:100%;background:linear-gradient(90deg,#22c55e,#4ade80)}
       .advd-recent-status{padding:3px 10px;border-radius:99px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em}
       .advd-status-in_progress, .advd-status-active{background:rgba(34,197,94,0.10);color:#16a34a}
       .advd-status-completed{background:rgba(99,102,241,0.10);color:#6366f1}
@@ -177,7 +177,7 @@ function renderAdvertiserStyles() {
       .advd-top-row{display:flex;justify-content:space-between;align-items:center;font-size:13px;padding:6px 0;gap:12px}
       .advd-top-row + .advd-top-row{border-top:1px solid var(--border)}
       .advd-top-name{color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-      .advd-top-val{color:#ea580c;font-weight:700;font-variant-numeric:tabular-nums;flex-shrink:0}
+      .advd-top-val{color:#22c55e;font-weight:700;font-variant-numeric:tabular-nums;flex-shrink:0}
 
       /* Empty state — info-rich */
       .advd-empty-wrap{display:flex;flex-direction:column;gap:18px}
@@ -186,7 +186,7 @@ function renderAdvertiserStyles() {
       .advd-how-steps{display:grid;grid-template-columns:1fr;gap:14px}
       @media (min-width:640px){.advd-how-steps{grid-template-columns:repeat(3,1fr)}}
       .advd-how-step{display:flex;align-items:flex-start;gap:12px}
-      .advd-how-num{width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,rgba(234,88,12,0.10),rgba(249,115,22,0.05));color:#ea580c;font-weight:800;font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0;border:1px solid rgba(234,88,12,0.18)}
+      .advd-how-num{width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,rgba(34,197,94,0.10),rgba(74,222,128,0.05));color:#22c55e;font-weight:800;font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0;border:1px solid rgba(34,197,94,0.18)}
       .advd-how-step-text{min-width:0;flex:1}
       .advd-how-step-title{font-size:13px;font-weight:700;color:var(--text-primary);line-height:1.3}
       .advd-how-step-desc{font-size:12px;color:var(--text-secondary,#6b7280);margin-top:3px;line-height:1.4}
@@ -195,21 +195,21 @@ function renderAdvertiserStyles() {
       @media (min-width:520px){.advd-feat-grid{grid-template-columns:1fr 1fr}}
       @media (min-width:840px){.advd-feat-grid{grid-template-columns:repeat(3,1fr)}}
       .advd-feat-card{display:flex;align-items:center;gap:12px;background:var(--card-bg,#fff);border:1px solid var(--border);border-radius:12px;padding:12px 14px;cursor:pointer;text-decoration:none;color:inherit;transition:border-color .12s, transform .12s, box-shadow .12s}
-      .advd-feat-card:hover{border-color:rgba(234,88,12,0.45);transform:translateY(-1px);box-shadow:0 4px 14px rgba(234,88,12,0.10)}
+      .advd-feat-card:hover{border-color:rgba(34,197,94,0.45);transform:translateY(-1px);box-shadow:0 4px 14px rgba(34,197,94,0.10)}
       .advd-feat-icon{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
       .advd-feat-icon svg{width:20px;height:20px}
       .advd-feat-info{flex:1;min-width:0}
       .advd-feat-label{font-size:13px;font-weight:700;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.25}
       .advd-feat-meta{font-size:11px;color:var(--text-secondary,#6b7280);margin-top:3px;font-variant-numeric:tabular-nums}
-      .advd-feat-meta .price{color:#ea580c;font-weight:700}
+      .advd-feat-meta .price{color:#22c55e;font-weight:700}
 
       .advd-balance-hint{display:flex;align-items:center;justify-content:space-between;gap:12px;background:linear-gradient(135deg,rgba(234,179,8,0.08),rgba(245,158,11,0.04));border:1px solid rgba(234,179,8,0.25);border-radius:10px;padding:12px 14px;font-size:12.5px;color:#92400e}
       .advd-balance-hint strong{color:#78350f}
-      .advd-balance-hint .advd-hint-cta{padding:6px 14px;border-radius:7px;border:0;background:linear-gradient(135deg,#f59e0b,#ea580c);color:#fff;font-weight:700;font-size:12px;cursor:pointer;text-decoration:none;white-space:nowrap}
+      .advd-balance-hint .advd-hint-cta{padding:6px 14px;border-radius:7px;border:0;background:linear-gradient(135deg,#f59e0b,#22c55e);color:#fff;font-weight:700;font-size:12px;cursor:pointer;text-decoration:none;white-space:nowrap}
 
       .advd-actions-row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:8px}
       .advd-secondary{padding:9px 16px;border-radius:9px;background:transparent;border:1px solid var(--border);color:var(--text-primary);font-weight:600;font-size:13px;cursor:pointer;text-decoration:none}
-      .advd-secondary:hover{border-color:#ea580c;color:#ea580c;background:rgba(234,88,12,0.04)}
+      .advd-secondary:hover{border-color:#22c55e;color:#22c55e;background:rgba(34,197,94,0.04)}
 
       /* Loading shimmer for featured grid while catalog loads */
       .advd-feat-skeleton{background:var(--bg-secondary,#f3f4f6);border-radius:12px;height:64px;animation:advdShimmer 1.4s ease-in-out infinite}
@@ -371,7 +371,7 @@ async function _advdHydrateFeatured() {
     const fmt = (v) => v == null ? '$0' : Math.abs(v) < 0.01 ? '$' + v.toFixed(4) : '$' + v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     const featured = r.items.slice(0, 6);
     grid.innerHTML = featured.map(it => {
-      const color = (typeof PLATFORM_COLORS !== 'undefined' && PLATFORM_COLORS[it.platform]) || '#ea580c';
+      const color = (typeof PLATFORM_COLORS !== 'undefined' && PLATFORM_COLORS[it.platform]) || '#22c55e';
       const icon = (typeof PLATFORM_ICONS !== 'undefined' && PLATFORM_ICONS[it.platform]) || '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg>';
       return `
         <a class="advd-feat-card" onclick="Router.navigate('/create-order')">
@@ -597,7 +597,7 @@ Router.register('dashboard', async (app) => {
         </div>
         <div class="d6-news">
           ${newsItems.map((n, idx) => {
-            const typeColor = n.type === 'update' ? '#10b981' : n.type === 'warning' ? '#f59e0b' : n.type === 'promo' ? '#ea580c' : '#60a5fa';
+            const typeColor = n.type === 'update' ? '#10b981' : n.type === 'warning' ? '#f59e0b' : n.type === 'promo' ? '#22c55e' : '#60a5fa';
             const ago = _timeAgo(n.created_at);
             const userReaction = n.user_reaction || null;
             const likes = n.likes || 0;

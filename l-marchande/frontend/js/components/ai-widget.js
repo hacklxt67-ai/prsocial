@@ -111,11 +111,11 @@
     style.textContent = `
       #ai-help-widget { position:fixed; bottom:20px; right:20px; z-index:9999; font-family:inherit; }
       #ai-help-btn {
-        width:52px; height:52px; border-radius:50%; background:linear-gradient(135deg,#dc2626,#ea580c);
+        width:52px; height:52px; border-radius:50%; background:linear-gradient(135deg,#dc2626,#22c55e);
         color:#fff; display:flex; align-items:center; justify-content:center; cursor:pointer;
-        box-shadow:0 4px 16px rgba(234,88,12,0.4); transition:transform 0.2s,box-shadow 0.2s;
+        box-shadow:0 4px 16px rgba(34,197,94,0.4); transition:transform 0.2s,box-shadow 0.2s;
       }
-      #ai-help-btn:hover { transform:scale(1.08); box-shadow:0 6px 20px rgba(234,88,12,0.5); }
+      #ai-help-btn:hover { transform:scale(1.08); box-shadow:0 6px 20px rgba(34,197,94,0.5); }
       #ai-help-chat {
         position:absolute; bottom:64px; right:0; width:340px; max-height:480px;
         background:#18181b; border:1px solid #2a2a2e;
@@ -125,7 +125,7 @@
       #ai-help-header {
         display:flex; align-items:center; justify-content:space-between;
         padding:12px 16px; border-bottom:1px solid #2a2a2e;
-        background:linear-gradient(135deg,#dc2626,#ea580c); color:#fff;
+        background:linear-gradient(135deg,#dc2626,#22c55e); color:#fff;
       }
       #ai-help-close {
         background:none; border:none; color:#fff; font-size:22px; cursor:pointer;
@@ -139,7 +139,7 @@
       }
       .ai-msg { max-width:85%; padding:10px 14px; border-radius:14px; font-size:13px; line-height:1.5; word-wrap:break-word; }
       .ai-msg-bot { align-self:flex-start; background:#27272a; color:#e4e4e7; border-bottom-left-radius:4px; }
-      .ai-msg-user { align-self:flex-end; background:linear-gradient(135deg,#dc2626,#ea580c); color:#fff; border-bottom-right-radius:4px; }
+      .ai-msg-user { align-self:flex-end; background:linear-gradient(135deg,#dc2626,#22c55e); color:#fff; border-bottom-right-radius:4px; }
       .ai-msg-typing { align-self:flex-start; background:#27272a; color:#a1a1aa; font-style:italic; border-bottom-left-radius:4px; }
       #ai-help-footer { border-top:1px solid #2a2a2e; padding:10px 12px; background:#18181b; }
       #ai-help-input-row { display:flex; gap:8px; }
@@ -147,10 +147,10 @@
         flex:1; padding:8px 12px; border:1px solid #3f3f46; border-radius:20px;
         font-size:13px; outline:none; background:#09090b; color:#e4e4e7;
       }
-      #ai-help-input:focus { border-color:#ea580c; }
+      #ai-help-input:focus { border-color:#22c55e; }
       #ai-help-send {
         padding:8px 16px; border:none; border-radius:20px;
-        background:linear-gradient(135deg,#dc2626,#ea580c); color:#fff;
+        background:linear-gradient(135deg,#dc2626,#22c55e); color:#fff;
         font-size:13px; font-weight:600; cursor:pointer; white-space:nowrap;
         transition:opacity 0.15s;
       }
@@ -160,7 +160,7 @@
         display:flex; align-items:center; justify-content:space-between; margin-top:8px; padding:0 4px;
       }
       #ai-help-ticket {
-        font-size:12px; color:#ea580c; text-decoration:none; font-weight:500;
+        font-size:12px; color:#22c55e; text-decoration:none; font-weight:500;
       }
       #ai-help-ticket:hover { text-decoration:underline; }
       @media (max-width:480px) {

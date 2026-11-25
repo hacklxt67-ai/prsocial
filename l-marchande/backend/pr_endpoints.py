@@ -315,19 +315,65 @@ def my_tasks_summary(user: Dict[str, Any] = Depends(_require_user)):
     c_pend = query_one("SELECT COUNT(*) as c FROM task_executions WHERE worker_id=? AND status='claimed'", (user["id"],))["c"]
     c_ver = query_one("SELECT COUNT(*) as c, COALESCE(SUM(reward_amount),0) as s FROM task_executions WHERE worker_id=? AND status='verified'", (user["id"],))
     c_rej = query_one("SELECT COUNT(*) as c FROM task_executions WHERE worker_id=? AND status='rejected'", (user["id"],))["c"]
+    plat_rows = query_all("""
+        SELECT c.platform, COUNT(*) as count, COALESCE(SUM(te.reward_amount),0) as earned
+        FROM task_executions te
+        JOIN campaigns c ON te.campaign_id = c.id
+        WHERE te.worker_id = ? AND te.status = 'verified'
+        GROUP BY c.platform
+    """, (user["id"],))
+    earned_tot = round(c_ver["s"], 4)
     return {
         "ok": True,
+        "balance": user["balance"],
+        "earned_total": earned_tot,
+        "paid_tasks_total": c_ver["c"],
+        "periods": {
+            "month": {"earned": earned_tot},
+            "today": {"earned": earned_tot}
+        },
+        "statuses": {
+            "approved": c_ver["c"],
+            "pending_review": c_pend,
+            "in_progress": c_pend,
+            "rejected": c_rej
+        },
+        "scopes": {
+            "manual": {"count": c_ver["c"], "earned": earned_tot},
+            "app": {"count": 0, "earned": 0},
+            "premium": {"count": 0, "earned": 0}
+        },
+        "platforms": plat_rows,
         "pending": c_pend,
         "in_progress": c_pend,
         "completed": c_ver["c"],
         "verified": c_ver["c"],
         "rejected": c_rej,
-        "total_earned": round(c_ver["s"], 4)
+        "total_earned": earned_tot
     }
 
 @router.get("/api/tasks/my/rates")
 def my_tasks_rates(user: Dict[str, Any] = Depends(_require_user)):
-    return {"ok": True, "approval_rate": 100.0, "trust_score": user.get("trust_score", 100)}
+    return {
+        "ok": True,
+        "approval_rate": 100.0,
+        "trust_score": user.get("trust_score", 100),
+        "manual": [
+            {"label": "Instagram Follow", "platform": "instagram", "reward": 0.008},
+            {"label": "Instagram Like", "platform": "instagram", "reward": 0.005},
+            {"label": "Telegram Join", "platform": "telegram", "reward": 0.0075},
+            {"label": "YouTube Subscribe", "platform": "youtube", "reward": 0.012},
+            {"label": "TikTok Follow", "platform": "tiktok", "reward": 0.006},
+            {"label": "Twitter/X Retweet", "platform": "twitter", "reward": 0.007}
+        ],
+        "premium": [],
+        "app": {
+            "view": {"per_1000": 0.40, "per_action": 0.0004},
+            "react": {"per_1000": 0.60, "per_action": 0.0006},
+            "comment": {"per_1000": 1.20, "per_action": 0.0012},
+            "join": {"per_1000": 2.50, "per_action": 0.0025}
+        }
+    }
 
 @router.get("/api/tasks/leaderboard")
 def tasks_leaderboard():

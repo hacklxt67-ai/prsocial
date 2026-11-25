@@ -451,7 +451,7 @@ Router.register('rules', (app) => {
       <div class="legal-tabs">${legalPage('/rules')}</div>
 
       <div class="legal-header">
-        <div class="legal-icon" style="background:rgba(234,88,12,0.12);color:var(--accent)">
+        <div class="legal-icon" style="background:rgba(34,197,94,0.12);color:var(--accent)">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
         </div>
         <div>

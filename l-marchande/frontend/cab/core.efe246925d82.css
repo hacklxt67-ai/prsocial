@@ -8,7 +8,7 @@
 @font-face{font-family:'Noto Sans Arabic';font-style:normal;font-weight:400 800;font-display:swap;src:url(/cab/font.noto-arabic.69cdf0bf005f.woff2) format('woff2');unicode-range:U+0600-06FF,U+0750-077F,U+0870-0891,U+0897-08E1,U+08E3-08FF,U+200C-200E,U+2010-2011,U+204F,U+2E41,U+FB50-FDFF,U+FE70-FE74,U+FE76-FEFC,U+102E0-102FB,U+10E60-10E7E,U+10EC2-10EC7,U+10EC9-10EEE,U+10EF0-10EFF,U+1EE00-1EE03,U+1EE05-1EE1F,U+1EE21-1EE22,U+1EE24,U+1EE27,U+1EE29-1EE32,U+1EE34-1EE37,U+1EE39,U+1EE3B,U+1EE42,U+1EE47,U+1EE49,U+1EE4B,U+1EE4D-1EE4F,U+1EE51-1EE52,U+1EE54,U+1EE57,U+1EE59,U+1EE5B,U+1EE5D,U+1EE5F,U+1EE61-1EE62,U+1EE64,U+1EE67-1EE6A,U+1EE6C-1EE72,U+1EE74-1EE77,U+1EE79-1EE7C,U+1EE7E,U+1EE80-1EE89,U+1EE8B-1EE9B,U+1EEA1-1EEA3,U+1EEA5-1EEA9,U+1EEAB-1EEBB,U+1EEF0-1EEF1}
 :root{
   color-scheme:light;color-scheme:only light;
-  --ground:#eef0f4;--glow-a:rgba(249,115,22,.16);--glow-b:rgba(99,102,241,.10);
+  --ground:#eef0f4;--glow-a:rgba(74,222,128,.16);--glow-b:rgba(99,102,241,.10);
   --surface:#fff;--surface-2:#f6f7fa;--surface-3:#eceef3;
   --line:rgba(15,23,42,.075);--line-2:rgba(15,23,42,.13);
   --ink:#0e1016;--ink-2:#434957;--ink-3:#687080;
@@ -16,18 +16,18 @@
   --sh-card:0 0 0 1px rgba(15,23,42,.045),0 1px 2px rgba(15,23,42,.06),0 8px 20px -10px rgba(15,23,42,.14),0 30px 50px -34px rgba(15,23,42,.32);
   --sh-lift:0 0 0 1px rgba(15,23,42,.06),0 2px 6px rgba(15,23,42,.07),0 18px 34px -14px rgba(15,23,42,.22),0 44px 70px -40px rgba(15,23,42,.40);
   --sh-tile:0 0 0 1px rgba(15,23,42,.065),0 1px 2px rgba(15,23,42,.05),0 8px 16px -10px rgba(15,23,42,.2);
-  --spot:rgba(249,115,22,.075);
-  --brand:linear-gradient(135deg,#ff8a3d 0%,#f05a1a 48%,#dc2626 100%);--brand-glow:rgba(240,90,26,.5);--brand-ink:#c2410c;
+  --spot:rgba(74,222,128,.075);
+  --brand:linear-gradient(135deg,#ff8a3d 0%,#f05a1a 48%,#dc2626 100%);--brand-glow:rgba(240,90,26,.5);--brand-ink:#16a34a;
   --ok:#16a34a;--ok-ink:#166534;--ok-wash:rgba(22,163,74,.10);
   --warn-ink:#9a5a06;--warn-wash:rgba(245,158,11,.15);
   --bad-ink:#be123c;--bad-wash:rgba(225,29,72,.09);
-  --vio-ink:#6d28d9;--vio-wash:rgba(139,92,246,.11);--org-wash:rgba(249,115,22,.10);
+  --vio-ink:#6d28d9;--vio-wash:rgba(139,92,246,.11);--org-wash:rgba(74,222,128,.10);
   --tip-bg:#0e1016;
   --r:18px;--ease:cubic-bezier(.2,.8,.2,1);--side-w:248px;--tab-h:64px;--px:14px;
 }
 :root[data-theme="dark"]{
   color-scheme:dark;
-  --ground:#07080b;--glow-a:rgba(249,115,22,.14);--glow-b:rgba(99,102,241,.10);
+  --ground:#07080b;--glow-a:rgba(74,222,128,.14);--glow-b:rgba(99,102,241,.10);
   --surface:#101217;--surface-2:#151820;--surface-3:#1d202a;
   --line:rgba(255,255,255,.065);--line-2:rgba(255,255,255,.11);
   --ink:#f4f5f8;--ink-2:#adb3c0;--ink-3:#7f8594;
@@ -35,11 +35,11 @@
   --sh-card:0 0 0 1px rgba(255,255,255,.03),0 1px 2px rgba(0,0,0,.5),0 18px 36px -20px rgba(0,0,0,.9);
   --sh-lift:0 0 0 1px rgba(255,255,255,.06),0 2px 6px rgba(0,0,0,.5),0 28px 52px -22px rgba(0,0,0,.95);
   --sh-tile:0 0 0 1px rgba(255,255,255,.07),0 1px 2px rgba(0,0,0,.5),0 10px 18px -12px rgba(0,0,0,.9);
-  --spot:rgba(249,115,22,.10);--brand-ink:#fb923c;
+  --spot:rgba(74,222,128,.10);--brand-ink:#86efac;
   --ok-ink:#4ade80;--ok-wash:rgba(34,197,94,.13);
   --warn-ink:#fbbf24;--warn-wash:rgba(245,158,11,.15);
   --bad-ink:#fb7185;--bad-wash:rgba(244,63,94,.14);
-  --vio-ink:#c4b5fd;--vio-wash:rgba(139,92,246,.18);--org-wash:rgba(249,115,22,.16);
+  --vio-ink:#c4b5fd;--vio-wash:rgba(139,92,246,.18);--org-wash:rgba(74,222,128,.16);
   --tip-bg:#262a35;
 }
 *,*::before,*::after{box-sizing:border-box}
@@ -126,7 +126,7 @@ html:lang(ja),html:lang(zh){line-break:strict}
 .cnt{margin-inline-start:auto;font-size:11px;font-weight:700;padding:2px 7px;border-radius:999px;font-variant-numeric:tabular-nums;background:var(--surface-3);color:var(--ink-2)}
 .cnt.hot{background:var(--brand);color:#fff;box-shadow:0 4px 10px -4px var(--brand-glow)}
 .cnt.vio{background:var(--vio-wash);color:var(--vio-ink)}
-.item.on .cnt{background:#fff;color:#9a3412;box-shadow:none}
+.item.on .cnt{background:#fff;color:#15803d;box-shadow:none}
 .cnt svg{display:inline-block;width:10px;height:10px;margin-inline-end:3px;vertical-align:-1px;opacity:1}
 .item .cnt svg,.mi .cnt svg{width:10px;height:10px;opacity:1;color:inherit}
 .item .ext{margin-inline-start:auto;opacity:.5}

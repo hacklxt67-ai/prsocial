@@ -288,7 +288,7 @@ Router.register('landing', (app) => {
   const feed = document.getElementById('lpFeed');
   if (feed) {
     const names = ['Alex','Maria','John','Anna','Mike','Sofia','David','Elena','Carlos','Yuki','Ahmed','Lisa','Omar','Nina','Leo'];
-    const avatarColors = ['#dc2626','#ea580c','#d97706','#65a30d','#0891b2','#7c3aed','#db2777','#2563eb','#059669','#e11d48'];
+    const avatarColors = ['#dc2626','#22c55e','#d97706','#65a30d','#0891b2','#7c3aed','#db2777','#2563eb','#059669','#e11d48'];
     const actions = [
       ['$0.005', 'Instagram Follow'],
       ['$0.01', 'YouTube Subscribe'],

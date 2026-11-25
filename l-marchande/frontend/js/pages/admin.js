@@ -993,7 +993,7 @@ document.addEventListener('click', () => {
     }
     .adm-msg-admin {
       background: var(--accent-light);
-      border: 1px solid rgba(234,88,12,0.3);
+      border: 1px solid rgba(34,197,94,0.3);
       align-self: flex-end;
       color: var(--text-primary);
     }
@@ -1168,7 +1168,7 @@ document.addEventListener('click', () => {
     .adm-os-error { background: rgba(239,68,68,0.15); color: #dc2626; font-size: var(--font-xs); font-weight: 700; padding: 2px 8px; border-radius: 6px; text-transform: uppercase; }
 
     /* Source badges */
-    .adm-src-admin { background: rgba(234,88,12,0.15); color: var(--accent); font-size: 9px; font-weight: 700; padding: 1px 6px; border-radius: 4px; text-transform: uppercase; margin-left: 4px; }
+    .adm-src-admin { background: rgba(34,197,94,0.15); color: var(--accent); font-size: 9px; font-weight: 700; padding: 1px 6px; border-radius: 4px; text-transform: uppercase; margin-left: 4px; }
     .adm-src-api { background: rgba(168,85,247,0.15); color: #a855f7; font-size: 9px; font-weight: 700; padding: 1px 6px; border-radius: 4px; text-transform: uppercase; margin-left: 4px; }
 
     /* Order progress bar */
@@ -1352,7 +1352,7 @@ document.addEventListener('click', () => {
     .adm-set-head { margin: 0 0 8px; }
     .adm-set-head h2 { margin: 0; font-size: 15px; font-weight: 700; }
     .adm-set-head p { margin: 4px 0 0; font-size: var(--font-sm); color: var(--text-muted); line-height: 1.45; }
-    .adm-set-link { color: var(--primary, #ea580c); text-decoration: none; font-weight: 600; }
+    .adm-set-link { color: var(--primary, #22c55e); text-decoration: none; font-weight: 600; }
     .adm-set-link:hover { text-decoration: underline; }
     .adm-set-sub { margin: 14px 0 6px; font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--text-muted); }
     .adm-set-num { max-width: 120px; text-align: end; font-variant-numeric: tabular-nums; }
@@ -1454,7 +1454,7 @@ Router.register('admin/login', (app) => {
         <h1>PR<span style="color:var(--accent)">.</span>SOCIAL</h1>
         <div style="font-size:0.75rem;color:var(--accent);font-weight:700;letter-spacing:0.1em;margin-top:4px">ADMIN PANEL</div>
       </div>
-      <div class="auth-card" style="border:1px solid rgba(234,88,12,0.15)">
+      <div class="auth-card" style="border:1px solid rgba(34,197,94,0.15)">
         <h2 style="display:flex;align-items:center;gap:8px">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
           Admin Login
@@ -1714,7 +1714,7 @@ Router.register('admin-tickets', async (app) => {
     // Status pill — compact, uppercase, colored dot prefix.
     const statusPill = (st) => {
       const cfg = {
-        open:     { color: '#ea580c', label: 'Pending' },
+        open:     { color: '#22c55e', label: 'Pending' },
         answered: { color: '#3b82f6', label: 'Answered' },
         closed:   { color: '#6b7280', label: 'Closed' },
       }[st] || { color: '#6b7280', label: st };
@@ -1739,8 +1739,8 @@ Router.register('admin-tickets', async (app) => {
     const sortIcon = (col) => {
       if (tSortBy !== col) return '<span style="opacity:0.45;font-size:11px;margin-left:5px;color:var(--text-muted)">↕</span>';
       return tSortDir === 'asc'
-        ? '<span style="font-size:11px;margin-left:5px;color:var(--accent,#ea580c);font-weight:700">↑</span>'
-        : '<span style="font-size:11px;margin-left:5px;color:var(--accent,#ea580c);font-weight:700">↓</span>';
+        ? '<span style="font-size:11px;margin-left:5px;color:var(--accent,#22c55e);font-weight:700">↑</span>'
+        : '<span style="font-size:11px;margin-left:5px;color:var(--accent,#22c55e);font-weight:700">↓</span>';
     };
 
     // Reliable div-grid layout: 7 columns, no <table> reset conflicts.
@@ -1766,7 +1766,7 @@ Router.register('admin-tickets', async (app) => {
         ${catChip('api_key', 'API key', '#0d9488')}
         <span style="display:inline-block;width:1px;height:18px;background:var(--border);margin:0 4px"></span>
         ${catChip('warning_appeal', 'Warning appeals', '#dc2626')}
-        ${catChip('restriction_appeal', 'Restriction appeals', '#f97316')}
+        ${catChip('restriction_appeal', 'Restriction appeals', '#4ade80')}
       </div>
 
       ${!tickets.length ? '<div class="adm-empty" style="padding:60px 20px;text-align:center;color:var(--text-muted);font-size:13px;border:1px solid var(--border);border-radius:8px">No tickets found</div>' : `
@@ -2079,7 +2079,7 @@ Router.register('admin-tickets', async (app) => {
     try {
       const data = await API.request('POST', '/admin/tickets/0/translate', { text, targetLang: 'ru' });
       const div = document.createElement('div');
-      div.style.cssText = 'margin-top:6px;padding:6px 10px;background:rgba(234,88,12,0.08);border-radius:6px;font-size:var(--font-sm);color:var(--text-primary);border-left:3px solid var(--accent)';
+      div.style.cssText = 'margin-top:6px;padding:6px 10px;background:rgba(34,197,94,0.08);border-radius:6px;font-size:var(--font-sm);color:var(--text-primary);border-left:3px solid var(--accent)';
       div.textContent = '🇷🇺 ' + data.translated;
       btn.parentElement.insertBefore(div, btn.nextSibling);
       btn.textContent = '✓ Translated';

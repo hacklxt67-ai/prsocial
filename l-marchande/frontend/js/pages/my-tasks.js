@@ -164,7 +164,7 @@ Router.register('my-tasks', async (app) => {
       <div class="mt-platforms" id="mtPlatforms"></div>
       <div class="mt-split">
         ${[
-          ['#ea580c', s.scopes.manual.earned, t('mt_tab_manual') || 'Manual'],
+          ['#22c55e', s.scopes.manual.earned, t('mt_tab_manual') || 'Manual'],
           ['#3b82f6', s.scopes.app.earned, t('mt_tab_app') || 'Android'],
           ['#a855f7', s.scopes.premium.earned, t('mt_tab_premium') || 'Premium'],
           ['#10b981', other > 0.0001 ? other : 0, t('mt_other_earnings') || 'Bonuses'],
@@ -187,7 +187,7 @@ Router.register('my-tasks', async (app) => {
       <div class="mt-plat-head">${t('mt_by_network') || 'By network, all time'}</div>
       <div class="mt-plat-grid">
         ${list.map((p) => {
-          const color = (typeof PLATFORM_COLORS !== 'undefined' && PLATFORM_COLORS[p.platform]) || '#ea580c';
+          const color = (typeof PLATFORM_COLORS !== 'undefined' && PLATFORM_COLORS[p.platform]) || '#22c55e';
           const icon = (typeof PLATFORM_ICONS !== 'undefined' && PLATFORM_ICONS[p.platform]) || '';
           const pct = Math.max(4, Math.round((p.earned / max) * 100));
           return `
@@ -219,7 +219,7 @@ Router.register('my-tasks', async (app) => {
   // ------------------------------------------------------------ список дел --
   function taskRow(x) {
     const icon = (typeof PLATFORM_ICONS !== 'undefined' && PLATFORM_ICONS[x.platform]) || '';
-    const color = (typeof PLATFORM_COLORS !== 'undefined' && PLATFORM_COLORS[x.platform]) || '#ea580c';
+    const color = (typeof PLATFORM_COLORS !== 'undefined' && PLATFORM_COLORS[x.platform]) || '#22c55e';
     // В базе имя лежит и с собачкой, и без неё — приводим к одному виду,
     // иначе на экране получается '@@name'.
     const uname = (x.target_username || '').replace(/^@+/, '');

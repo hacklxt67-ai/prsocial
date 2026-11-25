@@ -239,16 +239,68 @@ def cancel_task(execution_id: int, current_user: Dict[str, Any] = Depends(get_cu
     return {"status": "success", "message": msg}
 
 @app.get("/api/tasks/my/list")
-def list_my_tasks(status: str = "in_progress", current_user: Dict[str, Any] = Depends(get_current_user)):
-    db_status = "claimed" if status == "in_progress" else status
-    tasks = query_all("""
+def list_my_tasks(
+    status: str = "",
+    scope: str = "manual",
+    platform: str = "",
+    page: int = 1,
+    before: Optional[int] = None,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    if scope in ("app", "premium"):
+        return {
+            "ok": True,
+            "kind": "daily" if scope == "app" else "tasks",
+            "items": [],
+            "tasks": [],
+            "has_more": False,
+            "next": None
+        }
+
+    status_map = {"in_progress": "claimed", "approved": "verified", "pending_review": "submitted"}
+    where = ["te.worker_id = ?"]
+    params: List[Any] = [current_user["id"]]
+    if status:
+        where.append("te.status = ?")
+        params.append(status_map.get(status, status))
+    if platform:
+        where.append("LOWER(c.platform) = LOWER(?)")
+        params.append(platform)
+    if before:
+        where.append("te.id < ?")
+        params.append(before)
+
+    sql = f"""
         SELECT te.*, c.title, c.target_url, c.platform, c.action_type, c.description
         FROM task_executions te
         JOIN campaigns c ON te.campaign_id = c.id
-        WHERE te.worker_id = ? AND te.status = ?
-        ORDER BY te.id DESC
-    """, (current_user["id"], db_status))
-    return {"tasks": tasks}
+        WHERE {' AND '.join(where)}
+        ORDER BY te.id DESC LIMIT 25
+    """
+    rows = query_all(sql, tuple(params))
+    rev_status = {"verified": "approved", "claimed": "in_progress", "submitted": "pending_review"}
+    items = []
+    for r in rows:
+        st = rev_status.get(r["status"], r["status"])
+        items.append({
+            "id": r["id"],
+            "order_id": r["campaign_id"],
+            "platform": r["platform"],
+            "action": r["action_type"],
+            "label": r["title"],
+            "target_url": r["target_url"],
+            "status": st,
+            "started_at": r["claimed_at"],
+            "paid": r["reward_amount"] if st == "approved" else None,
+        })
+    return {
+        "ok": True,
+        "kind": "tasks",
+        "items": items,
+        "tasks": rows,
+        "has_more": False,
+        "next": items[-1]["id"] if items else None
+    }
 
 # ==============================================================================
 # 4. CAMPAIGNS (ADVERTISERS)

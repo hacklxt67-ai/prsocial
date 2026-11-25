@@ -4,7 +4,7 @@ Router.register('login', (app) => {
     <div class="auth-container">
       <div class="auth-logo">
         <style>@media (max-width:350px){.auth-beta{left:auto!important;right:0;top:-18px!important}}</style>
-        <h1 style="position:relative;display:inline-block">PR<span style="color:var(--accent)">.</span>SOCIAL<span class="auth-beta" style="position:absolute;top:-2px;left:calc(100% + 4px);white-space:nowrap;font-size:11px;font-weight:600;color:var(--accent);background:rgba(234,88,12,0.15);padding:2px 6px;border-radius:4px;letter-spacing:1px">BETA 2.0</span></h1>
+        <h1 style="position:relative;display:inline-block">PR<span style="color:var(--accent)">.</span>SOCIAL<span class="auth-beta" style="position:absolute;top:-2px;left:calc(100% + 4px);white-space:nowrap;font-size:11px;font-weight:600;color:var(--accent);background:rgba(34,197,94,0.15);padding:2px 6px;border-radius:4px;letter-spacing:1px">BETA 2.0</span></h1>
         <p>${t('app_tagline')}</p>
       </div>
       <div class="auth-card">

@@ -79,7 +79,7 @@ Router.register('referrals', async (app) => {
         <!-- Stats row -->
         <div class="ref-stats-row">
           <div class="ref-stat-card">
-            <div class="ref-stat-icon" style="background:rgba(234,88,12,0.12);color:#ea580c">
+            <div class="ref-stat-icon" style="background:rgba(34,197,94,0.12);color:#22c55e">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
             </div>
             <div class="ref-stat-num" id="refStatTotal">${totalAll}</div>

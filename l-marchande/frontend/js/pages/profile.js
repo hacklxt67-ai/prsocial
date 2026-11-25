@@ -298,7 +298,7 @@ async function bioVerifySlot(platform, accountId, username) {
   const platformLabel = platform === 'tiktok' ? 'TikTok' : platform === 'instagram' ? 'Instagram' : platform === 'twitter' ? 'Twitter' : platform === 'youtube' ? 'YouTube' : platform === 'facebook' ? 'Facebook' : platform === 'threads' ? 'Threads' : platform;
   if (statusEl) {
     statusEl.innerHTML = '<div style="display:flex;align-items:center;gap:8px;padding:6px 0">'
-      + '<div class="spinner" style="width:14px;height:14px;border:2px solid var(--surface-2, rgba(255,255,255,0.1));border-top-color:var(--accent, #ea580c);border-radius:50%;animation:spin 0.8s linear infinite"></div>'
+      + '<div class="spinner" style="width:14px;height:14px;border:2px solid var(--surface-2, rgba(255,255,255,0.1));border-top-color:var(--accent, #22c55e);border-radius:50%;animation:spin 0.8s linear infinite"></div>'
       + '<span style="color:var(--text-muted)">Checking your ' + platformLabel + ' bio...</span>'
       + '</div>';
   }
@@ -472,7 +472,7 @@ async function aiVerifyScreenshotSlot(platform, username, input, accountId) {
   const statusEl = document.getElementById('sa-verify-status-' + accountId) || document.getElementById('verify-status-' + platform);
   if (statusEl) {
     statusEl.innerHTML = '<div style="display:flex;align-items:center;gap:8px;padding:6px 0">'
-      + '<div class="spinner" style="width:14px;height:14px;border:2px solid var(--surface-2, rgba(255,255,255,0.1));border-top-color:var(--accent, #ea580c);border-radius:50%;animation:spin 0.8s linear infinite"></div>'
+      + '<div class="spinner" style="width:14px;height:14px;border:2px solid var(--surface-2, rgba(255,255,255,0.1));border-top-color:var(--accent, #22c55e);border-radius:50%;animation:spin 0.8s linear infinite"></div>'
       + '<span style="color:var(--text-muted)">' + (t('profile_verify_analyzing') || 'AI is analyzing your screenshot...') + '</span>'
       + '</div>';
   }
@@ -685,7 +685,7 @@ function openAddAccountModal(platformKey) {
       </div>
       <div style="display:flex;gap:8px;justify-content:flex-end">
         <button style="padding:10px 20px;background:transparent;color:var(--text-muted, #9ca3af);border:1px solid var(--border, #2a3040);border-radius:10px;cursor:pointer;font-size:13px" onclick="document.getElementById('addAccountModal').remove()">${t('common_cancel') || 'Cancel'}</button>
-        <button id="addAccountSubmit" style="padding:10px 24px;background:var(--accent, #ea580c);color:#fff;border:none;border-radius:10px;cursor:pointer;font-size:13px;font-weight:600">${t('profile_verify_start') || 'Get code'}</button>
+        <button id="addAccountSubmit" style="padding:10px 24px;background:var(--accent, #22c55e);color:#fff;border:none;border-radius:10px;cursor:pointer;font-size:13px;font-weight:600">${t('profile_verify_start') || 'Get code'}</button>
       </div>
     </div>`;
   document.body.appendChild(modal);
@@ -764,7 +764,7 @@ function renderSocialCard(p, account) {
           ${p.icon.startsWith("__IMG__") ? `<img src="${p.icon.slice(7)}" width="24" height="24">` : `<svg width="24" height="24" viewBox="0 0 24 24" fill="${p.color}"><path d="${p.icon}"/></svg>`}
         </div>
         <div class="social-card-info">
-          <div class="social-card-name">${p.name} <span style="font-size:10px;color:#ea580c;font-weight:600;margin-left:4px">SOON</span></div>
+          <div class="social-card-name">${p.name} <span style="font-size:10px;color:#22c55e;font-weight:600;margin-left:4px">SOON</span></div>
           <div class="social-card-status muted">Coming soon</div>
         </div>
       </div>
@@ -2355,14 +2355,14 @@ Router.register('profile', async (app) => {
         </details>
 
         <!-- Warnings -->
-        <div class="card" style="margin-bottom:16px;border:1px solid ${warningsData.count >= 32 ? 'rgba(239,68,68,0.4)' : warningsData.count >= 16 ? 'rgba(249,115,22,0.35)' : warningsData.count > 0 ? 'rgba(245,158,11,0.3)' : 'var(--border)'}">
+        <div class="card" style="margin-bottom:16px;border:1px solid ${warningsData.count >= 32 ? 'rgba(239,68,68,0.4)' : warningsData.count >= 16 ? 'rgba(74,222,128,0.35)' : warningsData.count > 0 ? 'rgba(245,158,11,0.3)' : 'var(--border)'}">
           <div class="card-body" style="padding:14px 18px">
             <div style="display:flex;align-items:center;gap:8px;margin-bottom:${warningsData.count > 0 ? '10' : '0'}px">
               <svg viewBox="0 0 24 24" fill="none" stroke="${warningsData.count > 0 ? '#f59e0b' : '#22c55e'}" stroke-width="2" width="20" height="20">${warningsData.count > 0
                 ? '<path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>'
                 : '<path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/>'
               }</svg>
-              <span style="font-weight:700;font-size:14px;color:${warningsData.count >= 32 ? '#ef4444' : warningsData.count >= 16 ? '#f97316' : warningsData.count > 0 ? '#f59e0b' : '#22c55e'}">${t('profile_warnings_title') || 'Warnings'}: ${warningsData.count}/32</span>
+              <span style="font-weight:700;font-size:14px;color:${warningsData.count >= 32 ? '#ef4444' : warningsData.count >= 16 ? '#4ade80' : warningsData.count > 0 ? '#f59e0b' : '#22c55e'}">${t('profile_warnings_title') || 'Warnings'}: ${warningsData.count}/32</span>
             </div>
             <div style="font-size:12px;color:var(--text-secondary)${warningsData.count > 0 ? ';margin-bottom:10px' : ''}">${warningsData.count > 0 ? (t('profile_warnings_hint') || 'Warnings are admin notes. Repeated violations may lead to account restriction.') : (t('profile_warnings_clean') || 'Your account is in good standing. Keep it up!')}</div>
             ${warningsData.warnings.map(w => {

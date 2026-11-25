@@ -67,7 +67,7 @@ Router.register('tasks', async (app) => {
       <div class="page-content">
         <div class="task-toolbar" id="taskToolbar">
           <div class="platform-chips" id="platformChips">
-            ${Object.keys(PLATFORM_ICONS).filter(p => !PREMIUM_PLATFORMS_TASKS.includes(p)).map((p, i) => `<div class="platform-chip${i === 0 ? ' active' : ''}" data-platform="${p}" style="--pc:${PLATFORM_COLORS[p] || '#ea580c'}">${PLATFORM_ICONS[p]}<span class="chip-count" id="cnt-${p}"></span></div>`).join('')}
+            ${Object.keys(PLATFORM_ICONS).filter(p => !PREMIUM_PLATFORMS_TASKS.includes(p)).map((p, i) => `<div class="platform-chip${i === 0 ? ' active' : ''}" data-platform="${p}" style="--pc:${PLATFORM_COLORS[p] || '#22c55e'}">${PLATFORM_ICONS[p]}<span class="chip-count" id="cnt-${p}"></span></div>`).join('')}
           </div>
           <div class="sort-toggle">
             <button class="sort-btn active" data-sort="reward"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2 11l4 4 4-4"/><path d="M6 15V1"/><path d="M14 5l-2-4-2 4"/><path d="M10 5h4"/><path d="M10 8h3"/><path d="M10 11h2"/></svg></button>
@@ -131,7 +131,7 @@ Router.register('tasks', async (app) => {
     const list = document.getElementById('tasksList');
     const empty = document.getElementById('tasksEmpty');
     empty.style.display = 'none';
-    const color = PLATFORM_COLORS[platform] || '#ea580c';
+    const color = PLATFORM_COLORS[platform] || '#22c55e';
     const icon = PLATFORM_ICONS[platform] || '';
     const platformName = platform.charAt(0).toUpperCase() + platform.slice(1);
     list.innerHTML = `
@@ -371,7 +371,7 @@ function getTaskLabel(task) {
 }
 
 function renderTaskCard(task) {
-  const color = PLATFORM_COLORS[task.platform] || '#ea580c';
+  const color = PLATFORM_COLORS[task.platform] || '#22c55e';
   const icon = PLATFORM_ICONS[task.platform] || '';
   const remaining = task.total_count - task.completed_count;
   const label = getTaskLabel(task);
@@ -399,7 +399,7 @@ async function openTask(taskId) {
 }
 
 function showTaskModal(task, completion) {
-  const color = PLATFORM_COLORS[task.platform] || '#ea580c';
+  const color = PLATFORM_COLORS[task.platform] || '#22c55e';
   const icon = PLATFORM_ICONS[task.platform] || '';
   const remaining = task.total_count - task.completed_count;
   const status = completion?.status || 'none';
@@ -518,7 +518,7 @@ function showTaskModal(task, completion) {
 
 function renderTaskAction(task, completion) {
   const status = completion?.status || 'none';
-  const color = PLATFORM_COLORS[task.platform] || '#ea580c';
+  const color = PLATFORM_COLORS[task.platform] || '#22c55e';
 
   // Reported as broken link — closed for this user, no retry, no start button
   if (status === 'link_dead') {
