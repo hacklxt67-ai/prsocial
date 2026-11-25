@@ -21,8 +21,8 @@ def seed():
         adv_pass = SecurityHelper.hash_password("AdvertPass2026!")
         adv_ref = SecurityHelper.generate_referral_code("LMC")
         adv_id = execute_commit("""
-            INSERT INTO users (email, username, hashed_password, role, balance, referral_code, trust_score)
-            VALUES ('agency@l-marchande.io', 'lux_agency', ?, 'advertiser', 250.0, ?, 98.5)
+            INSERT INTO users (email, username, hashed_password, role, email_verified, balance, referral_code, trust_score)
+            VALUES ('agency@l-marchande.io', 'lux_agency', ?, 'advertiser', 1, 250.0, ?, 98.5)
         """, (adv_pass, adv_ref))
         print("[+] Annonceur créé: lux_agency / AdvertPass2026!")
     else:
@@ -34,8 +34,8 @@ def seed():
         w_pass = SecurityHelper.hash_password("WorkerPass2026!")
         w_ref = SecurityHelper.generate_referral_code("LMW")
         w_id = execute_commit("""
-            INSERT INTO users (email, username, hashed_password, role, balance, referral_code, referred_by, trust_score)
-            VALUES ('worker@l-marchande.io', 'top_worker', ?, 'worker', 12.8450, ?, 1, 99.2)
+            INSERT INTO users (email, username, hashed_password, role, email_verified, balance, referral_code, referred_by, trust_score)
+            VALUES ('worker@l-marchande.io', 'top_worker', ?, 'worker', 1, 12.8450, ?, 1, 99.2)
         """, (w_pass, w_ref))
 
         # Ajouter ses comptes sociaux

@@ -11,6 +11,10 @@ from services.social_verification import (
     clean_username, build_profile_url, generate_verify_code,
     fetch_live_bio, validate_and_save_screenshot
 )
+from services.email_service import (
+    issue_verification_email, verify_email_token,
+    initiate_email_change, confirm_email_change
+)
 
 router = APIRouter()
 
@@ -157,12 +161,35 @@ async def reset_password():
     return {"ok": True}
 
 @router.post("/api/auth/resend-verification")
-async def resend_verification():
-    return {"ok": True}
+async def resend_verification(request: Request, user: Dict[str, Any] = Depends(_require_user)):
+    ok, msg, _ = issue_verification_email(user["id"], user["email"], base_url=str(request.base_url), enforce_cooldown=True)
+    if not ok:
+        status_code = 429 if "patienter" in msg.lower() else 400
+        return JSONResponse({"ok": False, "error": msg}, status_code=status_code)
+    return {"ok": True, "message": msg}
 
 @router.get("/api/auth/verify-email")
 def verify_email(token: str = ""):
-    return {"ok": True, "verified": True}
+    ok, msg = verify_email_token(token)
+    if not ok:
+        return JSONResponse({"ok": False, "verified": False, "error": msg}, status_code=400)
+    return {"ok": True, "verified": True, "message": msg}
+
+@router.post("/api/profile/email")
+async def profile_change_email(request: Request, user: Dict[str, Any] = Depends(_require_user)):
+    body = await request.json()
+    ok, payload = initiate_email_change(user["id"], body.get("new_email", ""), body.get("password", ""))
+    if not ok:
+        return JSONResponse(payload, status_code=400)
+    return payload
+
+@router.post("/api/profile/email/confirm")
+async def profile_confirm_email(request: Request, user: Dict[str, Any] = Depends(_require_user)):
+    body = await request.json()
+    ok, msg = confirm_email_change(user["id"], body.get("code", ""))
+    if not ok:
+        return JSONResponse({"ok": False, "error": msg}, status_code=400)
+    return {"ok": True, "message": msg}
 
 @router.post("/api/auth/verify-2fa")
 async def verify_2fa():

@@ -30,6 +30,13 @@ def init_db():
             username TEXT UNIQUE NOT NULL,
             hashed_password TEXT NOT NULL,
             role TEXT DEFAULT 'worker', -- 'worker', 'advertiser', 'admin'
+            email_verified INTEGER DEFAULT 0,
+            email_verify_token TEXT,
+            email_verify_expires_at TIMESTAMP,
+            email_verify_sent_at TIMESTAMP,
+            pending_email TEXT,
+            email_change_code TEXT,
+            email_change_expires_at TIMESTAMP,
             balance REAL DEFAULT 0.0,
             hold_balance REAL DEFAULT 0.0,
             referral_code TEXT UNIQUE NOT NULL,
@@ -154,6 +161,13 @@ def init_db():
         for col_sql in (
             "ALTER TABLE social_accounts ADD COLUMN is_default INTEGER DEFAULT 0",
             "ALTER TABLE social_accounts ADD COLUMN ai_attempts INTEGER DEFAULT 0",
+            "ALTER TABLE users ADD COLUMN email_verified INTEGER DEFAULT 0",
+            "ALTER TABLE users ADD COLUMN email_verify_token TEXT",
+            "ALTER TABLE users ADD COLUMN email_verify_expires_at TIMESTAMP",
+            "ALTER TABLE users ADD COLUMN email_verify_sent_at TIMESTAMP",
+            "ALTER TABLE users ADD COLUMN pending_email TEXT",
+            "ALTER TABLE users ADD COLUMN email_change_code TEXT",
+            "ALTER TABLE users ADD COLUMN email_change_expires_at TIMESTAMP",
         ):
             try:
                 cur.execute(col_sql)

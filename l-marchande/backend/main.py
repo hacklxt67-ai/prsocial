@@ -16,6 +16,7 @@ from schemas import (
 from services.wallet_service import WalletService
 from services.task_engine import TaskDistributionEngine
 from services.verification_engine import VerificationEngine
+from services.email_service import is_valid_email, issue_verification_email
 from pr_endpoints import router as pr_router
 
 # Initialisation de la base de données
@@ -78,10 +79,12 @@ def get_admin_user(current_user: Dict[str, Any] = Depends(get_current_user)) -> 
 # ==============================================================================
 @app.post("/api/auth/register", response_model=TokenResponse)
 def register(req: UserRegisterRequest, request: Request, response: Response):
+    if not is_valid_email(req.email):
+        raise HTTPException(status_code=400, detail="Format d'adresse e-mail invalide.")
     # Vérifier l'unicité de l'email et du pseudo
-    if query_one("SELECT id FROM users WHERE email = ?", (req.email,)):
+    if query_one("SELECT id FROM users WHERE LOWER(email) = LOWER(?)", (req.email,)):
         raise HTTPException(status_code=400, detail="Cette adresse email est déjà enregistrée.")
-    if query_one("SELECT id FROM users WHERE username = ?", (req.username,)):
+    if query_one("SELECT id FROM users WHERE LOWER(username) = LOWER(?)", (req.username,)):
         raise HTTPException(status_code=400, detail="Ce nom d'utilisateur est déjà utilisé.")
 
     # Parrainage
@@ -97,9 +100,12 @@ def register(req: UserRegisterRequest, request: Request, response: Response):
     new_ref_code = SecurityHelper.generate_referral_code("LM")
 
     user_id = execute_commit("""
-        INSERT INTO users (email, username, hashed_password, role, referral_code, referred_by, last_ip)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-    """, (req.email, req.username, hashed_pwd, req.role or "worker", new_ref_code, referred_by_id, client_ip))
+        INSERT INTO users (email, username, hashed_password, role, email_verified, referral_code, referred_by, last_ip)
+        VALUES (?, ?, ?, ?, 0, ?, ?, ?)
+    """, (req.email.strip().lower(), req.username.strip(), hashed_pwd, req.role or "worker", new_ref_code, referred_by_id, client_ip))
+
+    # Envoyer un vrai e-mail de vérification (token 24h)
+    issue_verification_email(user_id, req.email.strip().lower(), base_url=str(request.base_url), enforce_cooldown=False)
 
     user = query_one("SELECT * FROM users WHERE id = ?", (user_id,))
     token = SecurityHelper.create_jwt({"sub": user_id, "username": user["username"], "role": user["role"]})
