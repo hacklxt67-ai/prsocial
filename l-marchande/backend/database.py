@@ -192,16 +192,7 @@ def execute_commit(query: str, params: tuple = ()) -> int:
         try:
             cur = conn.cursor()
             cur.execute(query, params)
-            for col_sql in (
-            "ALTER TABLE social_accounts ADD COLUMN is_default INTEGER DEFAULT 0",
-            "ALTER TABLE social_accounts ADD COLUMN ai_attempts INTEGER DEFAULT 0",
-        ):
-            try:
-                cur.execute(col_sql)
-            except sqlite3.OperationalError:
-                pass
-
-        conn.commit()
+            conn.commit()
             return cur.lastrowid
         finally:
             conn.close()
